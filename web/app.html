@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProspectFlow OS</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">PF</div><div>ProspectFlow OS<br><small style="color:#7d8798;font-weight:700;font-size:9px">PLAN STARTER</small></div></div>
+    <div class="nav">
+      <button class="navbtn active" data-view="search">⌕ <span>Prospection</span></button>
+      <button class="navbtn" data-view="crm">▦ <span>CRM</span> <span class="tag" id="navCrmCount" style="margin-left:auto">0</span></button>
+      <button class="navbtn" data-view="settings">⚙ <span>Paramètres</span></button>
+    </div>
+    <div class="sidefoot">
+      Un prospect non vérifié par Google Places reste marqué "à vérifier" — jamais reclassé par supposition.
+      <div style="margin-top:10px"><button class="btn btn-white btn-sm" id="logoutBtn" style="width:100%">Se déconnecter</button></div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="top">
+      <div class="crumb" id="crumb">Prospection</div>
+      <div class="row"><span class="tiny" id="userEmail"></span></div>
+    </div>
+
+    <div class="content">
+      <!-- ============ PROSPECTION ============ -->
+      <section class="view active" id="view-search">
+        <div class="hero">
+          <div><h1>Prospection ultra-ciblée</h1><p>Adresse GPS précise → rayon exact → registre officiel → Google Places → filtres d'indépendance. Aucun prospect n'est présenté comme vérifié s'il ne l'est pas réellement.</p></div>
+        </div>
+
+        <div class="card">
+          <div class="row between"><h3 class="sectionTitle" style="margin:0">1. Qui voulez-vous démarcher ?</h3><span class="tag" id="targetCount">0 sélectionnée(s)</span></div>
+          <div class="catGrid" id="catGrid" style="margin-top:10px"></div>
+          <div class="chips" id="selectedCats" style="margin-top:10px"></div>
+        </div>
+
+        <div class="grid g2" style="margin-top:14px">
+          <div class="card">
+            <h3 class="sectionTitle">2. Adresse de départ exacte</h3>
+            <div class="form2">
+              <div class="field span2"><label>N° + rue</label><input id="street" placeholder="Ex. 12 rue de la Gare"></div>
+              <div class="field"><label>Code postal</label><input id="postal" placeholder="59400"></div>
+              <div class="field"><label>Ville</label><input id="city" placeholder="Cambrai"></div>
+              <div class="field span2"><label>Rayon (km)</label>
+                <div class="row"><input id="radius" type="range" min="0.5" max="250" step="0.5" value="20" style="flex:1"><input id="radiusNum" type="number" min="0.5" max="250" step="0.5" value="20" style="width:70px"></div>
+              </div>
+            </div>
+            <div class="row" style="margin-top:10px">
+              <button class="btn btn-dark btn-sm" id="verifyAddress">✓ Valider cette adresse</button>
+              <button class="btn btn-white btn-sm" id="useLocation">⌖ Ma position GPS</button>
+            </div>
+            <div class="hint" id="geoStatus" style="margin-top:10px">Point de départ non validé.</div>
+          </div>
+
+          <div class="card">
+            <h3 class="sectionTitle">3. Qualité des prospects</h3>
+            <div class="field"><label>Besoin digital</label>
+              <select id="webFilter">
+                <option value="all">Tous les statuts web</option>
+                <option value="no_or_weak" selected>Sans site confirmé + site faible</option>
+                <option value="none">Sans site confirmé uniquement</option>
+                <option value="weak">Site à améliorer uniquement</option>
+                <option value="unknown">À vérifier uniquement</option>
+              </select>
+            </div>
+            <div class="filterGrid" style="margin-top:9px">
+              <label class="filterTile"><input type="checkbox" id="operationalOnly" checked><div><b>Écarter fermés</b><span>Fermés définitivement.</span></div></label>
+              <label class="filterTile"><input type="checkbox" id="excludeTempClosed" checked><div><b>Écarter fermés temp.</b><span>Non joignables actuellement.</span></div></label>
+              <label class="filterTile"><input type="checkbox" id="excludeChains" checked><div><b>Écarter chaînes</b><span>Franchises et grandes enseignes.</span></div></label>
+              <label class="filterTile"><input type="checkbox" id="excludeAssociations" checked><div><b>Écarter associations</b><span>Priorité aux sociétés commerciales.</span></div></label>
+              <label class="filterTile"><input type="checkbox" id="excludeLargeGroups" checked><div><b>Écarter gros groupes</b><span>≥ 250 salariés.</span></div></label>
+              <label class="filterTile"><input type="checkbox" id="needContact"><div><b>Prioriser contact dispo</b><span>Téléphone ou site vérifié en premier.</span></div></label>
+            </div>
+            <div class="field" style="margin-top:9px"><label>Max établissements / SIREN</label><input id="maxEstablishments" type="number" min="1" max="1000" value="8"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="row between wrap">
+            <div><h3 class="sectionTitle" style="margin:0">Pipeline de vérification</h3><div class="tiny">Registre → distance exacte → indépendance → Google Places → site → score.</div></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <button id="searchBtn" class="btn btn-dark">Rechercher de vraies entreprises</button>
+          </div>
+          <div id="searchStatus" class="statusBox" style="margin-top:10px"></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="row between">
+            <div><h3 class="sectionTitle" style="margin:0">Résultats</h3><div class="tiny" id="resultCount">Aucune recherche.</div></div>
+            <button class="btn btn-dark btn-sm" id="addSelectedBtn" style="display:none">Ajouter la sélection au CRM</button>
+          </div>
+          <div id="resultsWrap" style="margin-top:12px"></div>
+        </div>
+      </section>
+
+      <!-- ============ CRM ============ -->
+      <section class="view" id="view-crm">
+        <div class="hero"><div><h1>CRM</h1><p>Les prospects ajoutés depuis la Prospection. Mettez à jour le statut au fil de vos contacts.</p></div></div>
+        <div id="crmWrap"></div>
+      </section>
+
+      <!-- ============ PARAMÈTRES ============ -->
+      <section class="view" id="view-settings">
+        <div class="hero"><div><h1>Paramètres entreprise</h1><p>Utilisés pour les futures recommandations et l'agent (plans Pro/Max).</p></div><button class="btn btn-dark btn-sm" id="saveSettings">Enregistrer</button></div>
+        <div class="card">
+          <div class="form2">
+            <div class="field"><label>Nom de l'entreprise</label><input id="setCompany"></div>
+            <div class="field"><label>Famille métier</label><select id="setBusinessType"></select></div>
+            <div class="field span2"><label>Activité précise</label><input id="setActivity" placeholder="Ex. Digitopuncture, création de sites internet, garage multimarque…"></div>
+            <div class="field span2"><label>Votre offre</label><textarea id="setOffer" rows="3"></textarea></div>
+            <div class="field span2"><label>Adresse / rue</label><input id="setStreet"></div>
+            <div class="field"><label>Code postal</label><input id="setPostal"></div>
+            <div class="field"><label>Ville</label><input id="setCity"></div>
+            <div class="field"><label>Rayon par défaut (km)</label><input id="setRadius" type="number" min="0.5" max="250" step="0.5"></div>
+          </div>
+        </div>
+        <div id="settingsStatus" style="margin-top:10px"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProspectFlow OS — Connexion</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="authWrap">
+  <div class="authCard">
+    <h1>ProspectFlow OS</h1>
+    <p>Connectez-vous avec votre email — vous recevez un lien de connexion, aucun mot de passe à retenir.</p>
+    <div class="field">
+      <label>Email</label>
+      <input id="email" type="email" placeholder="vous@entreprise.fr" autocomplete="email">
+    </div>
+    <button class="btn btn-dark" id="sendLink" style="width:100%;margin-top:12px">Recevoir le lien de connexion</button>
+    <div id="status" style="margin-top:12px"></div>
+    <div class="tiny" style="margin-top:16px;line-height:1.5">
+      La connexion Google (Google Sign-In) sera ajoutée séparément de l'accès Gmail —
+      volontairement deux permissions distinctes. En attendant, l'email suffit pour tester le produit.
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { supabase } from "./js/supabaseClient.js";
+
+const emailInput = document.getElementById("email");
+const statusEl = document.getElementById("status");
+const btn = document.getElementById("sendLink");
+
+function setStatus(kind, text) {
+  statusEl.innerHTML = `<div class="${kind}">${text}</div>`;
+}
+
+// Déjà connecté ? On saute directement dans l'app.
+supabase.auth.getSession().then(({ data }) => {
+  if (data.session) window.location.href = "app.html";
+});
+
+btn.addEventListener("click", async () => {
+  const email = emailInput.value.trim();
+  if (!email) return setStatus("danger", "Entrez votre email.");
+
+  btn.disabled = true;
+  btn.textContent = "Envoi...";
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: `${window.location.origin}/app.html` },
+  });
+  btn.disabled = false;
+  btn.textContent = "Recevoir le lien de connexion";
+
+  if (error) {
+    setStatus("danger", `Erreur : ${error.message}`);
+  } else {
+    setStatus("success", `Lien envoyé à ${email}. Ouvrez-le depuis cet appareil pour vous connecter.`);
+  }
+});
+
+emailInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") btn.click();
+});
+</script>
+</body>
+</html>

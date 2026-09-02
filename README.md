@@ -1,8 +1,10 @@
-# ProspectFlow OS — backend Starter
+# ProspectFlow OS — Starter (backend + frontend réels)
 
-Ce dépôt contient le vrai backend du moteur de qualité des prospects décrit
-dans le prototype (`prototype/PROSPECTFLOWOSV7.html`, gardé tel quel comme
-référence visuelle — il n'est pas encore branché sur ce backend).
+Ce dépôt contient une première version fonctionnelle du plan Starter :
+trouver et vérifier des prospects, avec un vrai backend Supabase et un vrai
+frontend branché dessus (auth, recherche, CRM, paramètres). Le prototype
+original (`prototype/PROSPECTFLOWOSV7.html`) est gardé comme référence
+visuelle mais n'est plus le produit — `web/` l'a remplacé.
 
 Portée actuelle : **plan Starter uniquement** — trouver et vérifier des
 prospects, sans envoi automatique d'emails. C'est volontairement l'étape 1
@@ -40,13 +42,26 @@ si Google ne répond pas pour un établissement donné, celui-ci reste marqué
 `business_status: "unverified"` / `website_quality: "unknown"` — jamais
 requalifié par défaut en "opérationnel" ou "site correct".
 
+- **Frontend** (`web/`, HTML/CSS/JS statique, sans build) :
+  - `index.html` — connexion par lien magique (email), aucun mot de passe.
+  - `app.html` + `js/app.js` — trois vues : Prospection (sélection de métiers →
+    codes NAF, adresse géocodée via la Base Adresse Nationale — gratuite, sans
+    clé —, filtres, appel de `search-prospects`, ajout de la sélection au CRM),
+    CRM (liste des prospects, changement de statut), Paramètres (profil
+    entreprise, `UPDATE` direct sur `profiles`).
+  - Toute lecture/écriture de données passe par `supabase-js` avec le JWT de
+    l'utilisateur connecté : c'est RLS qui protège les données, pas le code
+    frontend — la clé "anon" dans `web/js/config.js` est faite pour être publique.
+
 ## Ce qui n'est toujours pas fait
 
-- Frontend réel branché sur ce backend (le prototype HTML reste une maquette).
-- Auth (Google Sign-In / Gmail séparés), Stripe, envoi Gmail, scheduler de
-  relances, agent IA — prévus pour les étapes Pro/Max.
+- Google Sign-In / Gmail (connexions séparées), Stripe, envoi Gmail, scheduler
+  de relances, agent IA — prévus pour les étapes Pro/Max.
 - CASA/vérification Google pour les scopes Gmail sensibles — pas nécessaire
   tant que Starter (pas d'envoi automatique) n'est pas dépassé.
+- Déploiement du frontend (n'importe quel hébergeur de fichiers statiques —
+  Vercel, Netlify, Cloudflare Pages, ou même `supabase.storage` — convient,
+  aucun build n'est nécessaire).
 
 ## Mise en route
 
@@ -63,6 +78,19 @@ supabase secrets set GOOGLE_MAPS_API_KEY=xxxxx
 # 4. Déployer la fonction
 supabase functions deploy search-prospects
 ```
+
+Puis pour le frontend :
+
+```bash
+# 5. Renseigner l'URL et la clé anon du projet dans web/js/config.js
+# 6. Servir web/ en statique (ex. en local pour tester) :
+cd web && python3 -m http.server 8000
+# → http://localhost:8000/index.html
+```
+
+Dans Supabase Dashboard → Authentication → URL Configuration, ajoutez l'URL
+de votre frontend (ex. `http://localhost:8000` en local, votre domaine en
+prod) aux "Redirect URLs", sinon le lien magique renverra une erreur.
 
 Appel depuis le client (avec `supabase-js`, JWT utilisateur automatiquement
 inclus) :
