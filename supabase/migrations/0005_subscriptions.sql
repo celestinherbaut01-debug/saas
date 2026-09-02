@@ -16,6 +16,7 @@ create table if not exists public.subscriptions (
 );
 
 alter table public.subscriptions enable row level security;
+drop policy if exists "subscriptions: members can read" on public.subscriptions;
 create policy "subscriptions: members can read" on public.subscriptions
   for select using (public.is_workspace_member(workspace_id));
 -- Pas de policy insert/update/delete côté client : seul le service role (le

@@ -28,10 +28,13 @@ create table if not exists public.profiles (
 
 alter table public.profiles enable row level security;
 
+drop policy if exists "profiles: owner read" on public.profiles;
 create policy "profiles: owner read" on public.profiles
   for select using (auth.uid() = id);
+drop policy if exists "profiles: owner insert" on public.profiles;
 create policy "profiles: owner insert" on public.profiles
   for insert with check (auth.uid() = id);
+drop policy if exists "profiles: owner update" on public.profiles;
 create policy "profiles: owner update" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
@@ -71,6 +74,7 @@ create table if not exists public.search_zones (
 
 alter table public.search_zones enable row level security;
 
+drop policy if exists "search_zones: owner all" on public.search_zones;
 create policy "search_zones: owner all" on public.search_zones
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -128,6 +132,7 @@ create table if not exists public.prospects (
 
 alter table public.prospects enable row level security;
 
+drop policy if exists "prospects: owner all" on public.prospects;
 create policy "prospects: owner all" on public.prospects
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
@@ -174,6 +179,7 @@ create table if not exists public.verification_cache (
 
 alter table public.verification_cache enable row level security;
 
+drop policy if exists "verification_cache: authenticated read" on public.verification_cache;
 create policy "verification_cache: authenticated read" on public.verification_cache
   for select using (auth.role() = 'authenticated');
 

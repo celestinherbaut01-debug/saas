@@ -42,10 +42,13 @@ alter table public.customers enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.appointments enable row level security;
 
+drop policy if exists "customers: members all" on public.customers;
 create policy "customers: members all" on public.customers
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
+drop policy if exists "inventory_items: members all" on public.inventory_items;
 create policy "inventory_items: members all" on public.inventory_items
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
+drop policy if exists "appointments: members all" on public.appointments;
 create policy "appointments: members all" on public.appointments
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
 

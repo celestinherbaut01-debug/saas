@@ -53,18 +53,23 @@ $$;
 alter table public.workspaces enable row level security;
 alter table public.workspace_members enable row level security;
 
+drop policy if exists "workspaces: members can read" on public.workspaces;
 create policy "workspaces: members can read" on public.workspaces
   for select using (public.is_workspace_member(id));
+drop policy if exists "workspaces: creator can insert" on public.workspaces;
 create policy "workspaces: creator can insert" on public.workspaces
   for insert with check (created_by = auth.uid());
+drop policy if exists "workspaces: members can update" on public.workspaces;
 create policy "workspaces: members can update" on public.workspaces
   for update using (public.is_workspace_member(id)) with check (public.is_workspace_member(id));
 
+drop policy if exists "workspace_members: members can read own workspace roster" on public.workspace_members;
 create policy "workspace_members: members can read own workspace roster" on public.workspace_members
   for select using (public.is_workspace_member(workspace_id));
 -- L'ajout de membres se fait uniquement via la fonction ci-dessous
 -- (le créateur du workspace s'auto-ajoute comme owner), pas par insert direct
 -- côté client : évite qu'un membre s'auto-promeuve ou ajoute n'importe qui.
+drop policy if exists "workspace_members: self insert as creator" on public.workspace_members;
 create policy "workspace_members: self insert as creator" on public.workspace_members
   for insert with check (
     user_id = auth.uid()
@@ -144,6 +149,7 @@ create table if not exists public.business_profiles (
 );
 
 alter table public.business_profiles enable row level security;
+drop policy if exists "business_profiles: members all" on public.business_profiles;
 create policy "business_profiles: members all" on public.business_profiles
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
 
@@ -181,10 +187,12 @@ create index if not exists business_categories_search_idx
   on public.business_categories using gin(search_text gin_trgm_ops);
 
 alter table public.business_categories enable row level security;
+drop policy if exists "business_categories: readable by any authenticated user" on public.business_categories;
 create policy "business_categories: readable by any authenticated user" on public.business_categories
   for select using (auth.role() = 'authenticated');
 -- Pas de policy insert/update/delete : catalogue partagé, géré par migration/admin.
 
+alter table public.business_profiles drop constraint if exists business_profiles_own_category_fk;
 alter table public.business_profiles
   add constraint business_profiles_own_category_fk
   foreign key (own_category_id) references public.business_categories(id);
@@ -201,6 +209,7 @@ create table if not exists public.workspace_targets (
 );
 
 alter table public.workspace_targets enable row level security;
+drop policy if exists "workspace_targets: members all" on public.workspace_targets;
 create policy "workspace_targets: members all" on public.workspace_targets
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
 
@@ -227,9 +236,12 @@ create index if not exists prospects_workspace_idx on public.prospects(workspace
 create index if not exists prospects_workspace_status_idx on public.prospects(workspace_id, status);
 
 alter table public.prospects drop constraint if exists prospects_user_id_siret_key;
+alter table public.prospects drop constraint if exists prospects_workspace_siret_key;
 alter table public.prospects add constraint prospects_workspace_siret_key unique (workspace_id, siret);
 
+drop policy if exists "search_zones: members all" on public.search_zones;
 create policy "search_zones: members all" on public.search_zones
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
+drop policy if exists "prospects: members all" on public.prospects;
 create policy "prospects: members all" on public.prospects
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));

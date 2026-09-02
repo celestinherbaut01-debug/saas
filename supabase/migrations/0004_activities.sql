@@ -14,6 +14,7 @@ create table if not exists public.activities (
 );
 
 alter table public.activities enable row level security;
+drop policy if exists "activities: members all" on public.activities;
 create policy "activities: members all" on public.activities
   for all using (public.is_workspace_member(workspace_id)) with check (public.is_workspace_member(workspace_id));
 
