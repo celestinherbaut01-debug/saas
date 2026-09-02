@@ -1,10 +1,17 @@
 import type { SireneEtablissement } from "./types.ts";
 
-const BASE_URL = "https://recherche-entreprises.api.gouv.fr/search";
-const PER_PAGE = 25; // maximum accepté par l'API
+// Endpoint dédié à la recherche géographique — /search (search_type=TEXT)
+// rejette lat/long avec une erreur 400 ("Les paramètres 'lat', 'long' ne sont
+// autorisés que pour une recherche géographique"), confirmé dans le code
+// source de l'API (app/controller/search_params_builder.py côté
+// annuaire-entreprises-data-gouv-fr/search-api).
+const BASE_URL = "https://recherche-entreprises.api.gouv.fr/near_point";
+const PER_PAGE = 25; // max accepté (NUMERIC_FIELD_LIMITS.per_page, confirmé dans field_validation.py)
 const MAX_PAGES = 8; // garde-fou : 200 établissements bruts max par recherche
-/** L'API ne cherche pas au-delà de 50 km autour d'un point GPS. */
+/** Confirmé dans field_validation.py : NUMERIC_FIELD_LIMITS.radius = {min:0.001, max:50}. */
 const API_MAX_RADIUS_KM = 50;
+/** Max accepté pour limite_matching_etablissements (matching_size), même source. */
+const API_MAX_MATCHING_SIZE = 100;
 
 export interface SireneQuery {
   lat: number;
@@ -12,6 +19,8 @@ export interface SireneQuery {
   radiusKm: number;
   nafCodes: string[];
   operationalOnly: boolean;
+  /** Établissements matchés à ramener par entreprise (SIREN) — voir maxEstablishmentsPerSiren côté filtres. */
+  maxEstablishmentsPerSiren: number;
 }
 
 interface RawEtablissement {
@@ -71,20 +80,25 @@ function buildEstablishment(
 
 /**
  * Interroge le registre officiel des entreprises françaises (SIRENE/RNE via
- * recherche-entreprises.api.gouv.fr — API publique, gratuite, sans clé).
+ * recherche-entreprises.api.gouv.fr — API publique, gratuite, sans clé),
+ * sur l'endpoint de recherche géographique dédié `/near_point`.
  *
- * Limite connue de l'API : le filtre géographique `lat`/`long`/`radius` ne
- * cherche pas au-delà de 50 km. Pour un rayon demandé plus large, on plafonne
- * la requête à 50 km : le filtrage exact par distance se fait ensuite côté
- * appelant avec `haversineKm` sur les coordonnées réelles de chaque
- * établissement, donc aucun résultat hors-rayon ne peut fuiter — mais un rayon
- * de 200 km ne ramènera que ce qu'il y a dans le disque de 50 km.
+ * Limite documentée de l'API : le rayon ne peut pas dépasser 50 km. Pour un
+ * rayon demandé plus large, on plafonne la requête à 50 km : le filtrage
+ * exact par distance se fait ensuite côté appelant avec `haversineKm` sur
+ * les coordonnées réelles de chaque établissement, donc aucun résultat
+ * hors-rayon ne peut fuiter — mais un rayon de 200 km ne ramènera que ce
+ * qu'il y a dans le disque de 50 km.
  */
 export async function searchSirene(
   query: SireneQuery,
 ): Promise<SireneEtablissement[]> {
   const results: SireneEtablissement[] = [];
   const effectiveRadius = Math.min(query.radiusKm, API_MAX_RADIUS_KM);
+  const matchingSize = Math.min(
+    Math.max(query.maxEstablishmentsPerSiren, 1),
+    API_MAX_MATCHING_SIZE,
+  );
 
   for (let page = 1; page <= MAX_PAGES; page++) {
     const params = new URLSearchParams({
@@ -94,6 +108,11 @@ export async function searchSirene(
       page: String(page),
       per_page: String(PER_PAGE),
       minimal: "false",
+      // Par défaut l'API ne renvoie que 10 établissements matchés par
+      // entreprise (matching_size) — on relève ce plafond au besoin de
+      // l'appelant pour ne pas perdre silencieusement des établissements
+      // d'une même société mère au-delà de ces 10.
+      limite_matching_etablissements: String(matchingSize),
     });
     if (query.nafCodes.length > 0) {
       params.set("activite_principale", query.nafCodes.join(","));

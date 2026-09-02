@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
       radiusKm,
       nafCodes,
       operationalOnly: filters.operationalOnly,
+      maxEstablishmentsPerSiren: filters.maxEstablishmentsPerSiren,
     });
 
     // 4. Distance exacte + filtres registre (indépendance, statut).

@@ -111,10 +111,14 @@ const { data, error } = await supabase.functions.invoke("search-prospects", {
 
 ## Notes de coût et de limites à connaître
 
-- **SIRENE/RNE** : gratuit, sans clé, mais son filtre géographique
-  `lat/long/radius` ne cherche pas au-delà de **50 km** — pour un rayon
-  demandé plus large, la fonction plafonne la requête à 50 km (limite de
-  l'API elle-même, pas un bug côté backend).
+- **SIRENE/RNE** : gratuit, sans clé, mais la recherche géographique passe par
+  un endpoint dédié (`/near_point`, pas `/search`) dont le rayon est plafonné
+  à **50 km** — confirmé en lisant le code source public de l'API
+  ([search-api](https://github.com/annuaire-entreprises-data-gouv-fr/search-api),
+  `field_validation.py`) après qu'une première version de ce backend appelait
+  le mauvais endpoint. Pour un rayon demandé plus large, la fonction plafonne
+  la requête à 50 km ; le filtrage exact par distance reste fait côté backend
+  avec Haversine, donc aucun résultat hors-rayon ne peut fuiter.
 - **Google Places (New)** : facturé à l'appel (Text Search + Place Details
   par établissement vérifié). La fonction plafonne à 25 vérifications par
   recherche par défaut (`maxPlacesLookups`, 60 max) et met en cache 30 jours
