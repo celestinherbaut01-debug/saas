@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { cn } from "@/lib/utils";
+import { ProspectActions } from "@/components/prospect-actions";
 
 // Reflète supabase/functions/_shared/types.ts (EnrichedProspect) côté serveur.
 interface SearchResult {
@@ -166,38 +167,41 @@ export function ProspectionView({
     if (rows.length === 0) return;
     setAdding(true);
 
-    const { error } = await supabase.from("prospects").upsert(
-      rows.map((r) => ({
-        workspace_id: workspaceId,
-        siren: r.siren,
-        siret: r.siret,
-        company_name: r.companyName,
-        naf_code: r.nafCode,
-        street: r.street,
-        postal_code: r.postalCode,
-        city: r.city,
-        lat: r.lat,
-        lng: r.lng,
-        distance_km: r.distanceKm,
-        legal_status: r.etatAdministratif === "A" ? "active" : "closed",
-        nature_juridique: r.natureJuridique,
-        effectif_tranche: r.effectifTranche,
-        is_association: r.isAssociation,
-        is_large_group: r.isLargeGroup,
-        is_chain: r.isChain,
-        place_id: r.placeId,
-        business_status: r.businessStatus,
-        website_uri: r.websiteUri,
-        website_quality: r.websiteQuality,
-        phone: r.phone,
-        google_rating: r.googleRating,
-        google_rating_count: r.googleRatingCount,
-        places_checked_at: r.placesCheckedAt,
-        quality_score: r.qualityScore,
-        verification_sources: r.verificationSources,
-      })),
-      { onConflict: "workspace_id,siret" },
-    );
+    const { data: inserted, error } = await supabase
+      .from("prospects")
+      .upsert(
+        rows.map((r) => ({
+          workspace_id: workspaceId,
+          siren: r.siren,
+          siret: r.siret,
+          company_name: r.companyName,
+          naf_code: r.nafCode,
+          street: r.street,
+          postal_code: r.postalCode,
+          city: r.city,
+          lat: r.lat,
+          lng: r.lng,
+          distance_km: r.distanceKm,
+          legal_status: r.etatAdministratif === "A" ? "active" : "closed",
+          nature_juridique: r.natureJuridique,
+          effectif_tranche: r.effectifTranche,
+          is_association: r.isAssociation,
+          is_large_group: r.isLargeGroup,
+          is_chain: r.isChain,
+          place_id: r.placeId,
+          business_status: r.businessStatus,
+          website_uri: r.websiteUri,
+          website_quality: r.websiteQuality,
+          phone: r.phone,
+          google_rating: r.googleRating,
+          google_rating_count: r.googleRatingCount,
+          places_checked_at: r.placesCheckedAt,
+          quality_score: r.qualityScore,
+          verification_sources: r.verificationSources,
+        })),
+        { onConflict: "workspace_id,siret" },
+      )
+      .select("id");
 
     setAdding(false);
     if (error) {
@@ -205,6 +209,16 @@ export function ProspectionView({
     } else {
       setStatus({ kind: "ok", text: `${rows.length} prospect(s) ajouté(s) au CRM.` });
       setChecked(new Set());
+      if (inserted?.length) {
+        await supabase.from("activities").insert(
+          inserted.map((p) => ({
+            workspace_id: workspaceId,
+            prospect_id: p.id,
+            type: "added_to_crm" as const,
+            detail: "Depuis la Prospection",
+          })),
+        );
+      }
     }
   }
 
@@ -333,8 +347,8 @@ export function ProspectionView({
                   <th className="p-2.5">Distance</th>
                   <th className="p-2.5">Statut</th>
                   <th className="p-2.5">Site</th>
-                  <th className="p-2.5">Contact</th>
                   <th className="p-2.5">Score</th>
+                  <th className="p-2.5">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -356,11 +370,19 @@ export function ProspectionView({
                     <td className="p-2.5">
                       <Tag {...(websiteQualityLabel[r.websiteQuality] ?? websiteQualityLabel.unknown)} />
                     </td>
-                    <td className="p-2.5 text-faint">{r.phone || "—"}</td>
                     <td className="p-2.5">
                       <div className="flex h-6 w-9 items-center justify-center rounded-md bg-soft font-display text-[11px] font-bold">
                         {r.qualityScore}
                       </div>
+                    </td>
+                    <td className="p-2.5">
+                      <ProspectActions
+                        websiteUri={r.websiteUri}
+                        phone={r.phone}
+                        placeId={r.placeId}
+                        companyName={r.companyName}
+                        address={[r.street, r.postalCode, r.city].filter(Boolean).join(" ")}
+                      />
                     </td>
                   </tr>
                 ))}

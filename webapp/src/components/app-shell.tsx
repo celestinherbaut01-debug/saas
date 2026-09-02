@@ -19,14 +19,19 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     .maybeSingle();
 
   const workspace = membership
+    ? (await supabase.from("workspaces").select("name").eq("id", membership.workspace_id).maybeSingle()).data
+    : null;
+
+  const subscription = membership
     ? (
         await supabase
-          .from("workspaces")
-          .select("name, plan")
-          .eq("id", membership.workspace_id)
+          .from("subscriptions")
+          .select("plan")
+          .eq("workspace_id", membership.workspace_id)
           .maybeSingle()
       ).data
     : null;
+  const plan = subscription?.plan ?? "starter";
 
   return (
     <div className="grid min-h-screen grid-cols-[240px_1fr]">
@@ -38,7 +43,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className="font-display text-[13px] font-extrabold text-white">ProspectFlow</p>
             <p className="text-[9px] font-semibold uppercase tracking-wide text-sidebar-ink-dim">
-              Plan {workspace?.plan ?? "starter"}
+              Plan {plan}
             </p>
           </div>
         </div>
@@ -51,6 +56,20 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         </NavLink>
         <NavLink href="/crm" icon="▦">
           CRM
+        </NavLink>
+        <NavLink href="/agent" icon="✦">
+          Agent IA
+        </NavLink>
+        {plan === "max" && (
+          <NavLink href="/business-os" icon="▣">
+            Business OS
+          </NavLink>
+        )}
+        <NavLink href="/integrations" icon="◎">
+          Intégrations
+        </NavLink>
+        <NavLink href="/parametres" icon="⚙">
+          Paramètres
         </NavLink>
 
         <div className="mt-auto border-t border-sidebar-line pt-3 text-[10px] leading-relaxed text-sidebar-ink-dim">

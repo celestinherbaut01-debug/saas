@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Prospect } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { ProspectActions } from "@/components/prospect-actions";
 
 const STATUS_OPTIONS: [Prospect["status"], string][] = [
   ["new", "Nouveau"],
@@ -35,11 +37,22 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
   const [savingId, setSavingId] = useState<string | null>(null);
 
   async function updateStatus(id: string, status: Prospect["status"]) {
+    const prospect = prospects.find((p) => p.id === id);
     setSavingId(id);
     const { error } = await supabase.from("prospects").update({ status }).eq("id", id);
     setSavingId(null);
     if (!error) {
       setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
+      if (prospect) {
+        const from = STATUS_OPTIONS.find(([v]) => v === prospect.status)?.[1];
+        const to = STATUS_OPTIONS.find(([v]) => v === status)?.[1];
+        await supabase.from("activities").insert({
+          workspace_id: prospect.workspace_id,
+          prospect_id: id,
+          type: "status_change",
+          detail: `${from} → ${to}`,
+        });
+      }
     }
   }
 
@@ -91,6 +104,7 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
                   <th className="p-2.5">Statut Google</th>
                   <th className="p-2.5">Site</th>
                   <th className="p-2.5">Score</th>
+                  <th className="p-2.5">Actions</th>
                   <th className="p-2.5">Étape CRM</th>
                 </tr>
               </thead>
@@ -98,7 +112,9 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
                 {prospects.map((p) => (
                   <tr key={p.id} className="border-t border-line text-[12.5px]">
                     <td className="p-2.5">
-                      <div className="font-semibold">{p.company_name}</div>
+                      <Link href={`/crm/${p.id}`} className="font-semibold text-ink hover:text-accent">
+                        {p.company_name}
+                      </Link>
                       <div className="text-[10.5px] text-faint">
                         {[p.street, p.postal_code, p.city].filter(Boolean).join(" ")}
                       </div>
@@ -122,6 +138,15 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
                       <div className="flex h-6 w-9 items-center justify-center rounded-md bg-soft font-display text-[11px] font-bold">
                         {p.quality_score}
                       </div>
+                    </td>
+                    <td className="p-2.5">
+                      <ProspectActions
+                        websiteUri={p.website_uri}
+                        phone={p.phone}
+                        placeId={p.place_id}
+                        companyName={p.company_name}
+                        address={[p.street, p.postal_code, p.city].filter(Boolean).join(" ")}
+                      />
                     </td>
                     <td className="p-2.5">
                       <select

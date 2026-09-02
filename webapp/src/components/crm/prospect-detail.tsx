@@ -1,0 +1,228 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import type { Activity, Prospect } from "@/lib/supabase/types";
+import { createClient } from "@/lib/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ProspectActions } from "@/components/prospect-actions";
+import { scoreBreakdown } from "@/lib/score-breakdown";
+import { cn } from "@/lib/utils";
+
+const STATUS_OPTIONS: [Prospect["status"], string][] = [
+  ["new", "Nouveau"],
+  ["to_contact", "À contacter"],
+  ["contacted", "Contacté"],
+  ["replied", "A répondu"],
+  ["won", "Gagné"],
+  ["lost", "Perdu"],
+];
+
+const ACTIVITY_LABEL: Record<Activity["type"], string> = {
+  added_to_crm: "Ajouté au CRM",
+  status_change: "Statut changé",
+  note: "Note ajoutée",
+  email_sent: "Email envoyé",
+  followup_sent: "Relance envoyée",
+  reply_received: "Réponse reçue",
+  call_logged: "Appel enregistré",
+  google_verified: "Vérifié sur Google",
+  website_audited: "Site audité",
+  appointment_created: "Rendez-vous créé",
+};
+
+export function ProspectDetail({
+  prospect: initialProspect,
+  initialActivities,
+}: {
+  prospect: Prospect;
+  initialActivities: Activity[];
+}) {
+  const supabase = createClient();
+  const [prospect, setProspect] = useState(initialProspect);
+  const [activities, setActivities] = useState(initialActivities);
+  const [notes, setNotes] = useState(prospect.notes);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [showBreakdown, setShowBreakdown] = useState(false);
+
+  async function logActivity(type: Activity["type"], detail: string) {
+    const { data } = await supabase
+      .from("activities")
+      .insert({ workspace_id: prospect.workspace_id, prospect_id: prospect.id, type, detail })
+      .select("*")
+      .single();
+    if (data) setActivities((prev) => [data, ...prev]);
+  }
+
+  async function updateStatus(status: Prospect["status"]) {
+    setSavingStatus(true);
+    const { error } = await supabase.from("prospects").update({ status }).eq("id", prospect.id);
+    setSavingStatus(false);
+    if (!error) {
+      const from = STATUS_OPTIONS.find(([v]) => v === prospect.status)?.[1];
+      const to = STATUS_OPTIONS.find(([v]) => v === status)?.[1];
+      setProspect((p) => ({ ...p, status }));
+      await logActivity("status_change", `${from} → ${to}`);
+    }
+  }
+
+  async function saveNotes() {
+    setSavingNotes(true);
+    const { error } = await supabase.from("prospects").update({ notes }).eq("id", prospect.id);
+    setSavingNotes(false);
+    if (!error) setProspect((p) => ({ ...p, notes }));
+  }
+
+  async function addTimelineNote() {
+    if (!noteDraft.trim()) return;
+    await logActivity("note", noteDraft.trim());
+    setNoteDraft("");
+  }
+
+  const rows = scoreBreakdown(prospect.verification_sources, prospect.distance_km);
+  const total = rows.reduce((acc, r) => acc + r.points, 0);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <Link href="/crm" className="text-[12px] text-muted">
+            ← CRM
+          </Link>
+          <h1 className="mt-1 font-display text-2xl font-extrabold">{prospect.company_name}</h1>
+          <p className="text-[13px] text-muted">
+            {[prospect.street, prospect.postal_code, prospect.city].filter(Boolean).join(" ")}
+            {prospect.distance_km != null && ` — ${prospect.distance_km.toFixed(1)} km`}
+          </p>
+        </div>
+        <select
+          value={prospect.status}
+          disabled={savingStatus}
+          onChange={(e) => updateStatus(e.target.value as Prospect["status"])}
+          className="rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
+        >
+          {STATUS_OPTIONS.map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card className="sm:col-span-2">
+          <h2 className="font-display text-sm font-bold">Identité</h2>
+          <dl className="mt-3 grid grid-cols-2 gap-y-2 text-[12.5px]">
+            <dt className="text-faint">SIREN</dt>
+            <dd>{prospect.siren}</dd>
+            <dt className="text-faint">SIRET</dt>
+            <dd>{prospect.siret}</dd>
+            <dt className="text-faint">Code NAF</dt>
+            <dd>{prospect.naf_code ?? "—"}</dd>
+            <dt className="text-faint">Statut registre</dt>
+            <dd>{prospect.legal_status === "active" ? "Actif" : prospect.legal_status ?? "—"}</dd>
+            <dt className="text-faint">Effectif</dt>
+            <dd>{prospect.effectif_tranche ?? "—"}</dd>
+            <dt className="text-faint">Téléphone</dt>
+            <dd>{prospect.phone ?? "—"}</dd>
+            <dt className="text-faint">Avis Google</dt>
+            <dd>
+              {prospect.google_rating
+                ? `${prospect.google_rating}/5 (${prospect.google_rating_count ?? 0} avis)`
+                : "—"}
+            </dd>
+          </dl>
+          <div className="mt-4">
+            <ProspectActions
+              websiteUri={prospect.website_uri}
+              phone={prospect.phone}
+              placeId={prospect.place_id}
+              companyName={prospect.company_name}
+              address={[prospect.street, prospect.postal_code, prospect.city].filter(Boolean).join(" ")}
+            />
+          </div>
+        </Card>
+
+        <Card>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-bold">Score d&apos;opportunité</h2>
+            <div className="flex h-9 w-12 items-center justify-center rounded-lg bg-soft font-display text-[16px] font-extrabold">
+              {prospect.quality_score}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBreakdown((v) => !v)}
+            className="mt-2 text-[12px] font-semibold text-accent"
+          >
+            {showBreakdown ? "Masquer le détail" : `Pourquoi ${prospect.quality_score} ?`}
+          </button>
+          {showBreakdown && (
+            <ul className="mt-3 flex flex-col gap-1.5 text-[12px]">
+              {rows.map((r) => (
+                <li key={r.label} className="flex justify-between gap-2">
+                  <span className="text-muted">{r.label}</span>
+                  <span className={cn("font-semibold", r.points >= 0 ? "text-green-fg" : "text-red-fg")}>
+                    {r.points > 0 ? `+${r.points}` : r.points}
+                  </span>
+                </li>
+              ))}
+              <li className="flex justify-between border-t border-line pt-1.5 font-bold">
+                <span>Total (plafonné 0-100)</span>
+                <span>{total}</span>
+              </li>
+            </ul>
+          )}
+        </Card>
+      </div>
+
+      <Card>
+        <h2 className="font-display text-sm font-bold">Notes</h2>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          placeholder="Notes libres sur ce prospect…"
+          className="mt-2 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
+        />
+        <Button size="sm" className="mt-2" onClick={saveNotes} disabled={savingNotes || notes === prospect.notes}>
+          {savingNotes ? "Enregistrement…" : "Enregistrer"}
+        </Button>
+      </Card>
+
+      <Card>
+        <h2 className="font-display text-sm font-bold">Historique</h2>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={noteDraft}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            placeholder="Ajouter un événement (ex. appel passé, échange téléphonique…)"
+            className="flex-1 rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
+            onKeyDown={(e) => e.key === "Enter" && addTimelineNote()}
+          />
+          <Button size="sm" variant="outline" onClick={addTimelineNote}>
+            Ajouter
+          </Button>
+        </div>
+        <ul className="mt-4 flex flex-col gap-3">
+          {activities.length === 0 && <p className="text-[13px] text-muted">Aucun événement pour l&apos;instant.</p>}
+          {activities.map((a) => (
+            <li key={a.id} className="flex gap-3 text-[12.5px]">
+              <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
+              <div>
+                <span className="font-semibold">{ACTIVITY_LABEL[a.type]}</span>
+                {a.detail && <span className="text-muted"> — {a.detail}</span>}
+                <div className="text-[10.5px] text-faint">
+                  {new Date(a.created_at).toLocaleString("fr-FR")}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </div>
+  );
+}

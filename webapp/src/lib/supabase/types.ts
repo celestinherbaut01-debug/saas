@@ -172,6 +172,109 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["prospects"]["Row"]>;
         Relationships: [];
       };
+      subscriptions: {
+        Row: {
+          workspace_id: string;
+          plan: "starter" | "pro" | "max";
+          status: "active" | "trialing" | "past_due" | "canceled";
+          billing_period: "monthly" | "yearly" | null;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          current_period_end: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]> & {
+          workspace_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["subscriptions"]["Row"]>;
+        Relationships: [];
+      };
+      customers: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          phone: string | null;
+          email: string | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["customers"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["customers"]["Row"]>;
+        Relationships: [];
+      };
+      inventory_items: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          quantity: number;
+          unit: string;
+          low_stock_threshold: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["inventory_items"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["inventory_items"]["Row"]>;
+        Relationships: [];
+      };
+      appointments: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          prospect_id: string | null;
+          title: string;
+          starts_at: string;
+          ends_at: string | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["appointments"]["Row"]> & {
+          workspace_id: string;
+          title: string;
+          starts_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["appointments"]["Row"]>;
+        Relationships: [];
+      };
+      activities: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          prospect_id: string;
+          type:
+            | "added_to_crm"
+            | "status_change"
+            | "note"
+            | "email_sent"
+            | "followup_sent"
+            | "reply_received"
+            | "call_logged"
+            | "google_verified"
+            | "website_audited"
+            | "appointment_created";
+          detail: string;
+          created_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          prospect_id: string;
+          type: Database["public"]["Tables"]["activities"]["Row"]["type"];
+          detail?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["activities"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -183,3 +286,8 @@ export type BusinessProfile = Database["public"]["Tables"]["business_profiles"][
 export type Workspace = Database["public"]["Tables"]["workspaces"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type Prospect = Database["public"]["Tables"]["prospects"]["Row"];
+export type Activity = Database["public"]["Tables"]["activities"]["Row"];
+export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
+export type Customer = Database["public"]["Tables"]["customers"]["Row"];
+export type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"];
+export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
