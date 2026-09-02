@@ -127,6 +127,51 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["workspace_targets"]["Row"]>;
         Relationships: [];
       };
+      prospects: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          siren: string;
+          siret: string;
+          company_name: string;
+          category_id: string | null;
+          naf_code: string | null;
+          street: string | null;
+          postal_code: string | null;
+          city: string | null;
+          lat: number | null;
+          lng: number | null;
+          distance_km: number | null;
+          legal_status: string | null;
+          nature_juridique: string | null;
+          effectif_tranche: string | null;
+          is_association: boolean;
+          is_large_group: boolean;
+          is_chain: boolean;
+          place_id: string | null;
+          business_status: string | null;
+          website_uri: string | null;
+          website_quality: string | null;
+          phone: string | null;
+          google_rating: number | null;
+          google_rating_count: number | null;
+          places_checked_at: string | null;
+          quality_score: number;
+          verification_sources: Record<string, boolean>;
+          status: "new" | "to_contact" | "contacted" | "replied" | "won" | "lost";
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["prospects"]["Row"]> & {
+          workspace_id: string;
+          siren: string;
+          siret: string;
+          company_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["prospects"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -137,3 +182,4 @@ export type BusinessCategory = Database["public"]["Tables"]["business_categories
 export type BusinessProfile = Database["public"]["Tables"]["business_profiles"]["Row"];
 export type Workspace = Database["public"]["Tables"]["workspaces"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type Prospect = Database["public"]["Tables"]["prospects"]["Row"];

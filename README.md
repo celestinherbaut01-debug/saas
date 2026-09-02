@@ -13,8 +13,8 @@ l'état réel à chaque instant — pas une roadmap marketing.
 
 | Dossier | Rôle | État |
 |---|---|---|
-| `webapp/` | **L'application réelle** (Next.js/TypeScript/Tailwind) : compte, workspace, onboarding, bientôt prospection/CRM/agent IA/Stripe. | Phase 1 terminée |
-| `supabase/` | Backend partagé : migrations SQL + Edge Function `search-prospects` (registre SIRENE/RNE + Google Places + scoring). | Le moteur de recherche existe et fonctionne, pas encore branché sur `webapp/` (Phase 3) |
+| `webapp/` | **L'application réelle** (Next.js/TypeScript/Tailwind) : compte, workspace, onboarding, prospection, CRM. Bientôt agent IA/Gmail/Stripe. | Phases 1 et 3 terminées |
+| `supabase/` | Backend partagé : migrations SQL + Edge Function `search-prospects` (registre SIRENE/RNE + Google Places + scoring). | Branché sur `webapp/` (page Prospection) |
 | `web/` | Ancien frontend statique HTML/JS (avant le passage à Next.js). | **Legacy** — gardé pour référence, plus le produit |
 | `prototype/` | Maquette HTML d'origine, jamais branchée à un backend. | **Legacy** — référence visuelle uniquement |
 
@@ -48,16 +48,28 @@ l'état réel à chaque instant — pas une roadmap marketing.
   les fonctionnalités correspondantes n'existent pas encore (pas de faux
   chiffres).
 
+## Phase 3 — ce qui est réel depuis cette étape
+
+- **`/prospection`** : la page appelle réellement l'Edge Function
+  `search-prospects` (`webapp/src/components/prospection/prospection-view.tsx`)
+  avec le sélecteur de cibles et l'adresse de l'onboarding en pré-remplissage.
+  Résultats affichés avec statut Google, qualité de site et score, tels que
+  renvoyés par le vrai pipeline — pas de simulation.
+- **`/crm`** : liste les prospects réellement ajoutés (table `prospects`,
+  RLS par workspace), changement de statut persistant en base.
+- Le dashboard affiche désormais un vrai compteur de prospects (plus une
+  valeur figée à 0).
+
 ## Ce qui n'est pas encore fait
 
-Tout le reste du cahier des charges (Gmail, Stripe, agent IA NOVA, CRM
-persistant, Business OS par métier, etc.) — prévu phase par phase :
+Tout le reste du cahier des charges (Gmail, Stripe, agent IA NOVA, timeline
+d'activité, Business OS par métier, etc.) — prévu phase par phase :
 
-1. ~~Supabase + workspace + onboarding~~ ✅ (ce README)
+1. ~~Supabase + workspace + onboarding~~ ✅
 2. ~~Catalogue métiers + sélecteur de cibles + localisation~~ ✅
-3. Brancher `search-prospects` (déjà fonctionnel dans `supabase/`) sur `webapp/`
-4. Filtrage fermés/chaînes + audit qualité de site
-5. CRM persistant + timeline d'activité + score explicable
+3. ~~Brancher `search-prospects` sur `webapp/` (Prospection + CRM)~~ ✅
+4. Filtrage fermés/chaînes + audit qualité de site (déjà partiellement dans l'Edge Function — à approfondir : screenshot, plus de signaux)
+5. Timeline d'activité + score explicable en détail ("Pourquoi 92 ?")
 6. Agent IA NOVA (chat + outils sur les vraies données)
 7. Gmail (envoi réel uniquement — **pas de lecture automatique des réponses
    pour l'instant**, donc pas besoin de vérification CASA restreinte tant
