@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f2f4f8;
+  --panel: #ffffff;
+  --soft: #f7f9fc;
+  --line: #e1e5eb;
+  --ink: #12141c;
+  --muted: #5b6472;
+  --faint: #8890a0;
+  --accent: #2f5bea;
+  --accent-ink: #ffffff;
+  --sidebar: #0b0d12;
+  --sidebar-ink: #c7cdda;
+  --sidebar-ink-dim: #7c8497;
+  --sidebar-line: #1c2027;
+  --sidebar-active: #171b23;
+  --green-fg: #0f7a4e;
+  --green-bg: #e5f8ee;
+  --red-fg: #b3261e;
+  --red-bg: #fdeceb;
+  --amber-fg: #8a5a00;
+  --amber-bg: #fff4df;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-soft: var(--soft);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
+  --color-sidebar-ink-dim: var(--sidebar-ink-dim);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-green-fg: var(--green-fg);
+  --color-green-bg: var(--green-bg);
+  --color-red-fg: var(--red-fg);
+  --color-red-bg: var(--red-bg);
+  --color-amber-fg: var(--amber-fg);
+  --color-amber-bg: var(--amber-bg);
+  --font-display: var(--font-manrope);
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0e13;
+    --panel: #151821;
+    --soft: #1a1e27;
+    --line: #272c36;
+    --ink: #eef1f6;
+    --muted: #9aa3b5;
+    --faint: #6d7688;
+    --accent: #5b86ff;
+    --accent-ink: #0b0d12;
+    --green-fg: #5fd8a0;
+    --green-bg: #123326;
+    --red-fg: #ff8f87;
+    --red-bg: #3a1917;
+    --amber-fg: #ffc978;
+    --amber-bg: #3a2c0d;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c0e13;
+  --panel: #151821;
+  --soft: #1a1e27;
+  --line: #272c36;
+  --ink: #eef1f6;
+  --muted: #9aa3b5;
+  --faint: #6d7688;
+  --accent: #5b86ff;
+  --accent-ink: #0b0d12;
+  --green-fg: #5fd8a0;
+  --green-bg: #123326;
+  --red-fg: #ff8f87;
+  --red-bg: #3a1917;
+  --amber-fg: #ffc978;
+  --amber-bg: #3a2c0d;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
