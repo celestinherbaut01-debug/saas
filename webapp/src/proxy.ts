@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { REMEMBER_COOKIE, applyRememberPreference } from "@/lib/supabase/remember";
 
 // Next.js 16 a renommé middleware.ts -> proxy.ts (même mécanique, juste le
 // nom du fichier/export a changé — cf. node_modules/next/dist/docs).
@@ -28,7 +29,8 @@ export async function proxy(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
+          const remember = request.cookies.get(REMEMBER_COOKIE)?.value !== "0";
+          applyRememberPreference(cookiesToSet, remember).forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options),
           );
         },

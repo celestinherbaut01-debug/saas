@@ -58,7 +58,20 @@ export async function completeOnboarding(
     p_target_category_ids: payload.targetCategoryIds,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    // "relation ... does not exist" (code Postgres 42P01) = une migration
+    // n'a pas été appliquée sur ce projet Supabase — jamais un message
+    // technique brut affiché à l'utilisateur. L'erreur réelle reste dans
+    // les logs serveur pour le diagnostic.
+    console.error("complete_onboarding RPC error:", error);
+    if (error.code === "42P01" || error.message.includes("does not exist")) {
+      return {
+        error:
+          "Configuration serveur incomplète — certaines migrations Supabase ne semblent pas appliquées. Contactez le support.",
+      };
+    }
+    return { error: error.message };
+  }
 
   redirect("/dashboard");
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { GoogleButton } from "@/components/google-button";
 import { AuthForm } from "@/components/auth-form";
+import { RememberCheckbox } from "@/components/remember-checkbox";
 import { signInWithPassword } from "@/lib/actions/auth";
 
 export default async function LoginPage({
@@ -16,7 +17,11 @@ export default async function LoginPage({
         <h1 className="font-display text-xl font-extrabold">Se connecter</h1>
         <p className="mt-1 text-[13px] text-muted">Accédez à votre espace ProspectFlow.</p>
 
-        <div className="mt-6">
+        <div className="mt-4">
+          <RememberCheckbox />
+        </div>
+
+        <div className="mt-4">
           <GoogleButton next={next} />
         </div>
 

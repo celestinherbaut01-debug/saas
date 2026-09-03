@@ -35,10 +35,24 @@ export async function suggestAddresses(query: string): Promise<AddressSuggestion
   }));
 }
 
+/**
+ * Erreur de géolocalisation qui conserve le code natif du navigateur
+ * (1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT, 0 = pas
+ * supporté) pour permettre d'afficher un message utilisateur propre plutôt
+ * que le texte brut du navigateur (ex. "User denied Geolocation").
+ */
+export class GeolocationAppError extends Error {
+  code: number;
+  constructor(code: number, message: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
 export function geolocateBrowser(): Promise<{ lat: number; lng: number; accuracy: number }> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Géolocalisation non supportée par ce navigateur."));
+      reject(new GeolocationAppError(0, "Géolocalisation non supportée par ce navigateur."));
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -48,7 +62,7 @@ export function geolocateBrowser(): Promise<{ lat: number; lng: number; accuracy
           lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy,
         }),
-      (err) => reject(new Error(err.message)),
+      (err) => reject(new GeolocationAppError(err.code, err.message)),
       { enableHighAccuracy: true, timeout: 10000 },
     );
   });

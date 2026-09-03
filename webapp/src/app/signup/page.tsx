@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { GoogleButton } from "@/components/google-button";
 import { AuthForm } from "@/components/auth-form";
 import { signUpWithPassword } from "@/lib/actions/auth";
+import { RememberCheckbox } from "@/components/remember-checkbox";
 import { PlanIntentCapture } from "@/components/plan-intent";
 import { ENTITLEMENTS, isValidPlan } from "@/lib/entitlements";
 
@@ -22,7 +23,11 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
             : "Gratuit pour commencer — pas de carte bancaire requise."}
         </p>
 
-        <div className="mt-6">
+        <div className="mt-4">
+          <RememberCheckbox />
+        </div>
+
+        <div className="mt-4">
           <GoogleButton />
         </div>
 

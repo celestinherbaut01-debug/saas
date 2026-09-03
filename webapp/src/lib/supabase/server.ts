@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database } from "@/lib/supabase/types";
+import { REMEMBER_COOKIE, applyRememberPreference } from "@/lib/supabase/remember";
 
 /**
  * Client Supabase pour Server Components / Server Actions / Route Handlers.
@@ -19,7 +20,8 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
+            const remember = cookieStore.get(REMEMBER_COOKIE)?.value !== "0";
+            applyRememberPreference(cookiesToSet, remember).forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options),
             );
           } catch {
