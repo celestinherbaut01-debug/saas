@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { AppShell } from "@/components/app-shell";
 import { getXpSummary, xpActionLabel } from "@/lib/xp";
+import { getWorkspacePlan } from "@/lib/plan";
+import { PlanIntentBanner } from "@/components/plan-intent";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -42,10 +44,13 @@ export default async function DashboardPage() {
       : [{ count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }];
 
   const xp = membership ? await getXpSummary(membership.workspace_id) : null;
+  const plan = membership ? await getWorkspacePlan(membership.workspace_id) : "free";
 
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
+        <PlanIntentBanner currentPlan={plan} />
+
         <div>
           <h1 className="font-display text-2xl font-extrabold">
             Bonjour {user.user_metadata?.full_name || user.email}

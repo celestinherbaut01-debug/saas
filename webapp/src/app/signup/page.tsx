@@ -3,14 +3,23 @@ import { Card } from "@/components/ui/card";
 import { GoogleButton } from "@/components/google-button";
 import { AuthForm } from "@/components/auth-form";
 import { signUpWithPassword } from "@/lib/actions/auth";
+import { PlanIntentCapture } from "@/components/plan-intent";
+import { ENTITLEMENTS, isValidPlan } from "@/lib/entitlements";
 
-export default function SignupPage() {
+export default async function SignupPage({ searchParams }: PageProps<"/signup">) {
+  const params = await searchParams;
+  const planParam = typeof params.plan === "string" ? params.plan : null;
+  const selectedPlan = planParam && isValidPlan(planParam) && planParam !== "free" ? planParam : null;
+
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-16">
+      <PlanIntentCapture plan={selectedPlan} />
       <Card className="w-full max-w-sm shadow-sm">
         <h1 className="font-display text-xl font-extrabold">Créer un compte</h1>
         <p className="mt-1 text-[13px] text-muted">
-          Gratuit pour commencer — pas de carte bancaire requise.
+          {selectedPlan
+            ? `Plan choisi : ${ENTITLEMENTS[selectedPlan].label}. Créez votre compte pour continuer.`
+            : "Gratuit pour commencer — pas de carte bancaire requise."}
         </p>
 
         <div className="mt-6">

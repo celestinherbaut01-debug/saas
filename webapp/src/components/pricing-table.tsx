@@ -51,7 +51,7 @@ export function PricingTable() {
                 <span className="text-[12px] font-medium text-faint">{yearly ? "/an" : "/mois"}</span>
               </p>
               <Link
-                href="/signup"
+                href={plan.priceMonthly === 0 ? "/signup" : `/signup?plan=${plan.id}`}
                 className={cn(
                   "mt-4 rounded-lg px-3 py-2 text-center text-[12.5px] font-semibold",
                   plan.highlighted ? "bg-ink text-bg" : "border border-line bg-bg text-ink",
