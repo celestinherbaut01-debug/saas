@@ -7,15 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ProspectActions } from "@/components/prospect-actions";
-
-const STATUS_OPTIONS: [Prospect["status"], string][] = [
-  ["new", "Nouveau"],
-  ["to_contact", "À contacter"],
-  ["contacted", "Contacté"],
-  ["replied", "A répondu"],
-  ["won", "Gagné"],
-  ["lost", "Perdu"],
-];
+import { STATUS_OPTIONS } from "@/lib/crm-status";
 
 const businessStatusLabel: Record<string, { text: string; cls: string }> = {
   OPERATIONAL: { text: "Opérationnel", cls: "bg-green-bg text-green-fg" },
@@ -80,11 +72,11 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
           <p className="mt-1 font-display text-2xl font-extrabold">{counts.contacted ?? 0}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">Ont répondu</p>
-          <p className="mt-1 font-display text-2xl font-extrabold">{counts.replied ?? 0}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">RDV</p>
+          <p className="mt-1 font-display text-2xl font-extrabold">{counts.rdv ?? 0}</p>
         </Card>
         <Card className="p-4">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">Gagnés</p>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">Clients</p>
           <p className="mt-1 font-display text-2xl font-extrabold">{counts.won ?? 0}</p>
         </Card>
       </div>

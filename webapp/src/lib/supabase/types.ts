@@ -6,6 +6,8 @@
 // contrainte du générique `GenericTable` de @supabase/postgrest-js, sans
 // quoi TypeScript retombe silencieusement sur `never` pour insert/update.
 
+import type { ProspectStatus } from "@/lib/crm-status";
+
 interface Relationship {
   foreignKeyName: string;
   columns: string[];
@@ -158,7 +160,7 @@ export interface Database {
           places_checked_at: string | null;
           quality_score: number;
           verification_sources: Record<string, boolean>;
-          status: "new" | "to_contact" | "contacted" | "replied" | "won" | "lost";
+          status: ProspectStatus;
           notes: string;
           created_at: string;
           updated_at: string;

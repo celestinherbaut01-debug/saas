@@ -11,6 +11,12 @@ export type Plan = "free" | "starter" | "pro" | "max";
 export const PLAN_ORDER: Plan[] = ["free", "starter", "pro", "max"];
 const PLAN_RANK: Record<Plan, number> = { free: 0, starter: 1, pro: 2, max: 3 };
 
+// PRO donne un Business OS déjà sérieux (les 3 modules génériques, utilisables
+// au quotidien). MAX ajoute la couche "intelligente" : NOVA connectée aux
+// données métier, alertes de stock bas. C'est la vraie différence Pro/Max —
+// pas juste plus de quota.
+export type BusinessOsLevel = "none" | "standard" | "advanced";
+
 export interface PlanEntitlements {
   id: Plan;
   label: string;
@@ -20,12 +26,14 @@ export interface PlanEntitlements {
   prospectMonthlyLimit: number;
   searchMonthlyLimit: number;
   novaMonthlyLimit: number;
+  novaDailyLimit: number | null; // null = pas de plafond journalier séparé
   canUseNova: boolean;
   canDraftEmails: boolean;
   canUseCampaigns: boolean; // envoi/relances automatiques via Gmail
   canUseAutoFollowup: boolean;
-  canUseBusinessOS: boolean;
+  businessOsLevel: BusinessOsLevel;
   canUseTeam: boolean;
+  teamMemberLimit: number;
   highlighted?: boolean;
   features: string[]; // libellés affichés tels quels sur /tarifs
 }
@@ -37,22 +45,24 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     tagline: "Pour découvrir ProspectFlow.",
     priceMonthly: 0,
     seats: 1,
-    prospectMonthlyLimit: 25,
-    searchMonthlyLimit: 5,
-    novaMonthlyLimit: 2 * 30, // affiché comme "2/jour" ; quota mensuel technique
+    prospectMonthlyLimit: 15,
+    searchMonthlyLimit: 3,
+    novaMonthlyLimit: 60,
+    novaDailyLimit: 2,
     canUseNova: true,
     canDraftEmails: false,
     canUseCampaigns: false,
     canUseAutoFollowup: false,
-    canUseBusinessOS: false,
+    businessOsLevel: "none",
     canUseTeam: false,
+    teamMemberLimit: 1,
     features: [
       "1 utilisateur",
-      "25 prospects vérifiés / mois",
-      "5 recherches / mois",
-      "CRM limité",
+      "15 prospects vérifiés / mois",
+      "3 recherches / mois",
+      "CRM très limité",
       "2 requêtes NOVA / jour",
-      "Aucune automatisation",
+      "Aucune automatisation, aucun Business OS",
     ],
   },
   starter: {
@@ -64,12 +74,14 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     prospectMonthlyLimit: 500,
     searchMonthlyLimit: 60,
     novaMonthlyLimit: 100,
+    novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
     canUseCampaigns: false,
     canUseAutoFollowup: false,
-    canUseBusinessOS: false,
+    businessOsLevel: "none",
     canUseTeam: false,
+    teamMemberLimit: 1,
     features: [
       "1 utilisateur",
       "500 prospects vérifiés / mois",
@@ -77,24 +89,26 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "CRM complet + score d'opportunité",
       "100 requêtes NOVA / mois",
       "Génération d'emails (validation manuelle obligatoire)",
-      "Analytics de base",
+      "Analytics simples",
     ],
   },
   pro: {
     id: "pro",
     label: "Pro",
-    tagline: "Pour automatiser le suivi commercial.",
-    priceMonthly: 129,
+    tagline: "Le logiciel de gestion de votre métier commence ici.",
+    priceMonthly: 149,
     seats: 1,
     prospectMonthlyLimit: 2000,
     searchMonthlyLimit: 200,
     novaMonthlyLimit: 500,
+    novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
     canUseCampaigns: true,
     canUseAutoFollowup: true,
-    canUseBusinessOS: false,
+    businessOsLevel: "standard",
     canUseTeam: false,
+    teamMemberLimit: 1,
     highlighted: true,
     features: [
       "Tout Starter",
@@ -102,32 +116,34 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "500 requêtes NOVA / mois",
       "Campagnes email Gmail + relances automatiques",
       "Classification automatique des réponses",
-      "Calendrier + récap quotidien",
-      "Analytics avancées",
+      "Calendrier + analytics avancées",
+      "Business OS STANDARD adapté à votre métier",
     ],
   },
   max: {
     id: "max",
     label: "Max",
-    tagline: "Pour piloter le métier au complet.",
+    tagline: "Le Business OS complet, avec NOVA en plus.",
     priceMonthly: 249,
     seats: 5,
     prospectMonthlyLimit: 5000,
     searchMonthlyLimit: 1000,
     novaMonthlyLimit: 1500,
+    novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
     canUseCampaigns: true,
     canUseAutoFollowup: true,
-    canUseBusinessOS: true,
+    businessOsLevel: "advanced",
     canUseTeam: true,
+    teamMemberLimit: 5,
     features: [
       "Tout Pro",
       "5 000+ prospects vérifiés / mois",
       "1 500 requêtes NOVA / mois",
-      "Jusqu'à 5 utilisateurs",
-      "Business OS complet adapté à votre métier",
-      "NOVA connecté au Business OS",
+      "Jusqu'à 5 utilisateurs (équipe)",
+      "Business OS AVANCÉ : alertes stock, workflows métier",
+      "NOVA connectée aux données Business OS",
       "Automatisations et analytics avancées",
       "Support prioritaire",
     ],
@@ -145,6 +161,11 @@ export function getEntitlements(plan: Plan): PlanEntitlements {
 
 export function planAtLeast(plan: Plan, min: Plan): boolean {
   return PLAN_RANK[plan] >= PLAN_RANK[min];
+}
+
+export function businessOsAtLeast(plan: Plan, min: BusinessOsLevel): boolean {
+  const rank: Record<BusinessOsLevel, number> = { none: 0, standard: 1, advanced: 2 };
+  return rank[ENTITLEMENTS[plan].businessOsLevel] >= rank[min];
 }
 
 export function isValidPlan(value: string): value is Plan {

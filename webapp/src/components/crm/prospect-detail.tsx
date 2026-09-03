@@ -9,15 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ProspectActions } from "@/components/prospect-actions";
 import { scoreBreakdown } from "@/lib/score-breakdown";
 import { cn } from "@/lib/utils";
-
-const STATUS_OPTIONS: [Prospect["status"], string][] = [
-  ["new", "Nouveau"],
-  ["to_contact", "À contacter"],
-  ["contacted", "Contacté"],
-  ["replied", "A répondu"],
-  ["won", "Gagné"],
-  ["lost", "Perdu"],
-];
+import { STATUS_OPTIONS } from "@/lib/crm-status";
 
 const ACTIVITY_LABEL: Record<Activity["type"], string> = {
   added_to_crm: "Ajouté au CRM",
@@ -87,6 +79,12 @@ export function ProspectDetail({
 
   return (
     <div className="flex flex-col gap-5">
+      {prospect.status === "do_not_contact" && (
+        <div className="rounded-lg bg-red-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-red-fg">
+          ⚠ Ne plus contacter — ce prospect ne doit recevoir aucun email ni relance.
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <Link href="/crm" className="text-[12px] text-muted">

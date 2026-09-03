@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NavLink } from "@/components/nav-link";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
-import { ENTITLEMENTS, planAtLeast, type Plan } from "@/lib/entitlements";
+import { ENTITLEMENTS, businessOsAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -52,11 +52,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <NavLink href="/analytics" icon="◫">
         Analytics
       </NavLink>
-      {planAtLeast(plan, "max") && (
-        <NavLink href="/business-os" icon="▣">
-          Business OS
-        </NavLink>
-      )}
+      <NavLink href="/business-os" icon="▣" badge={businessOsAtLeast(plan, "standard") ? undefined : "PRO"}>
+        Business OS
+      </NavLink>
       <NavLink href="/integrations" icon="◎">
         Intégrations
       </NavLink>

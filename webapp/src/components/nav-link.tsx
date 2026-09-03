@@ -4,7 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export function NavLink({ href, icon, children }: { href: string; icon: string; children: React.ReactNode }) {
+export function NavLink({
+  href,
+  icon,
+  badge,
+  children,
+}: {
+  href: string;
+  icon: string;
+  badge?: string;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const active = pathname === href;
 
@@ -17,7 +27,10 @@ export function NavLink({ href, icon, children }: { href: string; icon: string; 
       )}
     >
       <span className="w-4 text-center text-[13px]">{icon}</span>
-      {children}
+      <span className="flex-1">{children}</span>
+      {badge && (
+        <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[9px] font-bold text-accent">{badge}</span>
+      )}
     </Link>
   );
 }

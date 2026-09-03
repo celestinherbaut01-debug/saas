@@ -3,8 +3,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
-import { planAtLeast, type Plan } from "@/lib/entitlements";
-import { assertQuota, getUsage, incrementUsage } from "@/lib/quota";
+import { businessOsAtLeast, type Plan } from "@/lib/entitlements";
+import { assertNovaQuota, getUsage, incrementNovaUsage } from "@/lib/quota";
+import { isValidProspectStatus } from "@/lib/crm-status";
 
 export interface NovaMessage {
   role: "user" | "assistant";
@@ -45,7 +46,7 @@ const TOOLS = [
       properties: {
         status: {
           type: "string",
-          enum: ["new", "to_contact", "contacted", "replied", "won", "lost"],
+          enum: ["new", "to_contact", "contacted", "replied", "interested", "rdv", "quote", "won", "lost", "do_not_contact"],
           description: "Étape CRM",
         },
         website_quality: {
@@ -90,12 +91,12 @@ const BUSINESS_OS_TOOL = {
 };
 
 function buildTools(plan: Plan) {
-  return planAtLeast(plan, "max") ? [...TOOLS, BUSINESS_OS_TOOL] : TOOLS;
+  return businessOsAtLeast(plan, "advanced") ? [...TOOLS, BUSINESS_OS_TOOL] : TOOLS;
 }
 
 async function runTool(workspaceId: string, plan: Plan, name: string, input: Record<string, unknown>) {
   if (name === "get_business_os_data") {
-    if (!planAtLeast(plan, "max")) return { error: "Business OS réservé au plan Max." };
+    if (!businessOsAtLeast(plan, "advanced")) return { error: "NOVA connectée au Business OS réservé au plan Max." };
     const supabase = await createClient();
     const limit = typeof input.limit === "number" ? Math.min(input.limit, 50) : 20;
     const osModule = input.module;
@@ -176,9 +177,8 @@ async function runCrmTool(workspaceId: string, name: string, input: Record<strin
       .from("prospects")
       .select("company_name, city, status, website_quality, business_status, quality_score, distance_km")
       .eq("workspace_id", workspaceId);
-    const validStatuses = ["new", "to_contact", "contacted", "replied", "won", "lost"] as const;
-    if (typeof input.status === "string" && (validStatuses as readonly string[]).includes(input.status)) {
-      query = query.eq("status", input.status as (typeof validStatuses)[number]);
+    if (typeof input.status === "string" && isValidProspectStatus(input.status)) {
+      query = query.eq("status", input.status);
     }
     if (typeof input.website_quality === "string") query = query.eq("website_quality", input.website_quality);
     if (typeof input.city === "string") query = query.ilike("city", `%${input.city}%`);
@@ -211,7 +211,7 @@ function buildSystemPrompt(plan: Plan): string {
     "Pour rédiger un email, consulte TOUJOURS get_my_business_profile (l'entreprise qui envoie) ET get_prospect " +
     "(le destinataire) avant d'écrire — jamais un email générique. Précise toujours qu'il doit être relu et validé " +
     "avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
-  if (planAtLeast(plan, "max")) {
+  if (businessOsAtLeast(plan, "advanced")) {
     prompt +=
       " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre aux questions sur " +
       "les clients, le stock/les pièces ou les rendez-vous/interventions métier.";
@@ -239,7 +239,7 @@ export async function askNova(
 
   const plan = await getWorkspacePlan(workspaceId);
   try {
-    await assertQuota(workspaceId, "nova_requests", plan);
+    await assertNovaQuota(workspaceId, plan);
   } catch (e) {
     return { error: e instanceof Error ? e.message : "Quota NOVA atteint." };
   }
@@ -258,7 +258,7 @@ export async function askNova(
 
     if (response.stop_reason !== "tool_use") {
       const textBlock = response.content.find((b) => b.type === "text");
-      await incrementUsage(workspaceId, "nova_requests");
+      await incrementNovaUsage(workspaceId);
       return { reply: textBlock && "text" in textBlock ? textBlock.text : "" };
     }
 
