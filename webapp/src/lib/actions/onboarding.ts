@@ -88,5 +88,12 @@ export async function completeOnboarding(
 
   if (onboardError) return { error: onboardError.message };
 
+  await supabase.rpc("award_xp", {
+    p_workspace_id: workspace.id,
+    p_action: "onboarding_completed",
+    p_amount: 50,
+    p_dedupe: true,
+  });
+
   redirect("/dashboard");
 }

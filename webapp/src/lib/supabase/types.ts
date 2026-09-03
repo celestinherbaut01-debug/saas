@@ -275,6 +275,24 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["activities"]["Row"]>;
         Relationships: [];
       };
+      xp_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          prospect_id: string | null;
+          action: string;
+          xp_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          prospect_id?: string | null;
+          action: string;
+          xp_amount: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["xp_events"]["Row"]>;
+        Relationships: [];
+      };
       usage_counters: {
         Row: {
           workspace_id: string;
@@ -298,6 +316,16 @@ export interface Database {
       increment_usage: {
         Args: { p_workspace_id: string; p_period_key: string; p_metric: string; p_amount?: number };
         Returns: number;
+      };
+      award_xp: {
+        Args: {
+          p_workspace_id: string;
+          p_action: string;
+          p_amount: number;
+          p_prospect_id?: string | null;
+          p_dedupe?: boolean;
+        };
+        Returns: boolean;
       };
       is_workspace_member: { Args: { target_workspace_id: string }; Returns: boolean };
     };
