@@ -8,7 +8,7 @@ pour le contexte produit complet et les instructions de configuration
 
 ```bash
 npm install
-cp .env.local.example .env.local   # remplir avec vos clés Supabase
+cp .env.example .env.local   # remplir avec vos clés Supabase
 npm run dev
 ```
 

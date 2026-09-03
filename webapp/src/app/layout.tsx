@@ -21,6 +21,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
   title: "ProspectFlow OS",
   description: "Prospection B2B vérifiée, CRM et agent commercial IA pour les entreprises françaises.",
 };

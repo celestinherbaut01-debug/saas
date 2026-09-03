@@ -132,9 +132,11 @@ et cliquez **Run** :
 6. `supabase/migrations/0006_business_os.sql`
 7. `supabase/migrations/0007_plans_quotas.sql` (plan Free + quotas réels)
 8. `supabase/migrations/0008_xp.sql` (gamification XP)
+9. `supabase/migrations/0009_onboarding_rpc.sql` (onboarding atomique — corrige l'erreur RLS "new row violates ... workspaces")
+10. `supabase/migrations/0010_crm_pipeline.sql` (pipeline CRM complet : intéressé/RDV/devis/ne plus contacter)
 
 Toutes ces migrations sont rejouables sans risque (idempotentes) : en cas
-de doute sur ce qui a déjà été exécuté, vous pouvez relancer 0001 à 0008
+de doute sur ce qui a déjà été exécuté, vous pouvez relancer 0001 à 0010
 dans l'ordre sans perdre de données.
 
 (Alternative avec le CLI : `supabase link --project-ref <ref> && supabase db push`.)
@@ -178,7 +180,7 @@ Dashboard Supabase → **Authentication** → **URL Configuration** :
 ```bash
 cd webapp
 npm install
-cp .env.local.example .env.local   # puis remplir avec les valeurs de l'étape 3
+cp .env.example .env.local   # puis remplir avec les valeurs de l'étape 3
 npm run dev
 ```
 → [http://localhost:3000](http://localhost:3000)
@@ -197,10 +199,52 @@ Redémarrez `npm run dev`. Sans cette clé, `/agent` fonctionne quand même
 mais affiche clairement "non configuré" — jamais une fausse réponse.
 
 ### 9. (Optionnel) Stripe — pas encore branché
-Une clé `STRIPE_SECRET_KEY` peut déjà être ajoutée à `.env.local` (voir
-`.env.local.example`), mais aucun Checkout n'existe encore dans le code :
-la page **Paramètres → Abonnement** reste en lecture seule tant que cette
-intégration n'est pas construite (prochaine phase).
+Rien à faire ici pour l'instant : Stripe n'est pas encore intégré (aucun
+Checkout, aucun webhook). Les 4 plans (Free/Starter/Pro/Max), leurs quotas
+et le Business OS fonctionnent déjà sans Stripe — voir "Tester les plans
+sans payer" ci-dessous.
+
+### Tester les plans sans payer
+En développement (`NODE_ENV` ≠ `production`), la page **Paramètres →
+Abonnement** affiche des boutons Free/Starter/Pro/Max qui changent
+immédiatement le plan du workspace, sans Stripe. Utilisez-les pour vérifier
+que chaque plan voit exactement ce qu'il doit voir (ex. Business OS
+inaccessible en Free/Starter, visible dès Pro, alertes stock uniquement en
+Max). Ce switch est bloqué automatiquement en production.
+
+## Déployer sur Netlify
+
+Le dépôt contient un `netlify.toml` à la racine qui indique déjà à Netlify
+que l'app vit dans `webapp/`. Reste à faire, sur [app.netlify.com](https://app.netlify.com) :
+
+1. **Add new site → Import an existing project** → connectez ce dépôt GitHub.
+2. Netlify détecte `netlify.toml` et pré-remplit : Base directory `webapp`,
+   Build command `npm run build`, Publish directory gérée automatiquement
+   par le plugin Next.js (rien à changer).
+3. **Environment variables** → ajoutez (mêmes noms que `.env.local`, voir
+   `webapp/.env.example`) :
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_APP_URL` = votre URL Netlify, ex. `https://prospectflow-xxxx.netlify.app`
+   - `ANTHROPIC_API_KEY` (si vous activez NOVA)
+4. **Deploy site**.
+5. Une fois l'URL Netlify connue, ajoutez-la à deux endroits (en gardant
+   les valeurs localhost existantes, ne les supprimez pas — vous voulez que
+   les deux fonctionnent) :
+   - **Supabase** → Authentication → URL Configuration → **Redirect URLs** :
+     ajoutez `https://votre-site.netlify.app/auth/callback`
+   - **Google Cloud Console** → APIs et services → Identifiants → votre
+     OAuth Client → rien à ajouter ici : le redirect autorisé pointe déjà
+     vers `https://<votre-projet>.supabase.co/auth/v1/callback`, qui ne
+     change pas entre local et production (c'est Supabase qui reçoit
+     Google, jamais directement votre site).
+6. Testez `https://votre-site.netlify.app` en navigation privée : Google
+   Sign-In doit fonctionner exactement comme en local.
+
+Compatibilité vérifiée : App Router, Server Actions, Route Handlers et
+`proxy.ts` (l'équivalent Next.js 16 du middleware) fonctionnent nativement
+sous Netlify via le plugin Next.js officiel — aucun code de ce dépôt n'utilise
+`output: "export"` ni ne suppose un environnement Node spécifique.
 
 ## Le moteur de recherche (`supabase/functions/search-prospects`)
 
