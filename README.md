@@ -130,6 +130,12 @@ et cliquez **Run** :
 4. `supabase/migrations/0004_activities.sql`
 5. `supabase/migrations/0005_subscriptions.sql`
 6. `supabase/migrations/0006_business_os.sql`
+7. `supabase/migrations/0007_plans_quotas.sql` (plan Free + quotas réels)
+8. `supabase/migrations/0008_xp.sql` (gamification XP)
+
+Toutes ces migrations sont rejouables sans risque (idempotentes) : en cas
+de doute sur ce qui a déjà été exécuté, vous pouvez relancer 0001 à 0008
+dans l'ordre sans perdre de données.
 
 (Alternative avec le CLI : `supabase link --project-ref <ref> && supabase db push`.)
 
