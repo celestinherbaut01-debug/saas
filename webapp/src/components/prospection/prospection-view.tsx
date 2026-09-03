@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
-import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { cn } from "@/lib/utils";
 import { ProspectActions } from "@/components/prospect-actions";
+import { addProspectsToCrm } from "@/lib/actions/prospects";
+import { runProspectSearch } from "@/lib/actions/search";
 
 // Reflète supabase/functions/_shared/types.ts (EnrichedProspect) côté serveur.
 interface SearchResult {
@@ -67,8 +69,6 @@ export function ProspectionView({
   businessProfile: BusinessProfile | null;
   defaultTargetIds: string[];
 }) {
-  const supabase = createClient();
-
   const [targetIds, setTargetIds] = useState<string[]>(defaultTargetIds);
   const [address, setAddress] = useState<AddressValue | null>(
     businessProfile?.lat && businessProfile.lng
@@ -118,31 +118,36 @@ export function ProspectionView({
     setStatus({ kind: "info", text: "Recherche en cours — registre officiel, Google Places, analyse des sites…" });
     setChecked(new Set());
 
-    const { data, error } = await supabase.functions.invoke("search-prospects", {
-      body: {
-        lat: address.lat,
-        lng: address.lng,
-        radiusKm,
-        nafCodes: nafCodesForSelection(),
-        filters: {
-          operationalOnly,
-          excludeTempClosed,
-          excludeChains,
-          excludeAssociations,
-          excludeLargeGroups,
-          needContact,
-          maxEstablishmentsPerSiren,
-          webFilter,
-        },
+    const result = await runProspectSearch(workspaceId, {
+      lat: address.lat,
+      lng: address.lng,
+      radiusKm,
+      nafCodes: nafCodesForSelection(),
+      filters: {
+        operationalOnly,
+        excludeTempClosed,
+        excludeChains,
+        excludeAssociations,
+        excludeLargeGroups,
+        needContact,
+        maxEstablishmentsPerSiren,
+        webFilter,
       },
     });
 
     setSearching(false);
 
-    if (error || data?.error) {
-      setStatus({ kind: "err", text: `Erreur : ${error?.message ?? data.error}` });
+    if (!result.ok) {
+      setStatus({ kind: "err", text: `Erreur : ${result.error}` });
       return;
     }
+
+    const data = result.data as {
+      results: SearchResult[];
+      totalMatchedInRegistry: number;
+      verifiedCount: number;
+      googlePlacesConfigured: boolean;
+    };
 
     setResults(data.results ?? []);
     setStatus({
@@ -167,58 +172,45 @@ export function ProspectionView({
     if (rows.length === 0) return;
     setAdding(true);
 
-    const { data: inserted, error } = await supabase
-      .from("prospects")
-      .upsert(
-        rows.map((r) => ({
-          workspace_id: workspaceId,
-          siren: r.siren,
-          siret: r.siret,
-          company_name: r.companyName,
-          naf_code: r.nafCode,
-          street: r.street,
-          postal_code: r.postalCode,
-          city: r.city,
-          lat: r.lat,
-          lng: r.lng,
-          distance_km: r.distanceKm,
-          legal_status: r.etatAdministratif === "A" ? "active" : "closed",
-          nature_juridique: r.natureJuridique,
-          effectif_tranche: r.effectifTranche,
-          is_association: r.isAssociation,
-          is_large_group: r.isLargeGroup,
-          is_chain: r.isChain,
-          place_id: r.placeId,
-          business_status: r.businessStatus,
-          website_uri: r.websiteUri,
-          website_quality: r.websiteQuality,
-          phone: r.phone,
-          google_rating: r.googleRating,
-          google_rating_count: r.googleRatingCount,
-          places_checked_at: r.placesCheckedAt,
-          quality_score: r.qualityScore,
-          verification_sources: r.verificationSources,
-        })),
-        { onConflict: "workspace_id,siret" },
-      )
-      .select("id");
+    const result = await addProspectsToCrm(
+      workspaceId,
+      rows.map((r) => ({
+        workspace_id: workspaceId,
+        siren: r.siren,
+        siret: r.siret,
+        company_name: r.companyName,
+        naf_code: r.nafCode,
+        street: r.street,
+        postal_code: r.postalCode,
+        city: r.city,
+        lat: r.lat,
+        lng: r.lng,
+        distance_km: r.distanceKm,
+        legal_status: r.etatAdministratif === "A" ? "active" : "closed",
+        nature_juridique: r.natureJuridique,
+        effectif_tranche: r.effectifTranche,
+        is_association: r.isAssociation,
+        is_large_group: r.isLargeGroup,
+        is_chain: r.isChain,
+        place_id: r.placeId,
+        business_status: r.businessStatus,
+        website_uri: r.websiteUri,
+        website_quality: r.websiteQuality,
+        phone: r.phone,
+        google_rating: r.googleRating,
+        google_rating_count: r.googleRatingCount,
+        places_checked_at: r.placesCheckedAt,
+        quality_score: r.qualityScore,
+        verification_sources: r.verificationSources,
+      })),
+    );
 
     setAdding(false);
-    if (error) {
-      setStatus({ kind: "err", text: `Erreur à l'ajout au CRM : ${error.message}` });
+    if (!result.ok) {
+      setStatus({ kind: "err", text: result.error ?? "Erreur à l'ajout au CRM." });
     } else {
-      setStatus({ kind: "ok", text: `${rows.length} prospect(s) ajouté(s) au CRM.` });
+      setStatus({ kind: "ok", text: `${result.addedCount} prospect(s) ajouté(s) au CRM.` });
       setChecked(new Set());
-      if (inserted?.length) {
-        await supabase.from("activities").insert(
-          inserted.map((p) => ({
-            workspace_id: workspaceId,
-            prospect_id: p.id,
-            type: "added_to_crm" as const,
-            detail: "Depuis la Prospection",
-          })),
-        );
-      }
     }
   }
 
@@ -319,6 +311,14 @@ export function ProspectionView({
             )}
           >
             {status.text}
+            {status.kind === "err" && status.text.startsWith("Quota") && (
+              <>
+                {" "}
+                <Link href="/parametres" className="font-semibold underline">
+                  Voir les plans
+                </Link>
+              </>
+            )}
           </p>
         )}
       </Card>

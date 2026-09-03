@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NavLink } from "@/components/nav-link";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
+import { ENTITLEMENTS, planAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
@@ -31,7 +32,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           .maybeSingle()
       ).data
     : null;
-  const plan = subscription?.plan ?? "starter";
+  const plan: Plan = subscription?.plan ?? "free";
+  const entitlements = ENTITLEMENTS[plan];
 
   return (
     <div className="grid min-h-screen grid-cols-[240px_1fr]">
@@ -43,7 +45,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <div>
             <p className="font-display text-[13px] font-extrabold text-white">ProspectFlow</p>
             <p className="text-[9px] font-semibold uppercase tracking-wide text-sidebar-ink-dim">
-              Plan {plan}
+              Plan {entitlements.label}
             </p>
           </div>
         </div>
@@ -60,7 +62,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <NavLink href="/agent" icon="✦">
           Agent IA
         </NavLink>
-        {plan === "max" && (
+        {planAtLeast(plan, "max") && (
           <NavLink href="/business-os" icon="▣">
             Business OS
           </NavLink>

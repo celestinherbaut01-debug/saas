@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
+import { planAtLeast, type Plan } from "@/lib/entitlements";
 
-export type Plan = "starter" | "pro" | "max";
-
-const PLAN_RANK: Record<Plan, number> = { starter: 0, pro: 1, max: 2 };
+export type { Plan };
+export { planAtLeast };
 
 export const PLAN_LABEL: Record<Plan, string> = {
+  free: "Free",
   starter: "Starter",
   pro: "Pro",
   max: "Max",
@@ -23,12 +24,8 @@ export async function getWorkspacePlan(workspaceId: string): Promise<Plan> {
     .eq("workspace_id", workspaceId)
     .maybeSingle();
 
-  if (!data || data.status === "canceled" || data.status === "past_due") return "starter";
+  if (!data || data.status === "canceled" || data.status === "past_due") return "free";
   return data.plan;
-}
-
-export function planAtLeast(plan: Plan, min: Plan): boolean {
-  return PLAN_RANK[plan] >= PLAN_RANK[min];
 }
 
 /** Lève une erreur explicite (jamais un contournement silencieux) si le plan est insuffisant. */

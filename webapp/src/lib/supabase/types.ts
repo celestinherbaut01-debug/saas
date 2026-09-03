@@ -35,7 +35,7 @@ export interface Database {
           id: string;
           name: string;
           created_by: string;
-          plan: "starter" | "pro" | "max";
+          plan: "free" | "starter" | "pro" | "max";
           created_at: string;
           updated_at: string;
         };
@@ -43,7 +43,7 @@ export interface Database {
           id?: string;
           name: string;
           created_by: string;
-          plan?: "starter" | "pro" | "max";
+          plan?: "free" | "starter" | "pro" | "max";
         };
         Update: Partial<Database["public"]["Tables"]["workspaces"]["Row"]>;
         Relationships: [];
@@ -175,7 +175,7 @@ export interface Database {
       subscriptions: {
         Row: {
           workspace_id: string;
-          plan: "starter" | "pro" | "max";
+          plan: "free" | "starter" | "pro" | "max";
           status: "active" | "trialing" | "past_due" | "canceled";
           billing_period: "monthly" | "yearly" | null;
           stripe_customer_id: string | null;
@@ -275,9 +275,32 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["activities"]["Row"]>;
         Relationships: [];
       };
+      usage_counters: {
+        Row: {
+          workspace_id: string;
+          period_key: string;
+          metric: "nova_requests" | "prospects_added" | "searches";
+          count: number;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          period_key: string;
+          metric: "nova_requests" | "prospects_added" | "searches";
+          count?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["usage_counters"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      increment_usage: {
+        Args: { p_workspace_id: string; p_period_key: string; p_metric: string; p_amount?: number };
+        Returns: number;
+      };
+      is_workspace_member: { Args: { target_workspace_id: string }; Returns: boolean };
+    };
   };
 }
 

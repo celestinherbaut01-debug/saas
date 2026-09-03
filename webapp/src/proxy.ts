@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // routes de l'application pour les utilisateurs non connectés / pas encore
 // onboardés.
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth", "/tarifs"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

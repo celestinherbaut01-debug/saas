@@ -2,6 +2,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspacePlan } from "@/lib/plan";
+import { assertQuota, getUsage, incrementUsage } from "@/lib/quota";
 
 export interface NovaMessage {
   role: "user" | "assistant";
@@ -10,6 +12,11 @@ export interface NovaMessage {
 
 export async function isNovaConfigured(): Promise<boolean> {
   return Boolean(process.env.ANTHROPIC_API_KEY);
+}
+
+export async function getNovaUsage(workspaceId: string) {
+  const plan = await getWorkspacePlan(workspaceId);
+  return getUsage(workspaceId, "nova_requests", plan);
 }
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -139,6 +146,13 @@ export async function askNova(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Session expirée." };
 
+  const plan = await getWorkspacePlan(workspaceId);
+  try {
+    await assertQuota(workspaceId, "nova_requests", plan);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Quota NOVA atteint." };
+  }
+
   const client = new Anthropic({ apiKey });
   const messages: Anthropic.MessageParam[] = history.map((m) => ({ role: m.role, content: m.content }));
 
@@ -153,6 +167,7 @@ export async function askNova(
 
     if (response.stop_reason !== "tool_use") {
       const textBlock = response.content.find((b) => b.type === "text");
+      await incrementUsage(workspaceId, "nova_requests");
       return { reply: textBlock && "text" in textBlock ? textBlock.text : "" };
     }
 
