@@ -16,7 +16,6 @@ export interface OnboardingPayload {
     lat: number;
     lng: number;
   } | null;
-  radiusKm: number;
   targetCategoryIds: string[];
 }
 
@@ -82,8 +81,9 @@ export async function completeOnboarding(
     p_city: payload.address.city,
     p_lat: payload.address.lat,
     p_lng: payload.address.lng,
-    p_radius_km: payload.radiusKm,
     p_target_category_ids: payload.targetCategoryIds,
+    // Rayon volontairement absent : n'est plus choisi à l'onboarding, mais
+    // sur la page Prospection (dépend du forfait) — voir 0014.
   });
 
   if (error) {

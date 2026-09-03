@@ -25,6 +25,7 @@ export interface PlanEntitlements {
   seats: number; // utilisateurs inclus (1 = pas d'équipe)
   prospectMonthlyLimit: number;
   searchMonthlyLimit: number;
+  maxRadiusKm: number;
   novaMonthlyLimit: number;
   novaDailyLimit: number | null; // null = pas de plafond journalier séparé
   canUseNova: boolean;
@@ -47,6 +48,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     seats: 1,
     prospectMonthlyLimit: 15,
     searchMonthlyLimit: 3,
+    maxRadiusKm: 10,
     novaMonthlyLimit: 60,
     novaDailyLimit: 2,
     canUseNova: true,
@@ -57,6 +59,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canUseTeam: false,
     teamMemberLimit: 1,
     features: [
+      "Rayon de prospection jusqu'à 10 km",
       "1 utilisateur",
       "15 prospects vérifiés / mois",
       "3 recherches / mois",
@@ -73,6 +76,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     seats: 1,
     prospectMonthlyLimit: 500,
     searchMonthlyLimit: 60,
+    maxRadiusKm: 50,
     novaMonthlyLimit: 100,
     novaDailyLimit: null,
     canUseNova: true,
@@ -83,6 +87,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canUseTeam: false,
     teamMemberLimit: 1,
     features: [
+      "Rayon de prospection jusqu'à 50 km",
       "1 utilisateur",
       "500 prospects vérifiés / mois",
       "Recherche avancée (zones, rayon, métiers)",
@@ -100,6 +105,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     seats: 1,
     prospectMonthlyLimit: 2000,
     searchMonthlyLimit: 200,
+    maxRadiusKm: 150,
     novaMonthlyLimit: 500,
     novaDailyLimit: null,
     canUseNova: true,
@@ -111,6 +117,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     teamMemberLimit: 1,
     highlighted: true,
     features: [
+      "Rayon de prospection jusqu'à 150 km",
       "Tout Starter",
       "2 000 prospects vérifiés / mois",
       "500 requêtes NOVA / mois",
@@ -128,6 +135,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     seats: 5,
     prospectMonthlyLimit: 5000,
     searchMonthlyLimit: 1000,
+    maxRadiusKm: 250,
     novaMonthlyLimit: 1500,
     novaDailyLimit: null,
     canUseNova: true,
@@ -138,6 +146,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canUseTeam: true,
     teamMemberLimit: 5,
     features: [
+      "Rayon de prospection jusqu'à 250 km",
       "Tout Pro",
       "5 000+ prospects vérifiés / mois",
       "1 500 requêtes NOVA / mois",

@@ -63,11 +63,15 @@ export function ProspectionView({
   categories,
   businessProfile,
   defaultTargetIds,
+  maxRadiusKm,
+  planLabel,
 }: {
   workspaceId: string;
   categories: BusinessCategory[];
   businessProfile: BusinessProfile | null;
   defaultTargetIds: string[];
+  maxRadiusKm: number;
+  planLabel: string;
 }) {
   const [targetIds, setTargetIds] = useState<string[]>(defaultTargetIds);
   const [address, setAddress] = useState<AddressValue | null>(
@@ -84,7 +88,10 @@ export function ProspectionView({
         }
       : null,
   );
-  const [radiusKm, setRadiusKm] = useState(businessProfile?.default_radius_km ?? 20);
+  // Le rayon est borné au maximum du forfait actuel — y compris si une
+  // valeur plus large avait été enregistrée sous un forfait supérieur
+  // depuis rétrogradé.
+  const [radiusKm, setRadiusKm] = useState(Math.min(businessProfile?.default_radius_km ?? 20, maxRadiusKm));
 
   const [operationalOnly, setOperationalOnly] = useState(true);
   const [excludeTempClosed, setExcludeTempClosed] = useState(true);
@@ -241,12 +248,24 @@ export function ProspectionView({
               <input
                 type="range"
                 min={0.5}
-                max={250}
+                max={maxRadiusKm}
                 step={0.5}
                 value={radiusKm}
-                onChange={(e) => setRadiusKm(Number(e.target.value))}
+                onChange={(e) => setRadiusKm(Math.min(Number(e.target.value), maxRadiusKm))}
                 className="w-full"
               />
+              <p className="mt-1 text-[11px] text-faint">
+                Votre forfait {planLabel} permet jusqu&apos;à {maxRadiusKm} km.
+                {maxRadiusKm < 250 && (
+                  <>
+                    {" "}
+                    <Link href="/parametres" className="font-semibold text-accent">
+                      Passer à un forfait supérieur
+                    </Link>{" "}
+                    pour élargir la zone.
+                  </>
+                )}
+              </p>
             </div>
           </div>
         </Card>
@@ -311,7 +330,7 @@ export function ProspectionView({
             )}
           >
             {status.text}
-            {status.kind === "err" && status.text.startsWith("Quota") && (
+            {status.kind === "err" && status.text.includes("supérieur") && (
               <>
                 {" "}
                 <Link href="/parametres" className="font-semibold underline">

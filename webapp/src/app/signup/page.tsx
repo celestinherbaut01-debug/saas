@@ -19,15 +19,8 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
     data: { user },
   } = await supabase.auth.getUser();
 
-  let continueHref = "/dashboard";
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("onboarding_completed")
-      .eq("id", user.id)
-      .maybeSingle();
-    continueHref = profile?.onboarding_completed ? "/dashboard" : "/onboarding";
-  }
+  // Toujours /dashboard : l'onboarding incomplet n'empêche plus l'accès.
+  const continueHref = "/dashboard";
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-16">

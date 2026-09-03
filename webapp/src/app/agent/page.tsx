@@ -18,7 +18,7 @@ export default async function AgentPage() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership) redirect("/onboarding");
+  if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
   const configured = await isNovaConfigured();
 

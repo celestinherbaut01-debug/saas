@@ -11,7 +11,7 @@ import { TargetCategoryPicker } from "@/components/onboarding/target-category-pi
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { completeOnboarding } from "@/lib/actions/onboarding";
 
-const STEPS = ["Entreprise", "Votre métier", "Vos cibles", "Zone de prospection", "Vérification"] as const;
+const STEPS = ["Entreprise", "Votre métier", "Vos cibles", "Localisation"] as const;
 
 /**
  * Recommandations heuristiques métier -> cibles, par slug de business_categories.
@@ -47,18 +47,26 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [targetIds, setTargetIds] = useState<string[]>([]);
 
   const [address, setAddress] = useState<AddressValue | null>(null);
-  const [radiusKm, setRadiusKm] = useState(20);
+  const [showAllTargets, setShowAllTargets] = useState(false);
 
   const ownSlug = categories.find((c) => c.id === ownCategoryId)?.slug ?? null;
   const recommendedSlugs = ownSlug ? RECOMMENDATIONS[ownSlug] : undefined;
+
+  const targetNames = useMemo(
+    () => targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter((n): n is string => Boolean(n)),
+    [targetIds, categories],
+  );
+  const visibleTargetNames = showAllTargets ? targetNames : targetNames.slice(0, 6);
+  const hiddenTargetCount = targetNames.length - visibleTargetNames.length;
 
   const canNext = useMemo(() => {
     if (step === 0) return companyName.trim().length > 0 && offer.trim().length > 0;
     if (step === 1) return true; // optionnel
     if (step === 2) return targetIds.length > 0;
-    if (step === 3) return address !== null;
     return true;
-  }, [step, companyName, offer, targetIds, address]);
+  }, [step, companyName, offer, targetIds]);
+
+  const canSubmit = address !== null;
 
   function submit() {
     setError(null);
@@ -73,7 +81,6 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
         address: address
           ? { street: address.street, postalCode: address.postalCode, city: address.city, lat: address.lat, lng: address.lng }
           : null,
-        radiusKm,
         targetCategoryIds: targetIds,
       });
       // En cas d'erreur : on reste sur cette même étape (pas de retour à
@@ -182,31 +189,48 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
             <div className="flex flex-col gap-1.5">
               <Label>Adresse de départ exacte</Label>
               <AddressField value={address} onChange={setAddress} />
+              <p className="text-[11.5px] text-faint">
+                Le rayon de prospection se règle directement dans Prospection, selon votre forfait.
+              </p>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label>Rayon de prospection : {radiusKm} km</Label>
-              <input
-                type="range"
-                min={0.5}
-                max={250}
-                step={0.5}
-                value={radiusKm}
-                onChange={(e) => setRadiusKm(Number(e.target.value))}
-              />
-            </div>
-          </div>
-        )}
 
-        {step === 4 && (
-          <div className="mt-4 flex flex-col gap-3 text-[13px]">
-            <Row label="Entreprise" value={companyName} />
-            <Row label="Offre" value={offer} />
-            <Row label="Votre métier" value={categories.find((c) => c.id === ownCategoryId)?.name ?? "Non précisé"} />
-            <Row
-              label="Cibles"
-              value={targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter(Boolean).join(", ")}
-            />
-            <Row label="Zone" value={address ? `${address.label} — ${radiusKm} km` : "—"} />
+            <div className="rounded-lg border border-line bg-soft px-3 py-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">
+                Récapitulatif — {companyName || "Entreprise sans nom"}
+              </p>
+              <p className="mt-1 text-[11.5px] text-muted">
+                {categories.find((c) => c.id === ownCategoryId)?.name ?? "Métier non précisé"}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {visibleTargetNames.map((name) => (
+                  <span
+                    key={name}
+                    className="rounded-full border border-line bg-panel px-2 py-0.5 text-[11px] text-ink"
+                  >
+                    {name}
+                  </span>
+                ))}
+                {hiddenTargetCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTargets(true)}
+                    className="rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-accent"
+                  >
+                    +{hiddenTargetCount} autres — voir toutes les cibles
+                  </button>
+                )}
+                {showAllTargets && targetNames.length > 6 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllTargets(false)}
+                    className="text-[11px] font-medium text-faint underline"
+                  >
+                    Réduire
+                  </button>
+                )}
+              </div>
+            </div>
+
             {error && (
               <div className="rounded-lg bg-red-bg px-3 py-2.5">
                 <p className="text-[12.5px] text-red-fg">{error}</p>
@@ -227,7 +251,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
               Continuer
             </Button>
           ) : (
-            <Button type="button" disabled={pending} onClick={submit} className="flex items-center gap-2">
+            <Button type="button" disabled={pending || !canSubmit} onClick={submit} className="flex items-center gap-2">
               {pending && (
                 <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-bg/40 border-t-bg" />
               )}
@@ -240,15 +264,6 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           )}
         </div>
       </Card>
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-line pb-2">
-      <span className="text-faint">{label}</span>
-      <span className="text-right font-medium text-ink">{value || "—"}</span>
     </div>
   );
 }

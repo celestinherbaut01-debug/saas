@@ -17,7 +17,7 @@ export default async function CrmPage() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership) redirect("/onboarding");
+  if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
   const { data: prospects } = await supabase
     .from("prospects")

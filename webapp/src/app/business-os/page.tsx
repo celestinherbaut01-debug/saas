@@ -22,7 +22,7 @@ export default async function BusinessOsPage() {
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
-  if (!membership) redirect("/onboarding");
+  if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
   const workspaceId = membership.workspace_id;
   const plan = await getWorkspacePlan(workspaceId);

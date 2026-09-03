@@ -18,15 +18,9 @@ export default async function LoginPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  let continueHref = next ?? "/dashboard";
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("onboarding_completed")
-      .eq("id", user.id)
-      .maybeSingle();
-    continueHref = profile?.onboarding_completed ? next ?? "/dashboard" : "/onboarding";
-  }
+  // Toujours /dashboard (ou la page demandée à l'origine) : l'onboarding
+  // incomplet n'empêche plus l'accès à l'application.
+  const continueHref = next ?? "/dashboard";
 
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-16">

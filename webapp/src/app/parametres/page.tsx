@@ -19,7 +19,7 @@ export default async function ParametresPage() {
     .limit(1)
     .maybeSingle();
 
-  if (!membership) redirect("/onboarding");
+  if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
   const [{ data: businessProfile }, { data: subscription }] = await Promise.all([
     supabase.from("business_profiles").select("*").eq("workspace_id", membership.workspace_id).maybeSingle(),

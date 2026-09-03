@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { AppShell } from "@/components/app-shell";
 import { getXpSummary, xpActionLabel } from "@/lib/xp";
-import { getWorkspacePlan } from "@/lib/plan";
+import { getUserAppState } from "@/lib/app-state";
 import { PlanIntentBanner } from "@/components/plan-intent";
+import { OnboardingBanner } from "@/components/onboarding-banner";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -13,42 +14,42 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // État applicatif calculé une seule fois, de la même façon partout dans
+  // l'app (voir lib/app-state.ts) — évite qu'une page décide "onboarding
+  // fait" et une autre "non" à partir de lectures légèrement différentes.
+  const appState = await getUserAppState(supabase, user.id);
+  const { workspaceId, plan, businessProfileExists } = appState;
 
   const [{ count: targetCount }, { count: prospectCount }, { count: wonCount }, { count: appointmentCount }] =
-    membership
+    workspaceId
       ? await Promise.all([
           supabase
             .from("workspace_targets")
             .select("category_id", { count: "exact", head: true })
-            .eq("workspace_id", membership.workspace_id),
+            .eq("workspace_id", workspaceId),
           supabase
             .from("prospects")
             .select("id", { count: "exact", head: true })
-            .eq("workspace_id", membership.workspace_id),
+            .eq("workspace_id", workspaceId),
           supabase
             .from("prospects")
             .select("id", { count: "exact", head: true })
-            .eq("workspace_id", membership.workspace_id)
+            .eq("workspace_id", workspaceId)
             .eq("status", "won"),
           supabase
             .from("appointments")
             .select("id", { count: "exact", head: true })
-            .eq("workspace_id", membership.workspace_id),
+            .eq("workspace_id", workspaceId),
         ])
       : [{ count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }];
 
-  const xp = membership ? await getXpSummary(membership.workspace_id) : null;
-  const plan = membership ? await getWorkspacePlan(membership.workspace_id) : "free";
+  const xp = workspaceId ? await getXpSummary(workspaceId) : null;
+  const configured = businessProfileExists;
 
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
+        {!configured && <OnboardingBanner />}
         <PlanIntentBanner currentPlan={plan} />
 
         <div>

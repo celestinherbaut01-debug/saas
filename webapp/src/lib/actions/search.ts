@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
 import { assertQuota, incrementUsage } from "@/lib/quota";
+import { ENTITLEMENTS } from "@/lib/entitlements";
 
 export interface SearchProspectsParams {
   lat: number;
@@ -34,6 +35,15 @@ export async function runProspectSearch(
   if (!user) return { ok: false, error: "Session expirée." };
 
   const plan = await getWorkspacePlan(workspaceId);
+
+  const maxRadiusKm = ENTITLEMENTS[plan].maxRadiusKm;
+  if (params.radiusKm > maxRadiusKm) {
+    return {
+      ok: false,
+      error: `Rayon trop grand pour votre forfait ${ENTITLEMENTS[plan].label} (max ${maxRadiusKm} km). Passez à un forfait supérieur dans Paramètres.`,
+    };
+  }
+
   try {
     await assertQuota(workspaceId, "searches", plan);
   } catch (e) {

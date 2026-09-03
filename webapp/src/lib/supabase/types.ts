@@ -331,8 +331,8 @@ export interface Database {
           p_city: string;
           p_lat: number;
           p_lng: number;
-          p_radius_km: number;
           p_target_category_ids: string[];
+          p_radius_km?: number | null;
         };
         Returns: string;
       };
