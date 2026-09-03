@@ -56,20 +56,24 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  // Connecté : ne reste pas sur /login ou /signup.
-  if (pathname === "/login" || pathname === "/signup") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+  // Contrairement à avant, un utilisateur connecté qui visite /login ou
+  // /signup n'est plus redirigé automatiquement : ces pages affichent
+  // elles-mêmes un écran "Vous êtes déjà connecté" (voir SessionGate) —
+  // aucune redirection invisible, l'utilisateur choisit explicitement.
+  if (pathname.startsWith("/auth") || pathname === "/onboarding") {
+    return response;
   }
 
-  if (pathname.startsWith("/auth") || pathname === "/onboarding") {
+  // "/" reste toujours la landing publique, même connecté — plus de
+  // redirection automatique et invisible vers /onboarding ou /dashboard
+  // simplement parce qu'une session existe.
+  if (pathname === "/") {
     return response;
   }
 
   // Connecté mais pas encore onboardé -> forcer l'onboarding avant le reste
   // de l'application (dashboard, prospection, etc.).
-  if (!isPublicPath(pathname) || pathname === "/") {
+  if (!isPublicPath(pathname)) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed")

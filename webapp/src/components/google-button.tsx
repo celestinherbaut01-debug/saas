@@ -25,7 +25,22 @@ function timeout(ms: number): Promise<never> {
  * debug visible (hors production) montre l'étape exacte atteinte, pour ne
  * pas dépendre de la console navigateur.
  */
-export function GoogleButton({ next }: { next?: string }) {
+export function GoogleButton({
+  next,
+  label,
+  forceAccountSelection,
+}: {
+  next?: string;
+  /** Libellé du bouton — défaut "Continuer avec Google". */
+  label?: string;
+  /**
+   * Force Google à toujours proposer le choix du compte (queryParams
+   * prompt: "select_account"), même si une session existe déjà côté
+   * navigateur pour un compte Google. Ne casse rien pour les appels sans
+   * cette option — comportement par défaut inchangé.
+   */
+  forceAccountSelection?: boolean;
+}) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<string[]>([]);
@@ -56,7 +71,11 @@ export function GoogleButton({ next }: { next?: string }) {
       const { data, error: oauthError } = await Promise.race([
         supabase.auth.signInWithOAuth({
           provider: "google",
-          options: { redirectTo: redirectTo.toString(), skipBrowserRedirect: true },
+          options: {
+            redirectTo: redirectTo.toString(),
+            skipBrowserRedirect: true,
+            ...(forceAccountSelection ? { queryParams: { prompt: "select_account" } } : {}),
+          },
         }),
         timeout(TIMEOUT_MS),
       ]);
@@ -108,7 +127,7 @@ export function GoogleButton({ next }: { next?: string }) {
           <path fill="#4CAF50" d="M24 44c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 35.4 27 36 24 36c-5.2 0-9.6-3.3-11.2-7.9l-6.6 5C9.9 39.7 16.4 44 24 44z"/>
           <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4 5.5l6.6 5.4C41.5 35.8 44 30.3 44 24c0-1.3-.1-2.7-.4-3.5z"/>
         </svg>
-        {loading ? "Redirection vers Google…" : "Continuer avec Google"}
+        {loading ? "Redirection vers Google…" : label ?? "Continuer avec Google"}
       </Button>
       {error && <p className="text-[12px] text-red-fg">{error}</p>}
       {DEV && steps.length > 0 && (

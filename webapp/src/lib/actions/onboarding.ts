@@ -22,8 +22,20 @@ export interface OnboardingPayload {
 
 export interface OnboardingResult {
   error: string | null;
+  /** Détail technique réel (jamais inventé) — présent uniquement hors production. */
+  devDetail?: string;
   ok?: boolean;
   workspaceId?: string;
+}
+
+const GENERIC_ERROR =
+  "Impossible de finaliser votre compte pour le moment. Votre configuration n'a pas été perdue. Réessayez ou contactez le support.";
+
+function serverError(realMessage: string): OnboardingResult {
+  return {
+    error: GENERIC_ERROR,
+    devDetail: process.env.NODE_ENV !== "production" ? realMessage : undefined,
+  };
 }
 
 export async function completeOnboarding(
@@ -76,17 +88,9 @@ export async function completeOnboarding(
 
   if (error) {
     console.error("[onboarding] complete_onboarding RPC error:", error);
-    // "relation ... does not exist" (code Postgres 42P01) = une migration
-    // n'a pas été appliquée sur ce projet Supabase — jamais un message
-    // technique brut affiché à l'utilisateur. L'erreur réelle reste dans
-    // les logs serveur pour le diagnostic.
-    if (error.code === "42P01" || error.message.includes("does not exist")) {
-      return {
-        error:
-          "Configuration serveur incomplète — certaines migrations Supabase ne semblent pas appliquées. Contactez le support.",
-      };
-    }
-    return { error: error.message };
+    // Jamais de message Postgres brut affiché à l'utilisateur. L'erreur
+    // réelle reste dans les logs serveur + en devDetail (dev uniquement).
+    return serverError(`RPC complete_onboarding: ${error.message} (code: ${error.code ?? "?"})`);
   }
 
   const { data: workspaceCheck } = await supabase
@@ -106,10 +110,9 @@ export async function completeOnboarding(
 
   if (!after || after.onboarding_completed !== true) {
     console.error("[onboarding] ÉCHEC : onboarding_completed n'est pas true après complete_onboarding — arrêt, pas de faux succès.");
-    return {
-      error:
-        "L'onboarding ne s'est pas terminé correctement côté serveur (profil non mis à jour). Réessayez ou contactez le support.",
-    };
+    return serverError(
+      `profiles.onboarding_completed n'est pas passé à true après le RPC (found=${after !== null}, error=${afterError?.message ?? "none"})`,
+    );
   }
 
   // Revalide le cache Next.js pour /dashboard et /onboarding : sans ça, un

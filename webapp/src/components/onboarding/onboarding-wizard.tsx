@@ -36,6 +36,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [step, setStep] = useState(0);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [devDetail, setDevDetail] = useState<string | undefined>(undefined);
 
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
@@ -61,6 +62,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
 
   function submit() {
     setError(null);
+    setDevDetail(undefined);
     startTransition(async () => {
       const result = await completeOnboarding({
         companyName,
@@ -74,8 +76,13 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
         radiusKm,
         targetCategoryIds: targetIds,
       });
+      // En cas d'erreur : on reste sur cette même étape (pas de retour à
+      // l'étape 1), rien n'est réinitialisé — toutes les données saisies
+      // (entreprise, offre, métier, cibles, zone, rayon) restent dans le
+      // state du composant, prêtes pour un nouvel essai.
       if (result?.error) {
         setError(result.error);
+        setDevDetail(result.devDetail);
         return;
       }
       // Navigation complète (pas router.push) : garantit que proxy.ts
@@ -104,10 +111,13 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
       </div>
 
       <Card className="shadow-sm">
-        <h1 className="font-display text-lg font-extrabold">{STEPS[step]}</h1>
+        <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">
+          Étape {step + 1} sur {STEPS.length}
+        </p>
+        <h1 className="mt-1 font-display text-[21px] font-extrabold tracking-tight text-ink">{STEPS[step]}</h1>
 
         {step === 0 && (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-5 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="companyName">Nom de l&apos;entreprise</Label>
               <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="The North Company" />
@@ -197,7 +207,14 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
               value={targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter(Boolean).join(", ")}
             />
             <Row label="Zone" value={address ? `${address.label} — ${radiusKm} km` : "—"} />
-            {error && <p className="text-[12px] text-red-fg">{error}</p>}
+            {error && (
+              <div className="rounded-lg bg-red-bg px-3 py-2.5">
+                <p className="text-[12.5px] text-red-fg">{error}</p>
+                {devDetail && (
+                  <p className="mt-1.5 font-mono text-[10.5px] text-red-fg/70">Détail technique (dev) : {devDetail}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -210,8 +227,15 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
               Continuer
             </Button>
           ) : (
-            <Button type="button" disabled={pending} onClick={submit}>
-              {pending ? "Création…" : "Trouver mes premiers prospects"}
+            <Button type="button" disabled={pending} onClick={submit} className="flex items-center gap-2">
+              {pending && (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-bg/40 border-t-bg" />
+              )}
+              {pending
+                ? "Configuration de votre espace…"
+                : error
+                  ? "Réessayer"
+                  : "Trouver mes premiers prospects"}
             </Button>
           )}
         </div>

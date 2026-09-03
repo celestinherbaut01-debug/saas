@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
 
@@ -9,7 +8,11 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (user) redirect("/dashboard");
+  // Plus de redirection automatique et invisible : "/" reste toujours la
+  // landing, même pour un utilisateur déjà connecté. C'est "/login" qui
+  // propose explicitement de continuer vers son espace (voir SessionGate).
+  const ctaHref = user ? "/login" : "/signup";
+  const ctaLabel = user ? "Accéder à mon espace" : "Essayer gratuitement";
 
   return (
     <div className="flex flex-1 flex-col">
@@ -25,8 +28,8 @@ export default async function Home() {
             d&apos;être montrée. Aucun prospect fictif, aucune donnée inventée — jamais.
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link href="/signup" className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg">
-              Essayer gratuitement
+            <Link href={ctaHref} className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg">
+              {ctaLabel}
             </Link>
             <Link
               href="/tarifs"
@@ -101,8 +104,8 @@ export default async function Home() {
         <section className="flex w-full max-w-2xl flex-col items-center gap-4 rounded-2xl border border-line bg-panel p-10 text-center">
           <h2 className="font-display text-xl font-extrabold">Prêt à trouver vos prochains clients ?</h2>
           <p className="text-[13px] text-muted">Gratuit pour démarrer, aucune carte requise.</p>
-          <Link href="/signup" className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg">
-            Créer mon compte
+          <Link href={ctaHref} className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg">
+            {user ? "Accéder à mon espace" : "Créer mon compte"}
           </Link>
         </section>
       </main>
