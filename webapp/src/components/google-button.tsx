@@ -1,36 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+
+const TIMEOUT_MS = 8000;
 
 /**
  * Vraie connexion Google OAuth via Supabase Auth : redirige réellement vers
  * l'écran de sélection de compte Google (aucune simulation). Nécessite que
  * le provider Google soit activé dans Supabase Auth (voir README) — sans
  * quoi Supabase renverra une erreur explicite, jamais une fausse session.
+ *
+ * skipBrowserRedirect + window.location.assign(data.url) explicite plutôt
+ * que de laisser supabase-js gérer la redirection en interne : si l'appel
+ * signInWithOAuth reste en attente (réseau lent, storage bloqué en
+ * navigation privée...), le garde-fou de 8s réactive le bouton au lieu de
+ * bloquer indéfiniment sur "Redirection vers Google…".
  */
 export function GoogleButton({ next }: { next?: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settledRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   async function handleClick() {
+    console.log("[GoogleButton] clic — démarrage OAuth");
+    settledRef.current = false;
     setLoading(true);
     setError(null);
-    const supabase = createClient();
-    const redirectTo = new URL("/auth/callback", window.location.origin);
-    if (next) redirectTo.searchParams.set("next", next);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: redirectTo.toString() },
-    });
+    timeoutRef.current = setTimeout(() => {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      console.error("[GoogleButton] timeout après", TIMEOUT_MS, "ms — aucune redirection reçue");
+      setLoading(false);
+      setError("Impossible de lancer la connexion Google. Réessayez.");
+    }, TIMEOUT_MS);
 
-    if (error) {
-      setError(error.message);
+    try {
+      const supabase = createClient();
+      const redirectTo = new URL("/auth/callback", window.location.origin);
+      if (next) redirectTo.searchParams.set("next", next);
+      console.log("[GoogleButton] redirectTo:", redirectTo.toString());
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: redirectTo.toString(), skipBrowserRedirect: true },
+      });
+
+      if (settledRef.current) return; // le timeout a déjà tranché
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      console.log("[GoogleButton] résultat data:", data, "error:", error);
+
+      if (error) {
+        settledRef.current = true;
+        console.error("[GoogleButton] erreur Supabase:", error);
+        setError(error.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!data?.url) {
+        settledRef.current = true;
+        console.error("[GoogleButton] aucune URL retournée par Supabase:", data);
+        setError("Impossible de lancer la connexion Google.");
+        setLoading(false);
+        return;
+      }
+
+      settledRef.current = true;
+      console.log("[GoogleButton] redirection vers:", data.url);
+      window.location.assign(data.url);
+      // Le composant démonte au changement de page — pas de setLoading(false) ici.
+    } catch (err) {
+      if (settledRef.current) return;
+      settledRef.current = true;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      console.error("[GoogleButton] exception:", err);
+      setError("Impossible de lancer la connexion Google.");
       setLoading(false);
     }
-    // Sinon : le navigateur est redirigé vers Google, ce composant démonte.
   }
 
   return (
