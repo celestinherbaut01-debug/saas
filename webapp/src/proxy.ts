@@ -17,6 +17,20 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
+/**
+ * NextResponse.redirect() n'ajoute par défaut aucun en-tête anti-cache : un
+ * navigateur peut mémoriser une redirection 307 et la rejouer localement
+ * sans jamais recontacter le serveur, même après que la condition qui l'a
+ * causée (ex. onboarding_completed) a changé côté base. D'où un blocage qui
+ * "persiste" alors que le code et les données sont corrects. On interdit
+ * explicitement ce cache sur toutes les redirections émises par le proxy.
+ */
+function noStoreRedirect(url: URL) {
+  const res = NextResponse.redirect(url);
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  return res;
+}
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -51,7 +65,7 @@ export async function proxy(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
+      return noStoreRedirect(url);
     }
     return response;
   }
@@ -95,11 +109,19 @@ export async function proxy(request: NextRequest) {
       console.log("[proxy] redirect =", "/onboarding");
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
+      return noStoreRedirect(url);
     }
     if (profile?.onboarding_completed === true) {
       console.log("[proxy] redirect =", pathname, "(autorisé)");
     }
+  }
+
+  // Toute réponse laissant passer une page protégée par ce bloc ne doit pas
+  // non plus être mise en cache par le navigateur : sans ça, une décision
+  // "autorisé" pourrait tout aussi bien être figée par erreur si l'état
+  // change ensuite (ex. déconnexion) sans nouvelle requête serveur.
+  if (!isPublicPath(pathname)) {
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
   }
 
   return response;
