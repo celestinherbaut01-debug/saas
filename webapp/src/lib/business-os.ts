@@ -19,6 +19,27 @@ const DEFAULT_PROFILE: BusinessOsProfile = {
   appointmentsLabel: "Rendez-vous",
 };
 
+// Certains métiers ont besoin d'un vocabulaire différent de celui de toute
+// leur famille (ex. "Sécurité privée" et "Cabinets comptables" partagent la
+// famille "Services B2B" mais n'ont rien à voir) : ces profils, indexés par
+// le slug du métier précis (feuille), sont vérifiés avant ceux par famille.
+const LEAF_PROFILES: Record<string, BusinessOsProfile> = {
+  cleaning: {
+    osName: "Nettoyage OS",
+    icon: "🧹",
+    customersLabel: "Sites clients",
+    inventoryLabel: "Consommables & matériel",
+    appointmentsLabel: "Interventions",
+  },
+  security: {
+    osName: "Sécurité OS",
+    icon: "🔒",
+    customersLabel: "Sites sous contrat",
+    inventoryLabel: "Équipements",
+    appointmentsLabel: "Planning agents",
+  },
+};
+
 const PROFILES: Record<string, BusinessOsProfile> = {
   automobile: {
     osName: "Garage OS",
@@ -64,7 +85,8 @@ const PROFILES: Record<string, BusinessOsProfile> = {
   },
 };
 
-export function getBusinessOsProfile(parentSlug: string | null): BusinessOsProfile {
+export function getBusinessOsProfile(parentSlug: string | null, leafSlug: string | null = null): BusinessOsProfile {
+  if (leafSlug && LEAF_PROFILES[leafSlug]) return LEAF_PROFILES[leafSlug];
   if (!parentSlug) return DEFAULT_PROFILE;
   return PROFILES[parentSlug] ?? DEFAULT_PROFILE;
 }

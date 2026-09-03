@@ -3,6 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
+import { planAtLeast, type Plan } from "@/lib/entitlements";
 import { assertQuota, getUsage, incrementUsage } from "@/lib/quota";
 
 export interface NovaMessage {
@@ -62,7 +63,70 @@ const TOOLS = [
   },
 ];
 
-async function runTool(workspaceId: string, name: string, input: Record<string, unknown>) {
+const BUSINESS_OS_TOOL = {
+  name: "get_business_os_data",
+  description:
+    "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock/pièces/consommables, " +
+    "ou rendez-vous/interventions/planning selon le métier. Jamais inventé.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      module: {
+        type: "string",
+        enum: ["customers", "inventory", "appointments"],
+        description: "customers = clients/sites ; inventory = stock/pièces/consommables ; appointments = RDV/interventions/planning",
+      },
+      limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
+    },
+    required: ["module"],
+  },
+};
+
+function buildTools(plan: Plan) {
+  return planAtLeast(plan, "max") ? [...TOOLS, BUSINESS_OS_TOOL] : TOOLS;
+}
+
+async function runTool(workspaceId: string, plan: Plan, name: string, input: Record<string, unknown>) {
+  if (name === "get_business_os_data") {
+    if (!planAtLeast(plan, "max")) return { error: "Business OS réservé au plan Max." };
+    const supabase = await createClient();
+    const limit = typeof input.limit === "number" ? Math.min(input.limit, 50) : 20;
+    const osModule = input.module;
+
+    if (osModule === "customers") {
+      const { data } = await supabase
+        .from("customers")
+        .select("name, phone, email, notes, created_at")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "inventory") {
+      const { data } = await supabase
+        .from("inventory_items")
+        .select("name, quantity, unit, low_stock_threshold")
+        .eq("workspace_id", workspaceId)
+        .order("name")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "appointments") {
+      const { data } = await supabase
+        .from("appointments")
+        .select("title, starts_at, ends_at, notes, customer_id, prospect_id")
+        .eq("workspace_id", workspaceId)
+        .order("starts_at")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    return { error: "Module Business OS inconnu." };
+  }
+
+  return runCrmTool(workspaceId, name, input);
+}
+
+async function runCrmTool(workspaceId: string, name: string, input: Record<string, unknown>) {
   const supabase = await createClient();
 
   if (name === "get_daily_summary") {
@@ -122,11 +186,19 @@ async function runTool(workspaceId: string, name: string, input: Record<string, 
   return { error: `Outil inconnu : ${name}` };
 }
 
-const SYSTEM_PROMPT =
-  "Tu es NOVA, l'assistant commercial de ProspectFlow OS. Réponds en français, de façon concise et concrète. " +
-  "Utilise TOUJOURS un outil pour obtenir des données réelles avant de répondre à une question sur les prospects, " +
-  "le CRM ou des statistiques — ne devine et n'invente jamais un chiffre ou un nom d'entreprise. " +
-  "Si une donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse.";
+function buildSystemPrompt(plan: Plan): string {
+  let prompt =
+    "Tu es NOVA, l'assistant commercial de ProspectFlow OS. Réponds en français, de façon concise et concrète. " +
+    "Utilise TOUJOURS un outil pour obtenir des données réelles avant de répondre à une question sur les prospects, " +
+    "le CRM ou des statistiques — ne devine et n'invente jamais un chiffre ou un nom d'entreprise. " +
+    "Si une donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse.";
+  if (planAtLeast(plan, "max")) {
+    prompt +=
+      " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre aux questions sur " +
+      "les clients, le stock/les pièces ou les rendez-vous/interventions métier.";
+  }
+  return prompt;
+}
 
 export async function askNova(
   workspaceId: string,
@@ -160,8 +232,8 @@ export async function askNova(
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
-      tools: TOOLS,
+      system: buildSystemPrompt(plan),
+      tools: buildTools(plan),
       messages,
     });
 
@@ -176,7 +248,7 @@ export async function askNova(
     const toolResults: Anthropic.ToolResultBlockParam[] = [];
     for (const block of response.content) {
       if (block.type === "tool_use") {
-        const result = await runTool(workspaceId, block.name, block.input as Record<string, unknown>);
+        const result = await runTool(workspaceId, plan, block.name, block.input as Record<string, unknown>);
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
       }
     }

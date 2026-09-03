@@ -51,12 +51,14 @@ export default async function BusinessOsPage() {
     .maybeSingle();
 
   let parentSlug: string | null = null;
+  let leafSlug: string | null = null;
   if (businessProfile?.own_category_id) {
     const { data: ownCategory } = await supabase
       .from("business_categories")
-      .select("parent_id")
+      .select("slug, parent_id")
       .eq("id", businessProfile.own_category_id)
       .maybeSingle();
+    leafSlug = ownCategory?.slug ?? null;
     if (ownCategory?.parent_id) {
       const { data: parent } = await supabase
         .from("business_categories")
@@ -67,7 +69,7 @@ export default async function BusinessOsPage() {
     }
   }
 
-  const profile = getBusinessOsProfile(parentSlug);
+  const profile = getBusinessOsProfile(parentSlug, leafSlug);
 
   const [{ data: customers }, { data: inventory }, { data: appointments }] = await Promise.all([
     supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
