@@ -9,7 +9,9 @@ import { REMEMBER_COOKIE, applyRememberPreference } from "@/lib/supabase/remembe
 // routes de l'application pour les utilisateurs non connectés / pas encore
 // onboardés.
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth", "/tarifs"];
+// "/debug-oauth" est temporaire (diagnostic du bouton Google) — à retirer
+// d'ici en même temps que la page une fois le bug résolu.
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth", "/tarifs", "/debug-oauth"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
