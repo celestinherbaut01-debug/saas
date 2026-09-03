@@ -317,6 +317,23 @@ export interface Database {
         Args: { p_workspace_id: string; p_period_key: string; p_metric: string; p_amount?: number };
         Returns: number;
       };
+      complete_onboarding: {
+        Args: {
+          p_company_name: string;
+          p_website: string | null;
+          p_offer_description: string;
+          p_audience: string;
+          p_own_category_id: string | null;
+          p_street: string;
+          p_postal_code: string;
+          p_city: string;
+          p_lat: number;
+          p_lng: number;
+          p_radius_km: number;
+          p_target_category_ids: string[];
+        };
+        Returns: string;
+      };
       award_xp: {
         Args: {
           p_workspace_id: string;

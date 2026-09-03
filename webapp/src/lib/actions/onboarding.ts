@@ -39,61 +39,26 @@ export async function completeOnboarding(
     return { error: "Sélectionnez au moins un métier à démarcher." };
   }
 
-  const { data: workspace, error: wsError } = await supabase
-    .from("workspaces")
-    .insert({ name: payload.companyName.trim(), created_by: user.id })
-    .select("id")
-    .single();
-
-  if (wsError || !workspace) {
-    return { error: wsError?.message ?? "Impossible de créer le workspace." };
-  }
-
-  const { error: memberError } = await supabase
-    .from("workspace_members")
-    .insert({ workspace_id: workspace.id, user_id: user.id, role: "owner" });
-
-  if (memberError) return { error: memberError.message };
-
-  const { error: profileError } = await supabase.from("business_profiles").insert({
-    workspace_id: workspace.id,
-    company_name: payload.companyName.trim(),
-    website: payload.website.trim() || null,
-    offer_description: payload.offerDescription.trim(),
-    audience: payload.audience,
-    own_category_id: payload.ownCategoryId,
-    street: payload.address.street,
-    postal_code: payload.address.postalCode,
-    city: payload.address.city,
-    lat: payload.address.lat,
-    lng: payload.address.lng,
-    default_radius_km: payload.radiusKm,
+  // Une seule fonction atomique côté serveur (auth.uid() y est lu en interne,
+  // jamais transmis) : soit tout est créé (workspace, membre, profil
+  // entreprise, cibles), soit rien ne l'est — plus de workspace orphelin
+  // possible en cas d'échec à mi-chemin. Voir 0009_onboarding_rpc.sql.
+  const { error } = await supabase.rpc("complete_onboarding", {
+    p_company_name: payload.companyName.trim(),
+    p_website: payload.website.trim() || null,
+    p_offer_description: payload.offerDescription.trim(),
+    p_audience: payload.audience,
+    p_own_category_id: payload.ownCategoryId,
+    p_street: payload.address.street,
+    p_postal_code: payload.address.postalCode,
+    p_city: payload.address.city,
+    p_lat: payload.address.lat,
+    p_lng: payload.address.lng,
+    p_radius_km: payload.radiusKm,
+    p_target_category_ids: payload.targetCategoryIds,
   });
 
-  if (profileError) return { error: profileError.message };
-
-  const { error: targetsError } = await supabase.from("workspace_targets").insert(
-    payload.targetCategoryIds.map((category_id) => ({
-      workspace_id: workspace.id,
-      category_id,
-    })),
-  );
-
-  if (targetsError) return { error: targetsError.message };
-
-  const { error: onboardError } = await supabase
-    .from("profiles")
-    .update({ onboarding_completed: true })
-    .eq("id", user.id);
-
-  if (onboardError) return { error: onboardError.message };
-
-  await supabase.rpc("award_xp", {
-    p_workspace_id: workspace.id,
-    p_action: "onboarding_completed",
-    p_amount: 50,
-    p_dedupe: true,
-  });
+  if (error) return { error: error.message };
 
   redirect("/dashboard");
 }
