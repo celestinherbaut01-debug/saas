@@ -74,7 +74,15 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
         radiusKm,
         targetCategoryIds: targetIds,
       });
-      if (result?.error) setError(result.error);
+      if (result?.error) {
+        setError(result.error);
+        return;
+      }
+      // Navigation complète (pas router.push) : garantit que proxy.ts
+      // s'exécute contre une requête neuve, sans dépendre d'un éventuel
+      // cache de routage côté client qui renverrait sur /onboarding.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/dashboard";
     });
   }
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export interface OnboardingPayload {
@@ -22,6 +22,8 @@ export interface OnboardingPayload {
 
 export interface OnboardingResult {
   error: string | null;
+  ok?: boolean;
+  workspaceId?: string;
 }
 
 export async function completeOnboarding(
@@ -39,11 +41,21 @@ export async function completeOnboarding(
     return { error: "Sélectionnez au moins un métier à démarcher." };
   }
 
+  // Diagnostic temporaire (visible dans le terminal `npm run dev`, pas dans
+  // le navigateur) : confirme l'état avant/après pour trouver précisément
+  // où ça coince si le bug persiste.
+  const { data: before } = await supabase
+    .from("profiles")
+    .select("onboarding_completed")
+    .eq("id", user.id)
+    .maybeSingle();
+  console.log("[onboarding] user.id =", user.id, "| onboarding_completed AVANT =", before?.onboarding_completed);
+
   // Une seule fonction atomique côté serveur (auth.uid() y est lu en interne,
   // jamais transmis) : soit tout est créé (workspace, membre, profil
   // entreprise, cibles), soit rien ne l'est — plus de workspace orphelin
-  // possible en cas d'échec à mi-chemin. Voir 0009_onboarding_rpc.sql.
-  const { error } = await supabase.rpc("complete_onboarding", {
+  // possible en cas d'échec à mi-chemin. Voir 0009_onboarding_rpc.sql / 0011.
+  const { data: workspaceId, error } = await supabase.rpc("complete_onboarding", {
     p_company_name: payload.companyName.trim(),
     p_website: payload.website.trim() || null,
     p_offer_description: payload.offerDescription.trim(),
@@ -59,11 +71,11 @@ export async function completeOnboarding(
   });
 
   if (error) {
+    console.error("[onboarding] complete_onboarding RPC error:", error);
     // "relation ... does not exist" (code Postgres 42P01) = une migration
     // n'a pas été appliquée sur ce projet Supabase — jamais un message
     // technique brut affiché à l'utilisateur. L'erreur réelle reste dans
     // les logs serveur pour le diagnostic.
-    console.error("complete_onboarding RPC error:", error);
     if (error.code === "42P01" || error.message.includes("does not exist")) {
       return {
         error:
@@ -73,5 +85,34 @@ export async function completeOnboarding(
     return { error: error.message };
   }
 
-  redirect("/dashboard");
+  const { data: workspaceCheck } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const { data: after } = await supabase
+    .from("profiles")
+    .select("onboarding_completed")
+    .eq("id", user.id)
+    .maybeSingle();
+  console.log(
+    "[onboarding] workspace_id retourné =", workspaceId,
+    "| workspace_members trouvé =", Boolean(workspaceCheck),
+    "| onboarding_completed APRÈS =", after?.onboarding_completed,
+  );
+
+  // Revalide le cache Next.js pour /dashboard et /onboarding : sans ça, un
+  // rendu de /dashboard mis en cache AVANT la fin de l'onboarding pourrait
+  // être resservi tel quel juste après, au lieu de refléter le nouvel état.
+  revalidatePath("/dashboard");
+  revalidatePath("/onboarding");
+  revalidatePath("/", "layout");
+
+  // Pas de redirect() ici : appelé via startTransition() (pas un <form
+  // action=...>), donc pas de <form> pour porter une redirection serveur
+  // fiable. On renvoie un statut de succès ; c'est le composant client qui
+  // déclenche une VRAIE navigation complète (window.location.href) vers
+  // /dashboard — garantit que proxy.ts s'exécute contre une requête neuve,
+  // sans dépendre du cache de routage client de Next.js.
+  return { error: null, ok: true, workspaceId: workspaceId ?? undefined };
 }
