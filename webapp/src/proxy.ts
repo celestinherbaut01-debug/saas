@@ -70,16 +70,31 @@ export async function proxy(request: NextRequest) {
   // Connecté mais pas encore onboardé -> forcer l'onboarding avant le reste
   // de l'application (dashboard, prospection, etc.).
   if (!isPublicPath(pathname) || pathname === "/") {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("onboarding_completed")
       .eq("id", user.id)
       .maybeSingle();
 
-    if (!profile?.onboarding_completed && pathname !== "/onboarding") {
+    // Jamais de undefined silencieux : on logue explicitement l'état lu,
+    // pour distinguer "profil absent" (bug réel) de "pas encore onboardé"
+    // (comportement normal).
+    if (profileError) {
+      console.error("[proxy] erreur lecture profiles :", profileError.message);
+    } else if (!profile) {
+      console.warn("[proxy] PROFILE ABSENT pour user.id =", user.id);
+    } else {
+      console.log("[proxy] onboarding_completed =", profile.onboarding_completed);
+    }
+
+    if (profile?.onboarding_completed !== true && pathname !== "/onboarding") {
+      console.log("[proxy] redirect =", "/onboarding");
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       return NextResponse.redirect(url);
+    }
+    if (profile?.onboarding_completed === true) {
+      console.log("[proxy] redirect =", pathname, "(autorisé)");
     }
   }
 

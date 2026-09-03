@@ -43,13 +43,17 @@ export async function completeOnboarding(
 
   // Diagnostic temporaire (visible dans le terminal `npm run dev`, pas dans
   // le navigateur) : confirme l'état avant/après pour trouver précisément
-  // où ça coince si le bug persiste.
-  const { data: before } = await supabase
+  // où ça coince si le bug persiste. `error` est toujours logué séparément
+  // — jamais transformé silencieusement en `undefined`.
+  const { data: before, error: beforeError } = await supabase
     .from("profiles")
-    .select("onboarding_completed")
+    .select("id, onboarding_completed")
     .eq("id", user.id)
     .maybeSingle();
-  console.log("[onboarding] user.id =", user.id, "| onboarding_completed AVANT =", before?.onboarding_completed);
+  console.log("[profile] user.id =", user.id);
+  console.log("[profile] found =", before !== null);
+  console.log("[profile] error =", beforeError ? beforeError.message : null);
+  console.log("[profile] onboarding_completed BEFORE =", before?.onboarding_completed ?? "(pas de ligne)");
 
   // Une seule fonction atomique côté serveur (auth.uid() y est lu en interne,
   // jamais transmis) : soit tout est créé (workspace, membre, profil
@@ -90,16 +94,23 @@ export async function completeOnboarding(
     .select("workspace_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  const { data: after } = await supabase
+  console.log("[onboarding] workspace_id =", workspaceId, "| workspace_members found =", workspaceCheck !== null);
+
+  const { data: after, error: afterError } = await supabase
     .from("profiles")
-    .select("onboarding_completed")
+    .select("id, onboarding_completed")
     .eq("id", user.id)
     .maybeSingle();
-  console.log(
-    "[onboarding] workspace_id retourné =", workspaceId,
-    "| workspace_members trouvé =", Boolean(workspaceCheck),
-    "| onboarding_completed APRÈS =", after?.onboarding_completed,
-  );
+  console.log("[profile] error (after) =", afterError ? afterError.message : null);
+  console.log("[profile] onboarding_completed AFTER =", after?.onboarding_completed ?? "(pas de ligne)");
+
+  if (!after || after.onboarding_completed !== true) {
+    console.error("[onboarding] ÉCHEC : onboarding_completed n'est pas true après complete_onboarding — arrêt, pas de faux succès.");
+    return {
+      error:
+        "L'onboarding ne s'est pas terminé correctement côté serveur (profil non mis à jour). Réessayez ou contactez le support.",
+    };
+  }
 
   // Revalide le cache Next.js pour /dashboard et /onboarding : sans ça, un
   // rendu de /dashboard mis en cache AVANT la fin de l'onboarding pourrait
