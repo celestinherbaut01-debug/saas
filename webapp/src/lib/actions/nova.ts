@@ -24,6 +24,13 @@ const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 const TOOLS = [
   {
+    name: "get_my_business_profile",
+    description:
+      "L'entreprise de l'UTILISATEUR (pas un prospect) : nom, offre, audience, ton souhaité, signature. " +
+      "À consulter avant de rédiger un email pour parler au nom de la bonne entreprise avec la bonne offre.",
+    input_schema: { type: "object" as const, properties: {}, required: [] },
+  },
+  {
     name: "get_daily_summary",
     description:
       "Récap réel du workspace : nombre total de prospects, répartition par statut CRM, prospects ajoutés aujourd'hui, nombre de métiers ciblés.",
@@ -129,6 +136,15 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
 async function runCrmTool(workspaceId: string, name: string, input: Record<string, unknown>) {
   const supabase = await createClient();
 
+  if (name === "get_my_business_profile") {
+    const { data } = await supabase
+      .from("business_profiles")
+      .select("company_name, website, offer_description, audience, tone, signature, agent_instruction")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    return data ?? { error: "Profil entreprise introuvable — onboarding non terminé." };
+  }
+
   if (name === "get_daily_summary") {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -191,7 +207,10 @@ function buildSystemPrompt(plan: Plan): string {
     "Tu es NOVA, l'assistant commercial de ProspectFlow OS. Réponds en français, de façon concise et concrète. " +
     "Utilise TOUJOURS un outil pour obtenir des données réelles avant de répondre à une question sur les prospects, " +
     "le CRM ou des statistiques — ne devine et n'invente jamais un chiffre ou un nom d'entreprise. " +
-    "Si une donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse.";
+    "Si une donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse. " +
+    "Pour rédiger un email, consulte TOUJOURS get_my_business_profile (l'entreprise qui envoie) ET get_prospect " +
+    "(le destinataire) avant d'écrire — jamais un email générique. Précise toujours qu'il doit être relu et validé " +
+    "avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
   if (planAtLeast(plan, "max")) {
     prompt +=
       " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre aux questions sur " +

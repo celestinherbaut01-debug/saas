@@ -9,7 +9,7 @@ const SUGGESTIONS = [
   "Fais-moi le récap du jour",
   "Qui dois-je relancer ?",
   "Trouve-moi les prospects sans site confirmé",
-  "Quels prospects ont le score le plus élevé ?",
+  "Rédige un email pour mon prospect le mieux noté",
 ];
 
 export function AgentChat({ workspaceId, configured }: { workspaceId: string; configured: boolean }) {
@@ -88,7 +88,11 @@ export function AgentChat({ workspaceId, configured }: { workspaceId: string; co
                 {m.content}
               </div>
             ))}
-            {sending && <div className="mr-auto max-w-[80%] rounded-2xl rounded-bl-sm bg-soft px-3.5 py-2 text-[13px] text-muted">…</div>}
+            {sending && (
+              <div className="mr-auto max-w-[80%] rounded-2xl rounded-bl-sm bg-soft px-3.5 py-2 text-[13px] text-muted">
+                NOVA réfléchit…
+              </div>
+            )}
           </div>
         </div>
 
