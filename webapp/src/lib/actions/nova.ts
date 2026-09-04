@@ -76,8 +76,8 @@ const BUSINESS_OS_TOOL = {
   description:
     "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
     "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), sites/contrats/" +
-    "interventions/incidents (nettoyage), projets/sites clients/tickets (agence), pertes (restaurant). Jamais " +
-    "inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
+    "interventions/incidents (nettoyage), projets/sites clients/tickets (agence), pertes/commandes/recettes " +
+    "(restaurant). Jamais inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -100,6 +100,8 @@ const BUSINESS_OS_TOOL = {
           "client_sites",
           "tickets",
           "waste_log",
+          "purchase_orders",
+          "recipes",
         ],
         description:
           "customers = clients/sites (générique) ; inventory = stock/pièces/consommables (générique) ; " +
@@ -108,7 +110,9 @@ const BUSINESS_OS_TOOL = {
           "documents = devis/factures avec statut) ; sites/contracts/interventions/incidents = nettoyage " +
           "(interventions inclut le statut planned/done/missed et la note qualité, incidents inclut la gravité) ; " +
           "projects/client_sites/tickets = agence (client_sites inclut les dates d'expiration domaine/hébergement " +
-          "et la prochaine maintenance, tickets inclut priorité/statut) ; waste_log = pertes restaurant",
+          "et la prochaine maintenance, tickets inclut priorité/statut) ; waste_log/purchase_orders/recipes = " +
+          "restaurant (purchase_orders inclut le statut draft/ordered/received, recipes inclut food_cost_percent " +
+          "déjà calculé)",
       },
       limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
     },
@@ -312,6 +316,40 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
         .limit(limit);
       return { count: data?.length ?? 0, results: data ?? [] };
     }
+    if (osModule === "purchase_orders") {
+      const { data } = await supabase
+        .from("purchase_orders")
+        .select("status, total_cost, ordered_at, received_at, notes, supplier_id")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      const supplierIds = [...new Set((data ?? []).map((p) => p.supplier_id).filter((id): id is string => Boolean(id)))];
+      const { data: suppliers } =
+        supplierIds.length > 0 ? await supabase.from("suppliers").select("id, name").in("id", supplierIds) : { data: [] };
+      const supplierById = new Map((suppliers ?? []).map((s) => [s.id, s.name]));
+      const results = (data ?? []).map(({ supplier_id, ...rest }) => ({ ...rest, supplier: supplier_id ? supplierById.get(supplier_id) ?? null : null }));
+      return { count: results.length, results };
+    }
+    if (osModule === "recipes") {
+      const { data: recipes } = await supabase.from("recipes").select("id, name, selling_price, notes").eq("workspace_id", workspaceId).order("name").limit(limit);
+      const recipeIds = (recipes ?? []).map((r) => r.id);
+      const { data: ingredients } =
+        recipeIds.length > 0
+          ? await supabase.from("recipe_ingredients").select("recipe_id, item_name, quantity, unit_cost").in("recipe_id", recipeIds)
+          : { data: [] };
+      const results = (recipes ?? []).map((r) => {
+        const lines = (ingredients ?? []).filter((i) => i.recipe_id === r.id);
+        const cost = lines.reduce((s, i) => s + i.unit_cost * i.quantity, 0);
+        return {
+          name: r.name,
+          selling_price: r.selling_price,
+          notes: r.notes,
+          food_cost: cost,
+          food_cost_percent: r.selling_price > 0 ? Math.round((cost / r.selling_price) * 100) : null,
+        };
+      });
+      return { count: results.length, results };
+    }
     return { error: "Module Business OS inconnu." };
   }
 
@@ -407,8 +445,10 @@ function buildSystemPrompt(plan: Plan): string {
       "d'équipe ?' = module interventions, filtre toi-même les résultats où team_member est null. Pour une agence " +
       "web : projets en maintenance = module projects ; 'quels domaines expirent bientôt ?' = module client_sites, " +
       "regarde domain_renewal_date/hosting_renewal_date ; tickets ouverts = module tickets, statut open/in_progress. " +
-      "Pour un restaurant : pertes récentes = module waste_log. N'appelle jamais un module qui n'a pas de sens pour " +
-      "ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
+      "Pour un restaurant : pertes récentes = module waste_log ; commandes fournisseurs en attente = module " +
+      "purchase_orders, statut ordered ; 'quel plat a le food cost le plus élevé ?' = module recipes, compare " +
+      "food_cost_percent (déjà calculé, ne recalcule jamais toi-même). N'appelle jamais un module qui n'a pas de " +
+      "sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
   }
   return prompt;
 }

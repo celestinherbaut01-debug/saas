@@ -1,68 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import type {
-  Customer,
-  InventoryItem,
-  Appointment,
-  WasteLogEntry,
-} from "@/lib/supabase/types";
-import type { BusinessOsProfile, BusinessOsVertical } from "@/lib/business-os";
+import type { Customer, InventoryItem, Appointment } from "@/lib/supabase/types";
+import type { BusinessOsProfile } from "@/lib/business-os";
 import { Card } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { cn } from "@/lib/utils";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
 import { AppointmentsModule } from "@/components/business-os/appointments-module";
-import { WasteLogModule } from "@/components/business-os/waste-log-module";
 
-// Garage, Nettoyage et Agence ont désormais leur propre vue dédiée
-// (GarageView, CleaningView, AgencyView), bien plus riche — ce composant
-// générique ne gère plus que Restaurant/Générique. Voir business-os/page.tsx
-// pour l'aiguillage.
-type TabKey = "overview" | "customers" | "inventory" | "appointments" | "waste_log";
-
-const VERTICAL_TABS: Record<Exclude<BusinessOsVertical, "garage" | "cleaning" | "agency">, TabKey[]> = {
-  generic: ["overview", "customers", "inventory", "appointments"],
-  restaurant: ["overview", "customers", "inventory", "waste_log", "appointments"],
-};
+// Garage, Nettoyage, Agence et Restaurant ont chacun leur propre vue dédiée
+// (GarageView, CleaningView, AgencyView, RestaurantView), bien plus riche —
+// ce composant générique ne sert plus qu'aux métiers sans verticale dédiée
+// (socle Clients/Stock/Rendez-vous). Voir business-os/page.tsx pour l'aiguillage.
+type TabKey = "overview" | "customers" | "inventory" | "appointments";
 
 export function BusinessOsView({
-  vertical,
   profile,
   isAdvanced,
   workspaceId,
   kpis,
-  untrackedNote,
   history,
   customers,
   inventory,
   appointments,
-  wasteLog,
   lowStock,
 }: {
-  vertical: Exclude<BusinessOsVertical, "garage" | "cleaning" | "agency">;
   profile: BusinessOsProfile;
   isAdvanced: boolean;
   workspaceId: string;
   kpis: { label: string; value: string; sub?: string }[];
-  untrackedNote?: string;
   history: { id: string; label: string; date: string }[];
   customers: Customer[];
   inventory: InventoryItem[];
   appointments: Appointment[];
-  wasteLog: WasteLogEntry[];
   lowStock: InventoryItem[];
 }) {
-  const tabs = VERTICAL_TABS[vertical];
   const [active, setActive] = useState<TabKey>("overview");
 
+  const tabs: TabKey[] = ["overview", "customers", "inventory", "appointments"];
   const TAB_LABEL: Record<TabKey, string> = {
     overview: "Vue d'ensemble",
     customers: profile.customersLabel,
     inventory: profile.inventoryLabel,
     appointments: profile.appointmentsLabel,
-    waste_log: "Pertes",
   };
 
   return (
@@ -120,12 +102,6 @@ export function BusinessOsView({
             </Card>
           )}
 
-          {untrackedNote && (
-            <p className="text-[11.5px] text-faint">
-              Pas encore suivi dans cette vue d&apos;ensemble : {untrackedNote}.
-            </p>
-          )}
-
           {!isAdvanced && (
             <Card className="border-line bg-soft text-center">
               <p className="text-[12.5px] text-muted">
@@ -149,7 +125,6 @@ export function BusinessOsView({
       {active === "appointments" && (
         <AppointmentsModule workspaceId={workspaceId} initial={appointments} label={profile.appointmentsLabel} />
       )}
-      {active === "waste_log" && <WasteLogModule workspaceId={workspaceId} initial={wasteLog} />}
     </div>
   );
 }

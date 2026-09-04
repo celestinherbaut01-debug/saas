@@ -10,7 +10,7 @@ import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
 import { AgencyView } from "@/components/business-os/agency/agency-view";
-import type { WasteLogEntry } from "@/lib/supabase/types";
+import { RestaurantView } from "@/components/business-os/restaurant/restaurant-view";
 
 export default async function BusinessOsPage() {
   const user = await getCachedUser();
@@ -216,56 +216,73 @@ export default async function BusinessOsPage() {
     );
   }
 
-  // On ne lit les tables spécifiques à un métier que pour ce métier — pas de
-  // requête pour "waste_log" sur un workspace générique, par exemple.
-  const [{ data: customers }, { data: inventory }, { data: appointments }, verticalData] = await Promise.all([
+  // Restaurant a aussi sa propre vue dédiée (mêmes principes que les autres).
+  if (vertical === "restaurant") {
+    const [
+      { data: customers },
+      { data: inventory },
+      { data: suppliers },
+      { data: purchaseOrders },
+      { data: purchaseOrderItems },
+      { data: recipes },
+      { data: recipeIngredients },
+      { data: wasteLog },
+      { data: appointments },
+      { data: teamMembers },
+    ] = await Promise.all([
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
+      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("purchase_orders").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("purchase_order_items").select("*").eq("workspace_id", workspaceId),
+      supabase.from("recipes").select("*").eq("workspace_id", workspaceId).order("name"),
+      supabase.from("recipe_ingredients").select("*").eq("workspace_id", workspaceId),
+      supabase.from("waste_log").select("*").eq("workspace_id", workspaceId).order("logged_at", { ascending: false }),
+      supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    ]);
+
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          <RestaurantView
+            workspaceId={workspaceId}
+            isAdvanced={isAdvanced}
+            initialCustomers={customers ?? []}
+            initialInventory={inventory ?? []}
+            initialSuppliers={suppliers ?? []}
+            initialPurchaseOrders={purchaseOrders ?? []}
+            initialPurchaseOrderItems={purchaseOrderItems ?? []}
+            initialRecipes={recipes ?? []}
+            initialRecipeIngredients={recipeIngredients ?? []}
+            initialWasteLog={wasteLog ?? []}
+            initialAppointments={appointments ?? []}
+            initialTeamMembers={teamMembers ?? []}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
+  // Métier générique (aucune verticale dédiée) : les 3 modules communs.
+  const [{ data: customers }, { data: inventory }, { data: appointments }] = await Promise.all([
     supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
     supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
-    (async () => {
-      if (vertical === "restaurant") {
-        const { data: wasteLog } = await supabase
-          .from("waste_log")
-          .select("*")
-          .eq("workspace_id", workspaceId)
-          .order("logged_at", { ascending: false });
-        return { wasteLog: wasteLog ?? [] };
-      }
-      return {};
-    })(),
   ]);
-
-  const wasteLog: WasteLogEntry[] = verticalData.wasteLog ?? [];
 
   const lowStock = (inventory ?? []).filter(
     (item) => item.low_stock_threshold != null && item.quantity <= item.low_stock_threshold,
   );
 
-  const now = new Date().getTime();
-  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const upcomingAppointments = (appointments ?? []).filter((a) => new Date(a.starts_at).getTime() >= now);
+  const upcomingAppointments = (appointments ?? []).filter((a) => new Date(a.starts_at).getTime() >= new Date().getTime());
 
-  let kpis: { label: string; value: string; sub?: string }[] = [];
-  let untrackedNote: string | undefined;
-  const history: { id: string; label: string; date: string }[] = [];
-
-  if (vertical === "restaurant") {
-    const wasteThisWeek = wasteLog
-      .filter((w) => new Date(w.logged_at).getTime() >= weekAgo)
-      .reduce((sum, w) => sum + (w.estimated_cost ?? 0), 0);
-    kpis = [
-      { label: "Ingrédients en stock critique", value: String(lowStock.length) },
-      { label: "Pertes cette semaine", value: `${wasteThisWeek.toFixed(2)} €` },
-      { label: "Réservations à venir", value: String(upcomingAppointments.length) },
-    ];
-    untrackedNote = "commandes fournisseurs, coût matière détaillé par recette";
-  } else {
-    kpis = [
-      { label: profile.customersLabel, value: String((customers ?? []).length) },
-      { label: profile.inventoryLabel, value: String((inventory ?? []).length) },
-      { label: "Prochain rendez-vous", value: upcomingAppointments[0] ? new Date(upcomingAppointments[0].starts_at).toLocaleDateString("fr-FR") : "—" },
-    ];
-  }
+  const kpis = [
+    { label: profile.customersLabel, value: String((customers ?? []).length) },
+    { label: profile.inventoryLabel, value: String((inventory ?? []).length) },
+    { label: "Prochain rendez-vous", value: upcomingAppointments[0] ? new Date(upcomingAppointments[0].starts_at).toLocaleDateString("fr-FR") : "—" },
+  ];
 
   return (
     <AppShell>
@@ -273,17 +290,14 @@ export default async function BusinessOsPage() {
         {header}
 
         <BusinessOsView
-          vertical={vertical}
           profile={profile}
           isAdvanced={isAdvanced}
           workspaceId={workspaceId}
           kpis={kpis}
-          untrackedNote={untrackedNote}
-          history={history}
+          history={[]}
           customers={customers ?? []}
           inventory={inventory ?? []}
           appointments={appointments ?? []}
-          wasteLog={wasteLog}
           lowStock={lowStock}
         />
       </div>
