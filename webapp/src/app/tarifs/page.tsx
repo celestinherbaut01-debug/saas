@@ -1,9 +1,15 @@
+import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
 import { PricingTable } from "@/components/pricing-table";
 import { PricingTrust } from "@/components/pricing-trust";
 import { PricingBusinessOs } from "@/components/pricing-business-os";
 
-export default function TarifsPage() {
+export default async function TarifsPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   return (
     <div className="flex flex-1 flex-col">
       <PublicNav />
@@ -18,7 +24,7 @@ export default function TarifsPage() {
           </p>
         </div>
 
-        <PricingTable />
+        <PricingTable loggedIn={Boolean(user)} />
         <PricingTrust />
         <PricingBusinessOs />
       </main>

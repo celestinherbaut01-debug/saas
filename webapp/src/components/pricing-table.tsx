@@ -5,7 +5,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ENTITLEMENTS, PLAN_ORDER, yearlyPrice } from "@/lib/entitlements";
 
-export function PricingTable() {
+export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
   const [yearly, setYearly] = useState(false);
 
   return (
@@ -59,13 +59,17 @@ export function PricingTable() {
               </p>
 
               <Link
-                href={plan.priceMonthly === 0 ? "/signup" : `/signup?plan=${plan.id}`}
+                href={loggedIn ? "/abonnement" : plan.priceMonthly === 0 ? "/signup" : `/signup?plan=${plan.id}`}
                 className={cn(
                   "mt-6 rounded-xl px-4 py-2.5 text-center text-[13px] font-semibold transition-opacity hover:opacity-90",
                   isPro ? "bg-accent text-accent-ink" : "border border-line bg-bg text-ink",
                 )}
               >
-                {plan.priceMonthly === 0 ? "Démarrer gratuitement" : `Choisir ${plan.label}`}
+                {loggedIn
+                  ? "Gérer dans Abonnements"
+                  : plan.priceMonthly === 0
+                    ? "Démarrer gratuitement"
+                    : `Choisir ${plan.label}`}
               </Link>
 
               <ul className="mt-7 flex flex-col gap-3 text-[12.5px] leading-relaxed text-muted">
@@ -89,8 +93,9 @@ export function PricingTable() {
       </div>
 
       <p className="text-center text-[11.5px] text-faint">
-        Les paiements en ligne (Stripe) ne sont pas encore branchés — inscription gratuite disponible dès
-        maintenant, changement de forfait payant à venir.
+        {loggedIn
+          ? "Les paiements en ligne (Stripe) ne sont pas encore branchés — gérez votre forfait actuel depuis Abonnements."
+          : "Les paiements en ligne (Stripe) ne sont pas encore branchés — inscription gratuite disponible dès maintenant, changement de forfait payant à venir."}
       </p>
     </div>
   );
