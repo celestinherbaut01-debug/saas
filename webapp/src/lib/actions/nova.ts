@@ -76,8 +76,8 @@ const BUSINESS_OS_TOOL = {
   description:
     "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
     "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), sites/contrats/" +
-    "interventions/incidents (nettoyage), projets (agence), pertes (restaurant). Jamais inventé — un module non " +
-    "pertinent pour ce workspace renvoie une liste vide.",
+    "interventions/incidents (nettoyage), projets/sites clients/tickets (agence), pertes (restaurant). Jamais " +
+    "inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -97,6 +97,8 @@ const BUSINESS_OS_TOOL = {
           "interventions",
           "incidents",
           "projects",
+          "client_sites",
+          "tickets",
           "waste_log",
         ],
         description:
@@ -105,7 +107,8 @@ const BUSINESS_OS_TOOL = {
           "(parts = catalogue de pièces avec quantité en stock, technicians = équipe avec charge de travail réelle, " +
           "documents = devis/factures avec statut) ; sites/contracts/interventions/incidents = nettoyage " +
           "(interventions inclut le statut planned/done/missed et la note qualité, incidents inclut la gravité) ; " +
-          "projects = agence ; waste_log = pertes restaurant",
+          "projects/client_sites/tickets = agence (client_sites inclut les dates d'expiration domaine/hébergement " +
+          "et la prochaine maintenance, tickets inclut priorité/statut) ; waste_log = pertes restaurant",
       },
       limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
     },
@@ -282,6 +285,24 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
         .limit(limit);
       return { count: data?.length ?? 0, results: data ?? [] };
     }
+    if (osModule === "client_sites") {
+      const { data } = await supabase
+        .from("client_sites")
+        .select("domain_name, hosting_provider, domain_renewal_date, hosting_renewal_date, next_maintenance_at, monthly_price, status")
+        .eq("workspace_id", workspaceId)
+        .order("domain_renewal_date")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "tickets") {
+      const { data } = await supabase
+        .from("tickets")
+        .select("title, priority, status, created_at, resolved_at, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
     if (osModule === "waste_log") {
       const { data } = await supabase
         .from("waste_log")
@@ -384,9 +405,10 @@ function buildSystemPrompt(plan: Plan): string {
       "'quels devis sont en attente ?' = module documents, doc_type = quote et status = sent. Pour le nettoyage : " +
       "contrats bientôt à renouveler = module contracts, statut ending_soon ; 'quelles interventions n'ont pas " +
       "d'équipe ?' = module interventions, filtre toi-même les résultats où team_member est null. Pour une agence " +
-      "web : projets en maintenance = module projects. Pour un restaurant : pertes récentes = module waste_log. " +
-      "N'appelle jamais un module qui n'a pas de sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt " +
-      "que d'inventer une réponse.";
+      "web : projets en maintenance = module projects ; 'quels domaines expirent bientôt ?' = module client_sites, " +
+      "regarde domain_renewal_date/hosting_renewal_date ; tickets ouverts = module tickets, statut open/in_progress. " +
+      "Pour un restaurant : pertes récentes = module waste_log. N'appelle jamais un module qui n'a pas de sens pour " +
+      "ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
   }
   return prompt;
 }
