@@ -1,62 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { cn } from "@/lib/utils";
-import { ProspectActions } from "@/components/prospect-actions";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch } from "@/lib/actions/search";
+import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
-// Reflète supabase/functions/_shared/types.ts (EnrichedProspect) côté serveur.
-interface SearchResult {
-  siren: string;
-  siret: string;
-  companyName: string;
-  nafCode: string | null;
-  street: string | null;
-  postalCode: string | null;
-  city: string | null;
-  lat: number | null;
-  lng: number | null;
-  etatAdministratif: string | null;
-  natureJuridique: string | null;
-  effectifTranche: string | null;
-  distanceKm: number;
-  isAssociation: boolean;
-  isLargeGroup: boolean;
-  isChain: boolean;
-  placeId: string | null;
-  businessStatus: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY" | "unverified";
-  websiteUri: string | null;
-  websiteQuality: "none" | "weak" | "ok" | "unknown";
-  phone: string | null;
-  googleRating: number | null;
-  googleRatingCount: number | null;
-  placesCheckedAt: string | null;
-  qualityScore: number;
-  verificationSources: Record<string, boolean>;
-}
-
-const businessStatusLabel: Record<string, { text: string; cls: string }> = {
-  OPERATIONAL: { text: "Opérationnel", cls: "bg-green-bg text-green-fg" },
-  CLOSED_TEMPORARILY: { text: "Fermé temp.", cls: "bg-amber-bg text-amber-fg" },
-  CLOSED_PERMANENTLY: { text: "Fermé définitivement", cls: "bg-red-bg text-red-fg" },
-  unverified: { text: "À vérifier", cls: "bg-soft text-muted" },
-};
-const websiteQualityLabel: Record<string, { text: string; cls: string }> = {
-  none: { text: "Sans site confirmé", cls: "bg-green-bg text-green-fg" },
-  weak: { text: "Site à améliorer", cls: "bg-amber-bg text-amber-fg" },
-  ok: { text: "Site correct", cls: "bg-soft text-muted" },
-  unknown: { text: "À vérifier", cls: "bg-soft text-muted" },
-};
-function Tag({ text, cls }: { text: string; cls: string }) {
-  return <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", cls)}>{text}</span>;
-}
+type SearchResult = ProspectionResult;
 
 export function ProspectionView({
   workspaceId,
@@ -100,7 +57,12 @@ export function ProspectionView({
   const [excludeLargeGroups, setExcludeLargeGroups] = useState(true);
   const [needContact, setNeedContact] = useState(false);
   const [maxEstablishmentsPerSiren, setMaxEstablishmentsPerSiren] = useState(8);
-  const [webFilter, setWebFilter] = useState<"all" | "no_or_weak" | "none" | "weak" | "unknown">("no_or_weak");
+  // "all" par défaut : le registre suffit à afficher un prospect, Google
+  // Places ne fait qu'enrichir — un filtre par défaut plus restrictif
+  // masquait TOUS les résultats tant que Google Places n'était pas
+  // configuré (websiteQuality reste "unknown" sans Google, exclu par
+  // l'ancien filtre "no_or_weak").
+  const [webFilter, setWebFilter] = useState<"all" | "no_or_weak" | "none" | "weak" | "unknown">("all");
 
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "ok" | "err"; text: string; devDetail?: string } | null>(
@@ -108,7 +70,20 @@ export function ProspectionView({
   );
   const [results, setResults] = useState<SearchResult[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [manuallyVerified, setManuallyVerified] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
+  const [viewingIndex, setViewingIndex] = useState<number | null>(null);
+  const router = useRouter();
+
+  const nafToLabel = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const cat of categories) {
+      for (const code of cat.naf_codes) {
+        if (!map.has(code)) map.set(code, cat.name);
+      }
+    }
+    return map;
+  }, [categories]);
 
   function nafCodesForSelection(): string[] {
     const set = new Set<string>();
@@ -154,15 +129,19 @@ export function ProspectionView({
     const data = result.data as {
       results: SearchResult[];
       totalMatchedInRegistry: number;
-      verifiedCount: number;
+      totalReturned: number;
+      googleVerifiedCount: number;
       googlePlacesConfigured: boolean;
     };
 
     setResults(data.results ?? []);
+    setManuallyVerified(new Set());
     setStatus({
       kind: "ok",
-      text: `${data.totalMatchedInRegistry} établissement(s) trouvé(s) dans le registre, ${data.verifiedCount} vérifié(s)${
-        data.googlePlacesConfigured ? "." : " — clé Google Places non configurée côté serveur : statuts \"à vérifier\"."
+      text: `${data.totalMatchedInRegistry} établissement(s) trouvé(s) dans le registre, ${data.totalReturned} affiché(s), ${data.googleVerifiedCount} vérifié(s) par Google${
+        data.googlePlacesConfigured
+          ? "."
+          : " — clé Google Places non configurée côté serveur : les entreprises restent affichées avec le statut « À vérifier »."
       }`,
     });
   }
@@ -176,43 +155,48 @@ export function ProspectionView({
     });
   }
 
+  function markVerified(i: number) {
+    setManuallyVerified((prev) => new Set(prev).add(i));
+  }
+
+  function toProspectInsert(r: SearchResult) {
+    return {
+      workspace_id: workspaceId,
+      siren: r.siren,
+      siret: r.siret,
+      company_name: r.companyName,
+      naf_code: r.nafCode,
+      street: r.street,
+      postal_code: r.postalCode,
+      city: r.city,
+      lat: r.lat,
+      lng: r.lng,
+      distance_km: r.distanceKm,
+      legal_status: r.etatAdministratif === "A" ? "active" : "closed",
+      nature_juridique: r.natureJuridique,
+      effectif_tranche: r.effectifTranche,
+      is_association: r.isAssociation,
+      is_large_group: r.isLargeGroup,
+      is_chain: r.isChain,
+      place_id: r.placeId,
+      business_status: r.businessStatus,
+      website_uri: r.websiteUri,
+      website_quality: r.websiteQuality,
+      phone: r.phone,
+      google_rating: r.googleRating,
+      google_rating_count: r.googleRatingCount,
+      places_checked_at: r.placesCheckedAt,
+      quality_score: r.qualityScore,
+      verification_sources: r.verificationSources,
+    };
+  }
+
   async function addSelectedToCrm() {
     const rows = [...checked].map((i) => results[i]);
     if (rows.length === 0) return;
     setAdding(true);
 
-    const result = await addProspectsToCrm(
-      workspaceId,
-      rows.map((r) => ({
-        workspace_id: workspaceId,
-        siren: r.siren,
-        siret: r.siret,
-        company_name: r.companyName,
-        naf_code: r.nafCode,
-        street: r.street,
-        postal_code: r.postalCode,
-        city: r.city,
-        lat: r.lat,
-        lng: r.lng,
-        distance_km: r.distanceKm,
-        legal_status: r.etatAdministratif === "A" ? "active" : "closed",
-        nature_juridique: r.natureJuridique,
-        effectif_tranche: r.effectifTranche,
-        is_association: r.isAssociation,
-        is_large_group: r.isLargeGroup,
-        is_chain: r.isChain,
-        place_id: r.placeId,
-        business_status: r.businessStatus,
-        website_uri: r.websiteUri,
-        website_quality: r.websiteQuality,
-        phone: r.phone,
-        google_rating: r.googleRating,
-        google_rating_count: r.googleRatingCount,
-        places_checked_at: r.placesCheckedAt,
-        quality_score: r.qualityScore,
-        verification_sources: r.verificationSources,
-      })),
-    );
+    const result = await addProspectsToCrm(workspaceId, rows.map(toProspectInsert));
 
     setAdding(false);
     if (!result.ok) {
@@ -221,6 +205,17 @@ export function ProspectionView({
       setStatus({ kind: "ok", text: `${result.addedCount} prospect(s) ajouté(s) au CRM.` });
       setChecked(new Set());
     }
+  }
+
+  async function viewDetail(i: number) {
+    setViewingIndex(i);
+    const result = await addProspectsToCrm(workspaceId, [toProspectInsert(results[i])]);
+    setViewingIndex(null);
+    if (!result.ok || !result.ids?.[0]) {
+      setStatus({ kind: "err", text: result.error ?? "Impossible d'ouvrir la fiche pour l'instant." });
+      return;
+    }
+    router.push(`/crm/${result.ids[0]}`);
   }
 
   return (
@@ -364,56 +359,20 @@ export function ProspectionView({
         {results.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">Aucun résultat pour l&apos;instant — lancez une recherche.</p>
         ) : (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-line">
-            <table className="w-full min-w-[760px] border-collapse">
-              <thead>
-                <tr className="bg-soft text-left text-[9.5px] uppercase tracking-wide text-faint">
-                  <th className="p-2.5"></th>
-                  <th className="p-2.5">Entreprise</th>
-                  <th className="p-2.5">Distance</th>
-                  <th className="p-2.5">Statut</th>
-                  <th className="p-2.5">Site</th>
-                  <th className="p-2.5">Score</th>
-                  <th className="p-2.5">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r, i) => (
-                  <tr key={r.siret} className="border-t border-line text-[12.5px]">
-                    <td className="p-2.5">
-                      <input type="checkbox" checked={checked.has(i)} onChange={() => toggleChecked(i)} />
-                    </td>
-                    <td className="p-2.5">
-                      <div className="font-semibold">{r.companyName}</div>
-                      <div className="text-[10.5px] text-faint">
-                        {[r.street, r.postalCode, r.city].filter(Boolean).join(" ")}
-                      </div>
-                    </td>
-                    <td className="p-2.5">{r.distanceKm.toFixed(1)} km</td>
-                    <td className="p-2.5">
-                      <Tag {...(businessStatusLabel[r.businessStatus] ?? businessStatusLabel.unverified)} />
-                    </td>
-                    <td className="p-2.5">
-                      <Tag {...(websiteQualityLabel[r.websiteQuality] ?? websiteQualityLabel.unknown)} />
-                    </td>
-                    <td className="p-2.5">
-                      <div className="flex h-6 w-9 items-center justify-center rounded-md bg-soft font-display text-[11px] font-bold">
-                        {r.qualityScore}
-                      </div>
-                    </td>
-                    <td className="p-2.5">
-                      <ProspectActions
-                        websiteUri={r.websiteUri}
-                        phone={r.phone}
-                        placeId={r.placeId}
-                        companyName={r.companyName}
-                        address={[r.street, r.postalCode, r.city].filter(Boolean).join(" ")}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {results.map((r, i) => (
+              <ResultCard
+                key={r.siret}
+                result={r}
+                activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+                checked={checked.has(i)}
+                onToggleCheck={() => toggleChecked(i)}
+                manuallyVerified={manuallyVerified.has(i)}
+                onMarkVerified={() => markVerified(i)}
+                onViewDetail={() => viewDetail(i)}
+                viewingDetail={viewingIndex === i}
+              />
+            ))}
           </div>
         )}
       </Card>

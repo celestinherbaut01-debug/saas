@@ -38,6 +38,22 @@ export interface SireneEtablissement {
   effectifTranche: string | null;
 }
 
+/**
+ * Statut de vérification unique affiché à l'utilisateur — dérivé de
+ * placeId/websiteUri/websiteQuality, jamais un champ saisi séparément (une
+ * seule source de vérité, calculée côté serveur, voir computeVerificationStatus
+ * dans index.ts). Le registre (SIRENE) suffit à afficher un prospect ;
+ * Google Places ne fait qu'enrichir ce statut quand disponible.
+ */
+export type VerificationStatus =
+  | "REGISTRY_ONLY" // Google non consulté (pas de clé, ou plafond de vérifications atteint pour cette recherche)
+  | "GOOGLE_VERIFIED" // Google confirme l'établissement, statut du site indéterminé
+  | "NO_WEBSITE_CONFIRMED" // Google confirme l'absence de site
+  | "WEBSITE_FOUND" // un site existe (Google le confirme) mais sa qualité n'a pas pu être analysée
+  | "WEBSITE_WEAK"
+  | "WEBSITE_GOOD"
+  | "UNKNOWN";
+
 export interface EnrichedProspect extends SireneEtablissement {
   distanceKm: number;
   isAssociation: boolean;
@@ -48,10 +64,13 @@ export interface EnrichedProspect extends SireneEtablissement {
   businessStatus: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY" | "unverified";
   websiteUri: string | null;
   websiteQuality: "none" | "weak" | "ok" | "unknown";
+  verificationStatus: VerificationStatus;
   phone: string | null;
   googleRating: number | null;
   googleRatingCount: number | null;
   placesCheckedAt: string | null;
+  /** Confirmation manuelle par l'utilisateur (jamais déduite automatiquement). */
+  manuallyVerified?: boolean;
 
   qualityScore: number;
   verificationSources: Record<string, boolean>;

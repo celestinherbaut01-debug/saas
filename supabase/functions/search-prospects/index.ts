@@ -19,7 +19,7 @@ import { isAssociationOrPublic, isKnownChain, isLargeGroup } from "../_shared/ch
 import { verifyWithGooglePlaces } from "../_shared/placesApi.ts";
 import { analyseWebsiteQuality } from "../_shared/websiteQuality.ts";
 import { computeQualityScore } from "../_shared/scoring.ts";
-import type { EnrichedProspect, SearchRequest } from "../_shared/types.ts";
+import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_shared/types.ts";
 
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
 const HARD_MAX_PLACES_LOOKUPS = 60;
@@ -27,6 +27,25 @@ const CACHE_TTL_DAYS = 30;
 
 function badRequest(message: string) {
   return jsonResponse({ error: message }, 400);
+}
+
+/**
+ * Dérive le statut de vérification unique affiché à l'utilisateur — jamais
+ * saisi séparément, toujours recalculé depuis les mêmes données que le
+ * badge affiché (placeId/websiteUri/websiteQuality). Voir VerificationStatus
+ * dans _shared/types.ts pour la signification de chaque valeur.
+ */
+function computeVerificationStatus(
+  placeId: string | null,
+  websiteUri: string | null,
+  websiteQuality: EnrichedProspect["websiteQuality"],
+): VerificationStatus {
+  if (!placeId) return "REGISTRY_ONLY";
+  if (!websiteUri) return "NO_WEBSITE_CONFIRMED";
+  if (websiteQuality === "ok") return "WEBSITE_GOOD";
+  if (websiteQuality === "weak") return "WEBSITE_WEAK";
+  if (websiteQuality === "unknown") return "WEBSITE_FOUND";
+  return "GOOGLE_VERIFIED";
 }
 
 Deno.serve(async (req) => {
@@ -124,13 +143,29 @@ Deno.serve(async (req) => {
 
     candidates.sort((a, b) => a.distanceKm - b.distanceKm);
     const totalMatched = candidates.length;
-    const toVerify = candidates.slice(0, maxPlacesLookups);
 
     // 5. Vérification Google Places (avec cache par SIRET) + qualité du site.
+    //
+    // RÈGLE PRODUIT : le registre suffit à afficher un prospect. Google
+    // Places ENRICHIT, il ne conditionne JAMAIS la présence d'un résultat.
+    // Auparavant, seuls les `maxPlacesLookups` premiers candidats étaient
+    // même ajoutés aux résultats — les autres (au-delà du plafond de coût
+    // Google) disparaissaient silencieusement. Maintenant, TOUS les
+    // candidats du registre sont retournés ; seule la vérification Google
+    // (payante à l'appel) reste plafonnée par `maxPlacesLookups`, et le
+    // cache (gratuit, une lecture DB) est consulté pour tout le monde en un
+    // seul aller-retour groupé plutôt qu'une requête par candidat.
     const cacheTtlMs = CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
-    const enriched: EnrichedProspect[] = [];
+    const { data: cachedRows } = await admin
+      .from("verification_cache")
+      .select("*")
+      .in("siret", candidates.map((c) => c.siret));
+    const cacheBySiret = new Map((cachedRows ?? []).map((r) => [r.siret, r]));
 
-    for (const c of toVerify) {
+    const enriched: EnrichedProspect[] = [];
+    let liveGoogleCallsUsed = 0;
+
+    for (const c of candidates) {
       const isChain = isKnownChain(c.companyName);
       const isAssociation = isAssociationOrPublic(c.natureJuridique);
       const isLarge = isLargeGroup(c.effectifTranche);
@@ -142,16 +177,13 @@ Deno.serve(async (req) => {
         phone: string | null;
         rating: number | null;
         ratingCount: number | null;
-      } | null = null;
+      };
       let websiteQuality: EnrichedProspect["websiteQuality"] = "unknown";
       let checkedAt: string | null = null;
       let fromCache = false;
+      let googleConsulted = false;
 
-      const { data: cached } = await admin
-        .from("verification_cache")
-        .select("*")
-        .eq("siret", c.siret)
-        .maybeSingle();
+      const cached = cacheBySiret.get(c.siret);
 
       if (cached && Date.now() - new Date(cached.checked_at).getTime() < cacheTtlMs) {
         placesResult = {
@@ -165,11 +197,14 @@ Deno.serve(async (req) => {
         websiteQuality = cached.website_quality ?? "unknown";
         checkedAt = cached.checked_at;
         fromCache = true;
-      } else if (googleApiKey) {
+        googleConsulted = true;
+      } else if (googleApiKey && liveGoogleCallsUsed < maxPlacesLookups) {
+        liveGoogleCallsUsed++;
         const address = [c.street, c.postalCode, c.city].filter(Boolean).join(", ");
         placesResult = await verifyWithGooglePlaces(c.companyName, address, googleApiKey);
         websiteQuality = await analyseWebsiteQuality(placesResult.websiteUri);
         checkedAt = new Date().toISOString();
+        googleConsulted = true;
 
         await admin.from("verification_cache").upsert({
           siret: c.siret,
@@ -183,8 +218,9 @@ Deno.serve(async (req) => {
           checked_at: checkedAt,
         });
       } else {
-        // Pas de clé Google configurée : on ne fabrique aucune donnée,
-        // le prospect reste explicitement "à vérifier".
+        // Pas de clé Google configurée, ou plafond de vérifications payantes
+        // atteint pour cette recherche : on ne fabrique aucune donnée, le
+        // prospect reste explicitement "à vérifier" — mais reste affiché.
         placesResult = {
           placeId: null,
           businessStatus: "unverified",
@@ -196,9 +232,16 @@ Deno.serve(async (req) => {
         websiteQuality = "unknown";
       }
 
-      // Filtres qui dépendent de la vérification Places.
-      if (filters.operationalOnly && placesResult.businessStatus === "CLOSED_PERMANENTLY") continue;
-      if (filters.excludeTempClosed && placesResult.businessStatus === "CLOSED_TEMPORARILY") continue;
+      // Filtres qui dépendent de la vérification Places — uniquement
+      // appliqués si Google a réellement été consulté (sinon on ne sait
+      // pas si l'établissement est fermé, donc on ne l'exclut jamais sur
+      // une simple absence de donnée).
+      if (googleConsulted) {
+        if (filters.operationalOnly && placesResult.businessStatus === "CLOSED_PERMANENTLY") continue;
+        if (filters.excludeTempClosed && placesResult.businessStatus === "CLOSED_TEMPORARILY") continue;
+      }
+
+      const verificationStatus = computeVerificationStatus(placesResult.placeId, placesResult.websiteUri, websiteQuality);
 
       const base = {
         ...c,
@@ -209,6 +252,7 @@ Deno.serve(async (req) => {
         businessStatus: placesResult.businessStatus,
         websiteUri: placesResult.websiteUri,
         websiteQuality,
+        verificationStatus,
         phone: placesResult.phone,
         googleRating: placesResult.rating,
         googleRatingCount: placesResult.ratingCount,
@@ -221,7 +265,8 @@ Deno.serve(async (req) => {
       enriched.push({ ...base, qualityScore: score, verificationSources: sources });
     }
 
-    // 6. Filtre "besoin digital" final.
+    // 6. Filtre "besoin digital" — optionnel, "all" par défaut côté client :
+    // ne doit jamais, à lui seul, faire disparaître un prospect du registre.
     let results = enriched;
     if (filters.webFilter !== "all") {
       const wanted: Record<string, EnrichedProspect["websiteQuality"][]> = {
@@ -246,7 +291,8 @@ Deno.serve(async (req) => {
 
     return jsonResponse({
       totalMatchedInRegistry: totalMatched,
-      verifiedCount: results.length,
+      totalReturned: results.length,
+      googleVerifiedCount: results.filter((r) => r.placeId !== null).length,
       googlePlacesConfigured: Boolean(googleApiKey),
       results,
     });

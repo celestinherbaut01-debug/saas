@@ -11,6 +11,8 @@ export interface AddProspectsResult {
   ok: boolean;
   error?: string;
   addedCount?: number;
+  /** IDs des lignes insérées/mises à jour (même ordre que `rows`) — utilisé notamment pour naviguer vers la fiche CRM juste après ajout. */
+  ids?: string[];
 }
 
 /**
@@ -60,5 +62,5 @@ export async function addProspectsToCrm(
     await incrementUsage(workspaceId, "prospects_added", inserted.length);
   }
 
-  return { ok: true, addedCount: inserted?.length ?? 0 };
+  return { ok: true, addedCount: inserted?.length ?? 0, ids: (inserted ?? []).map((p) => p.id) };
 }
