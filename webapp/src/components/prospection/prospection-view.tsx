@@ -103,7 +103,9 @@ export function ProspectionView({
   const [webFilter, setWebFilter] = useState<"all" | "no_or_weak" | "none" | "weak" | "unknown">("no_or_weak");
 
   const [searching, setSearching] = useState(false);
-  const [status, setStatus] = useState<{ kind: "info" | "ok" | "err"; text: string } | null>(null);
+  const [status, setStatus] = useState<{ kind: "info" | "ok" | "err"; text: string; devDetail?: string } | null>(
+    null,
+  );
   const [results, setResults] = useState<SearchResult[]>([]);
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
@@ -145,7 +147,7 @@ export function ProspectionView({
     setSearching(false);
 
     if (!result.ok) {
-      setStatus({ kind: "err", text: `Erreur : ${result.error}` });
+      setStatus({ kind: "err", text: `Erreur : ${result.error}`, devDetail: result.devDetail });
       return;
     }
 
@@ -321,7 +323,7 @@ export function ProspectionView({
           </Button>
         </div>
         {status && (
-          <p
+          <div
             className={cn(
               "mt-3 rounded-lg px-3 py-2 text-[12.5px]",
               status.kind === "err" && "bg-red-bg text-red-fg",
@@ -338,7 +340,12 @@ export function ProspectionView({
                 </Link>
               </>
             )}
-          </p>
+            {status.kind === "err" && status.devDetail && (
+              <pre className="mt-2 whitespace-pre-wrap break-words rounded-md bg-red-fg/10 px-2.5 py-2 font-mono text-[10.5px] leading-relaxed text-red-fg/80">
+                {status.devDetail}
+              </pre>
+            )}
+          </div>
         )}
       </Card>
 

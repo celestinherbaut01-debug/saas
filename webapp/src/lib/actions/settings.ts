@@ -1,8 +1,10 @@
 "use server";
 
+import { createClient as createServiceRoleClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isValidPlan } from "@/lib/entitlements";
+import type { Database } from "@/lib/supabase/types";
 
 export interface SettingsActionState {
   error: string | null;
@@ -14,6 +16,17 @@ export interface SettingsActionState {
  * l'application des quotas/fonctionnalités en développement. Bloqué en
  * production : le seul chemin légitime pour changer de plan en prod sera
  * Stripe Checkout/Billing Portal (pas encore branché, voir README).
+ *
+ * Bug corrigé : `public.subscriptions` n'a AUCUNE policy RLS d'écriture
+ * cliente (voir 0005_subscriptions.sql — volontaire, seul un futur webhook
+ * Stripe doit écrire ici). Un .update() avec le client normal ne touchait
+ * donc silencieusement AUCUNE ligne : Postgres ne lève pas d'erreur quand
+ * RLS exclut une ligne d'un UPDATE, il traite juste ça comme "0 ligne
+ * concernée" — l'action renvoyait `{ok:true}` sans que le plan ait changé
+ * en base. On utilise donc ici le service role (qui contourne RLS),
+ * exclusivement après le contrôle NODE_ENV ci-dessus ET une vérification
+ * explicite d'appartenance au workspace (le service role, lui, ignore RLS :
+ * l'autorisation doit être vérifiée avant de l'utiliser, pas déléguée à lui).
  */
 export async function setDevPlan(workspaceId: string, plan: string): Promise<SettingsActionState> {
   if (process.env.NODE_ENV === "production") {
@@ -27,13 +40,44 @@ export async function setDevPlan(workspaceId: string, plan: string): Promise<Set
   } = await supabase.auth.getUser();
   if (!user) return { error: "Session expirée." };
 
-  const { error } = await supabase
-    .from("subscriptions")
-    .update({ plan, status: "active" })
-    .eq("workspace_id", workspaceId);
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership) return { error: "Vous n'êtes pas membre de ce workspace." };
 
-  if (error) return { error: error.message };
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!serviceRoleKey || !supabaseUrl) {
+    return {
+      error:
+        "SUPABASE_SERVICE_ROLE_KEY manquant dans webapp/.env.local — nécessaire en dev pour écrire dans subscriptions (aucune policy d'écriture cliente n'y existe volontairement). Ajoutez-la (Supabase → Project Settings → API → service_role) puis relancez npm run dev.",
+    };
+  }
+  const admin = createServiceRoleClient<Database>(supabaseUrl, serviceRoleKey);
+
+  const { data: updated, error } = await admin
+    .from("subscriptions")
+    .upsert({ workspace_id: workspaceId, plan, status: "active" }, { onConflict: "workspace_id" })
+    .select("plan")
+    .maybeSingle();
+
+  if (error) return { error: `Échec de la mise à jour du plan : ${error.message}` };
+  // Jamais de faux succès : on relit ce qui a réellement été écrit plutôt
+  // que de supposer que l'absence d'erreur veut dire que ça a marché.
+  if (!updated || updated.plan !== plan) {
+    return {
+      error: `Écriture acceptée mais le plan relu en base ("${updated?.plan ?? "aucune ligne"}") ne correspond pas à "${plan}".`,
+    };
+  }
+
   revalidatePath("/parametres");
+  revalidatePath("/dashboard");
+  revalidatePath("/prospection");
+  revalidatePath("/business-os");
+  revalidatePath("/analytics");
   revalidatePath("/", "layout");
   return { error: null, ok: true };
 }

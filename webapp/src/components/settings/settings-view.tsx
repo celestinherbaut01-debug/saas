@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import Link from "next/link";
+import { useActionState, useState } from "react";
 import type { BusinessProfile, Subscription } from "@/lib/supabase/types";
 import type { QuotaStatus } from "@/lib/quota";
 import { Card } from "@/components/ui/card";
@@ -8,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { updateBusinessProfile, setDevPlan, type SettingsActionState } from "@/lib/actions/settings";
-import { ENTITLEMENTS, PLAN_ORDER, type Plan } from "@/lib/entitlements";
+import { updateBusinessProfile, type SettingsActionState } from "@/lib/actions/settings";
+import { DevPlanSwitcher } from "@/components/settings/dev-plan-switcher";
+import { ENTITLEMENTS, type Plan } from "@/lib/entitlements";
 
 export function SettingsView({
   workspaceId,
@@ -30,6 +32,7 @@ export function SettingsView({
   });
 
   const currentPlan: Plan = subscription?.plan ?? "free";
+  const [showManage, setShowManage] = useState(false);
 
   return (
     <div className="flex flex-col gap-5">
@@ -70,70 +73,53 @@ export function SettingsView({
       </Card>
 
       <Card>
-        <h2 className="font-display text-sm font-bold">Usage ce mois-ci</h2>
-        <p className="mt-1 text-[12px] text-muted">Quotas réels, vérifiés côté serveur à chaque action.</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <UsageBar label="Requêtes NOVA" status={usage.nova} />
-          <UsageBar label="Prospects ajoutés" status={usage.prospects} />
-          <UsageBar label="Recherches" status={usage.searches} />
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">Plan actuel</p>
+            <p className="mt-1 font-display text-xl font-extrabold">{ENTITLEMENTS[currentPlan].label}</p>
+            <p className="mt-0.5 text-[13px] text-muted">
+              {ENTITLEMENTS[currentPlan].priceMonthly === 0
+                ? "Gratuit"
+                : `${ENTITLEMENTS[currentPlan].priceMonthly} €/mois`}
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => isDev && setShowManage((v) => !v)}
+            disabled={!isDev}
+            title={isDev ? undefined : "Paiement Stripe pas encore branché — bientôt disponible."}
+          >
+            Gérer mon abonnement
+          </Button>
         </div>
-      </Card>
 
-      <Card>
-        <h2 className="font-display text-sm font-bold">Abonnement</h2>
-        <p className="mt-1 text-[12.5px] text-muted">
-          Paiement en ligne à connecter (Stripe) — aucune carte n&apos;est demandée pour l&apos;instant, votre
-          workspace est sur le plan {ENTITLEMENTS[currentPlan].label} par défaut.
-        </p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-4">
-          {PLAN_ORDER.map((planId) => {
-            const plan = ENTITLEMENTS[planId];
-            return (
-              <div
-                key={plan.id}
-                className={cn(
-                  "rounded-xl border p-4",
-                  plan.id === currentPlan ? "border-ink bg-soft" : "border-line bg-panel",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-display text-[13px] font-extrabold">{plan.label}</span>
-                  {plan.id === currentPlan && (
-                    <span className="rounded-full bg-ink px-2 py-0.5 text-[9px] font-bold text-bg">ACTUEL</span>
-                  )}
-                </div>
-                <p className="mt-1 font-display text-lg font-extrabold">
-                  {plan.priceMonthly === 0 ? "Gratuit" : `${plan.priceMonthly}€/mois`}
-                </p>
-                <ul className="mt-2 flex flex-col gap-1 text-[11.5px] text-muted">
-                  {plan.features.slice(0, 4).map((f) => (
-                    <li key={f}>· {f}</li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-        {isDev && (
-          <div className="mt-4 rounded-lg border border-dashed border-line bg-soft p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-              Dev uniquement — désactivé en production
-            </p>
-            <p className="mt-1 text-[12px] text-muted">
-              Changer le plan sans Stripe, pour tester l&apos;application réelle des quotas et fonctionnalités.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {PLAN_ORDER.map((planId) => (
-                <DevPlanButton
-                  key={planId}
-                  workspaceId={workspaceId}
-                  plan={planId}
-                  active={planId === currentPlan}
-                />
-              ))}
-            </div>
+        {!isDev && (
+          <p className="mt-2 text-[11.5px] text-faint">
+            Le paiement en ligne (Stripe) n&apos;est pas encore branché — aucune carte n&apos;est demandée pour
+            l&apos;instant.
+          </p>
+        )}
+        {isDev && showManage && (
+          <div className="mt-3">
+            <DevPlanSwitcher workspaceId={workspaceId} currentPlan={currentPlan} />
           </div>
         )}
+
+        <div className="mt-5 border-t border-line pt-4">
+          <h2 className="text-[12px] font-bold text-ink">Usage du mois</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <UsageBar label="Prospects" status={usage.prospects} />
+            <UsageBar label="Recherches" status={usage.searches} />
+            <UsageBar label="NOVA" status={usage.nova} />
+          </div>
+        </div>
+
+        <div className="mt-5 border-t border-line pt-4">
+          <Link href="/tarifs" className="text-[13px] font-semibold text-accent">
+            Voir tous les forfaits →
+          </Link>
+        </div>
       </Card>
     </div>
   );
@@ -156,18 +142,5 @@ function UsageBar({ label, status }: { label: string; status: QuotaStatus }) {
         />
       </div>
     </div>
-  );
-}
-
-function DevPlanButton({ workspaceId, plan, active }: { workspaceId: string; plan: Plan; active: boolean }) {
-  const boundAction = setDevPlan.bind(null, workspaceId, plan);
-  const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(boundAction, { error: null });
-  return (
-    <form action={formAction}>
-      <Button type="submit" variant="outline" size="sm" disabled={pending || active}>
-        {ENTITLEMENTS[plan].label}
-      </Button>
-      {state.error && <p className="mt-1 text-[10px] text-red-fg">{state.error}</p>}
-    </form>
   );
 }

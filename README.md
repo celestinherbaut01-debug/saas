@@ -205,12 +205,20 @@ et le Business OS fonctionnent déjà sans Stripe — voir "Tester les plans
 sans payer" ci-dessous.
 
 ### Tester les plans sans payer
-En développement (`NODE_ENV` ≠ `production`), la page **Paramètres →
-Abonnement** affiche des boutons Free/Starter/Pro/Max qui changent
-immédiatement le plan du workspace, sans Stripe. Utilisez-les pour vérifier
-que chaque plan voit exactement ce qu'il doit voir (ex. Business OS
+En développement (`NODE_ENV` ≠ `production`), la page **Paramètres → Plan
+actuel → Gérer mon abonnement** affiche des boutons Free/Starter/Pro/Max qui
+changent immédiatement le plan du workspace, sans Stripe. Utilisez-les pour
+vérifier que chaque plan voit exactement ce qu'il doit voir (ex. Business OS
 inaccessible en Free/Starter, visible dès Pro, alertes stock uniquement en
-Max). Ce switch est bloqué automatiquement en production.
+Max, rayon de prospection plafonné selon le plan). Ce switch est bloqué
+automatiquement en production.
+
+Nécessite `SUPABASE_SERVICE_ROLE_KEY` dans `webapp/.env.local` (voir
+`webapp/.env.example`) : `public.subscriptions` n'a volontairement aucune
+policy RLS d'écriture côté client (seul un futur webhook Stripe doit y
+écrire), donc ce switch dev passe par le service role, uniquement après le
+contrôle `NODE_ENV`. Sans cette clé, le bouton affiche une erreur explicite
+plutôt que d'échouer silencieusement.
 
 ## Déployer sur Netlify
 
