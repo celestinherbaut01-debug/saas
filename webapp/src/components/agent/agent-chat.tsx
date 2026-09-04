@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { askNova, type NovaMessage } from "@/lib/actions/nova";
@@ -12,11 +12,20 @@ const SUGGESTIONS = [
   "Rédige un email pour mon prospect le mieux noté",
 ];
 
-export function AgentChat({ workspaceId, configured }: { workspaceId: string; configured: boolean }) {
+export function AgentChat({
+  workspaceId,
+  configured,
+  initialPrompt,
+}: {
+  workspaceId: string;
+  configured: boolean;
+  initialPrompt?: string;
+}) {
   const [messages, setMessages] = useState<NovaMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const autoSent = useRef(false);
 
   async function send(text: string) {
     if (!text.trim() || sending) return;
@@ -35,6 +44,17 @@ export function AgentChat({ workspaceId, configured }: { workspaceId: string; co
     }
     setMessages((prev) => [...prev, { role: "assistant", content: result.reply }]);
   }
+
+  // Ouvert depuis une fiche prospect (ex. "Préparer un email") avec un
+  // prompt déjà rempli dans l'URL : envoyé une seule fois à l'ouverture,
+  // jamais à chaque re-render.
+  useEffect(() => {
+    if (initialPrompt && configured && !autoSent.current) {
+      autoSent.current = true;
+      send(initialPrompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, configured]);
 
   return (
     <div className="flex flex-col gap-5">
