@@ -10,27 +10,9 @@ import { CategoryCombobox } from "@/components/onboarding/category-combobox";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { completeOnboarding } from "@/lib/actions/onboarding";
+import { recommendedSlugsFor } from "@/lib/target-recommendations";
 
 const STEPS = ["Entreprise", "Votre métier", "Vos cibles", "Localisation"] as const;
-
-/**
- * Recommandations heuristiques métier -> cibles, par slug de business_categories.
- * Volontairement simple pour la Phase 1 (pas d'IA) — affiné plus tard avec un
- * vrai moteur de recommandation basé sur l'offre décrite en texte libre.
- */
-const RECOMMENDATIONS: Record<string, string[]> = {
-  web: ["restaurants", "garages", "hair", "realestate", "dentists"],
-  it: ["restaurants", "garages", "hair", "realestate"],
-  marketing: ["restaurants", "hair", "beauty", "realestate"],
-  design: ["restaurants", "hair", "beauty"],
-  photo: ["hair", "beauty", "realestate"],
-  cleaning: ["hotels", "gyms", "realestate", "dentists"],
-  security: ["realestate", "supermarkets"],
-  accounting: ["restaurants", "garages", "hair", "realestate"],
-  law: ["realestate", "dealers"],
-  consulting: ["realestate", "accounting"],
-  insurance: ["realestate", "garages"],
-};
 
 export function OnboardingWizard({ categories }: { categories: BusinessCategory[] }) {
   const [step, setStep] = useState(0);
@@ -50,7 +32,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [showAllTargets, setShowAllTargets] = useState(false);
 
   const ownSlug = categories.find((c) => c.id === ownCategoryId)?.slug ?? null;
-  const recommendedSlugs = ownSlug ? RECOMMENDATIONS[ownSlug] : undefined;
+  const recommendedSlugs = recommendedSlugsFor(ownSlug);
 
   const targetNames = useMemo(
     () => targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter((n): n is string => Boolean(n)),

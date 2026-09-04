@@ -11,6 +11,8 @@ import { AddressField, type AddressValue } from "@/components/onboarding/address
 import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch } from "@/lib/actions/search";
+import { updateOfferAudience } from "@/lib/actions/settings";
+import { recommendedSlugsFor } from "@/lib/target-recommendations";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
 type SearchResult = ProspectionResult;
@@ -75,6 +77,16 @@ export function ProspectionView({
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const router = useRouter();
 
+  const [offerDescription, setOfferDescription] = useState(businessProfile?.offer_description ?? "");
+  const [audience, setAudience] = useState<"b2b" | "b2c" | "both">(businessProfile?.audience ?? "both");
+  const [savingOffer, setSavingOffer] = useState(false);
+  const [offerSaved, setOfferSaved] = useState(false);
+  const offerChanged =
+    offerDescription !== (businessProfile?.offer_description ?? "") || audience !== (businessProfile?.audience ?? "both");
+
+  const [phoneOnly, setPhoneOnly] = useState(false);
+  const [googleFicheOnly, setGoogleFicheOnly] = useState(false);
+
   const nafToLabel = useMemo(() => {
     const map = new Map<string, string>();
     for (const cat of categories) {
@@ -84,6 +96,31 @@ export function ProspectionView({
     }
     return map;
   }, [categories]);
+
+  const ownSlug = businessProfile?.own_category_id
+    ? categories.find((c) => c.id === businessProfile.own_category_id)?.slug ?? null
+    : null;
+  const recommendedSlugs = recommendedSlugsFor(ownSlug);
+
+  const displayedResults = useMemo(
+    () =>
+      results
+        .map((r, i) => ({ r, i }))
+        .filter(({ r }) => (!phoneOnly || r.phone) && (!googleFicheOnly || r.placeId)),
+    [results, phoneOnly, googleFicheOnly],
+  );
+
+  async function saveOffer() {
+    setSavingOffer(true);
+    setOfferSaved(false);
+    const result = await updateOfferAudience(workspaceId, offerDescription, audience);
+    setSavingOffer(false);
+    if (!result.ok) {
+      setStatus({ kind: "err", text: result.error ?? "Impossible d'enregistrer votre offre." });
+    } else {
+      setOfferSaved(true);
+    }
+  }
 
   function nafCodesForSelection(): string[] {
     const set = new Set<string>();
@@ -229,15 +266,66 @@ export function ProspectionView({
       </div>
 
       <Card>
-        <h2 className="font-display text-sm font-bold">1. Qui voulez-vous démarcher ?</h2>
+        <h2 className="font-display text-sm font-bold">1. Votre offre</h2>
+        <div className="mt-3 flex flex-col gap-3">
+          <div>
+            <label className="text-[11px] font-semibold text-muted">Que vendez-vous ?</label>
+            <textarea
+              value={offerDescription}
+              onChange={(e) => {
+                setOfferDescription(e.target.value);
+                setOfferSaved(false);
+              }}
+              rows={2}
+              placeholder="Ex. Création de sites internet pour commerçants et artisans."
+              className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold text-muted">Vous vendez principalement à :</label>
+            <div className="mt-1 flex gap-2">
+              {(["b2b", "b2c", "both"] as const).map((a) => (
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => {
+                    setAudience(a);
+                    setOfferSaved(false);
+                  }}
+                  className={cn(
+                    "rounded-lg border px-3 py-1.5 text-[13px]",
+                    audience === a ? "border-ink bg-ink text-bg" : "border-line bg-panel text-ink",
+                  )}
+                >
+                  {a === "b2b" ? "Entreprises (B2B)" : a === "b2c" ? "Particuliers (B2C)" : "Les deux"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" onClick={saveOffer} disabled={savingOffer || !offerChanged}>
+              {savingOffer ? "Enregistrement…" : "Enregistrer"}
+            </Button>
+            {offerSaved && !offerChanged && <span className="text-[11.5px] text-green-fg">✓ Enregistré</span>}
+          </div>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="font-display text-sm font-bold">2. Qui voulez-vous démarcher ?</h2>
         <div className="mt-3">
-          <TargetCategoryPicker categories={categories} value={targetIds} onChange={setTargetIds} />
+          <TargetCategoryPicker
+            categories={categories}
+            value={targetIds}
+            onChange={setTargetIds}
+            recommendedSlugs={recommendedSlugs}
+          />
         </div>
       </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <h2 className="font-display text-sm font-bold">2. Adresse de départ</h2>
+          <h2 className="font-display text-sm font-bold">3. Adresse de départ</h2>
           <div className="mt-3 flex flex-col gap-3">
             <AddressField value={address} onChange={setAddress} />
             <div>
@@ -268,7 +356,7 @@ export function ProspectionView({
         </Card>
 
         <Card>
-          <h2 className="font-display text-sm font-bold">3. Qualité des prospects</h2>
+          <h2 className="font-display text-sm font-bold">4. Qualité des prospects</h2>
           <div className="mt-3 flex flex-col gap-3">
             <div>
               <label className="text-[11px] font-semibold text-muted">Besoin digital</label>
@@ -283,6 +371,9 @@ export function ProspectionView({
                 <option value="weak">Site à améliorer uniquement</option>
                 <option value="unknown">À vérifier uniquement</option>
               </select>
+              <p className="mt-1 text-[10.5px] text-faint">
+                Sans Google Places configuré, tout reste « à vérifier » — laissez sur « Tous » pour ne rien masquer.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-[12px]">
               <Filter label="Écarter fermés" checked={operationalOnly} onChange={setOperationalOnly} />
@@ -291,6 +382,8 @@ export function ProspectionView({
               <Filter label="Écarter associations" checked={excludeAssociations} onChange={setExcludeAssociations} />
               <Filter label="Écarter gros groupes" checked={excludeLargeGroups} onChange={setExcludeLargeGroups} />
               <Filter label="Contact en priorité" checked={needContact} onChange={setNeedContact} />
+              <Filter label="Téléphone disponible" checked={phoneOnly} onChange={setPhoneOnly} />
+              <Filter label="Fiche Google disponible" checked={googleFicheOnly} onChange={setGoogleFicheOnly} />
             </div>
             <div>
               <label className="text-[11px] font-semibold text-muted">Max établissements / SIREN</label>
@@ -347,7 +440,13 @@ export function ProspectionView({
       <Card>
         <div className="flex items-center justify-between">
           <h2 className="font-display text-sm font-bold">
-            Résultats {results.length > 0 && <span className="font-sans font-normal text-faint">({results.length})</span>}
+            Résultats{" "}
+            {results.length > 0 && (
+              <span className="font-sans font-normal text-faint">
+                ({displayedResults.length}
+                {displayedResults.length !== results.length ? ` sur ${results.length}` : ""})
+              </span>
+            )}
           </h2>
           {results.length > 0 && (
             <Button size="sm" onClick={addSelectedToCrm} disabled={checked.size === 0 || adding}>
@@ -358,9 +457,13 @@ export function ProspectionView({
 
         {results.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">Aucun résultat pour l&apos;instant — lancez une recherche.</p>
+        ) : displayedResults.length === 0 ? (
+          <p className="mt-4 text-[13px] text-muted">
+            Aucun résultat ne correspond aux filtres « Téléphone disponible » / « Fiche Google disponible ».
+          </p>
         ) : (
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((r, i) => (
+            {displayedResults.map(({ r, i }) => (
               <ResultCard
                 key={r.siret}
                 result={r}
