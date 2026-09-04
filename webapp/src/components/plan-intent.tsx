@@ -61,7 +61,7 @@ export function PlanIntentBanner({ currentPlan }: { currentPlan: Plan }) {
     <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-soft px-3.5 py-2.5 text-[12.5px]">
       <span>
         Vous aviez choisi le plan <b>{ENTITLEMENTS[intended].label}</b> avant de vous inscrire.{" "}
-        <Link href="/parametres" className="font-semibold text-accent">
+        <Link href="/abonnement" className="font-semibold text-accent">
           Passer à ce plan
         </Link>
       </span>

@@ -128,7 +128,7 @@ export async function runProspectSearch(
   if (params.radiusKm > maxRadiusKm) {
     return {
       ok: false,
-      error: `Rayon trop grand pour votre forfait ${ENTITLEMENTS[plan].label} (max ${maxRadiusKm} km). Passez à un forfait supérieur dans Paramètres.`,
+      error: `Rayon trop grand pour votre forfait ${ENTITLEMENTS[plan].label} (max ${maxRadiusKm} km). Passez à un forfait supérieur dans Abonnements.`,
     };
   }
 

@@ -261,7 +261,7 @@ export function ProspectionView({
                 {maxRadiusKm < 250 && (
                   <>
                     {" "}
-                    <Link href="/parametres" className="font-semibold text-accent">
+                    <Link href="/abonnement" className="font-semibold text-accent">
                       Passer à un forfait supérieur
                     </Link>{" "}
                     pour élargir la zone.
@@ -335,7 +335,7 @@ export function ProspectionView({
             {status.kind === "err" && status.text.includes("supérieur") && (
               <>
                 {" "}
-                <Link href="/parametres" className="font-semibold underline">
+                <Link href="/abonnement" className="font-semibold underline">
                   Voir les plans
                 </Link>
               </>

@@ -10,19 +10,7 @@ import { ProspectActions } from "@/components/prospect-actions";
 import { scoreBreakdown } from "@/lib/score-breakdown";
 import { cn } from "@/lib/utils";
 import { STATUS_OPTIONS } from "@/lib/crm-status";
-
-const ACTIVITY_LABEL: Record<Activity["type"], string> = {
-  added_to_crm: "Ajouté au CRM",
-  status_change: "Statut changé",
-  note: "Note ajoutée",
-  email_sent: "Email envoyé",
-  followup_sent: "Relance envoyée",
-  reply_received: "Réponse reçue",
-  call_logged: "Appel enregistré",
-  google_verified: "Vérifié sur Google",
-  website_audited: "Site audité",
-  appointment_created: "Rendez-vous créé",
-};
+import { ACTIVITY_LABEL } from "@/lib/activity-labels";
 
 export function ProspectDetail({
   prospect: initialProspect,
