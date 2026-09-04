@@ -144,11 +144,21 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
     if (osModule === "repair_orders") {
       const { data } = await supabase
         .from("repair_orders")
-        .select("title, status, scheduled_at, completed_at, labor_cost, parts_cost, notes")
+        .select("title, status, scheduled_at, completed_at, labor_cost, parts_cost, notes, vehicle_id")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
         .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const vehicleIds = [...new Set((data ?? []).map((r) => r.vehicle_id).filter((id): id is string => Boolean(id)))];
+      const { data: vehicles } =
+        vehicleIds.length > 0
+          ? await supabase.from("vehicles").select("id, registration, make, model").in("id", vehicleIds)
+          : { data: [] };
+      const vehicleById = new Map((vehicles ?? []).map((v) => [v.id, v]));
+      const results = (data ?? []).map(({ vehicle_id, ...rest }) => ({
+        ...rest,
+        vehicle: vehicle_id ? vehicleById.get(vehicle_id) ?? null : null,
+      }));
+      return { count: results.length, results };
     }
     if (osModule === "contracts") {
       const { data } = await supabase
@@ -262,8 +272,13 @@ function buildSystemPrompt(plan: Plan): string {
     "avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
   if (businessOsAtLeast(plan, "advanced")) {
     prompt +=
-      " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre aux questions sur " +
-      "les clients, le stock/les pièces ou les rendez-vous/interventions métier.";
+      " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre avec les vraies " +
+      "données métier — clients, stock, rendez-vous, et selon le métier du workspace : véhicules/ordres de " +
+      "réparation (garage — ex. 'quels véhicules attendent une pièce ?' = module repair_orders, statut " +
+      "waiting_parts), contrats de site (nettoyage — ex. contrats bientôt à renouveler = module contracts, statut " +
+      "ending_soon), projets (agence web — ex. projets en maintenance = module projects), pertes (restaurant — " +
+      "ex. pertes récentes = module waste_log). N'appelle jamais un module qui n'a pas de sens pour ce métier ; s'il " +
+      "renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
   }
   return prompt;
 }
