@@ -13,6 +13,9 @@ export function PublicNav() {
         <Link href="/tarifs" className="text-muted hover:text-ink">
           Tarifs
         </Link>
+        <Link href="/securite" className="hidden text-muted hover:text-ink sm:inline">
+          Sécurité
+        </Link>
         <Link href="/login" className="text-muted hover:text-ink">
           Se connecter
         </Link>

@@ -272,10 +272,78 @@ Détails techniques :
 - Si `GOOGLE_MAPS_API_KEY` n'est pas configurée, ou si Google ne répond pas,
   l'établissement reste marqué "à vérifier" — jamais requalifié par défaut.
 
+### ⚠ Cette fonction doit être déployée manuellement — ce n'est pas automatique
+
+Contrairement à `webapp/` (déployé automatiquement par Netlify à chaque push),
+**les Edge Functions Supabase ne se déploient jamais toutes seules.** Écrire
+le code dans `supabase/functions/search-prospects/index.ts` et le pousser sur
+GitHub ne suffit pas : tant que la commande `supabase functions deploy` n'a
+pas été exécutée avec succès, la fonction n'existe pas côté Supabase, et
+`/prospection` renvoie l'erreur "Edge Function returned a non-2xx status
+code" avec un statut **404** et un corps `{"code":"NOT_FOUND","message":
+"Requested function was not found"}` — c'est exactement l'erreur détaillée
+que `runProspectSearch` (`webapp/src/lib/actions/search.ts`) affiche
+désormais en dev, et c'est le symptôme d'un projet où la fonction n'a
+jamais été déployée, pas un bug dans le code de la fonction elle-même.
+
+Cause racine trouvée dans ce repo : **il n'existait pas de
+`supabase/config.toml`**. Sans ce fichier, la CLI Supabase refuse toute
+commande liée au projet (`link`, `functions deploy`, `db push`...) avec
+`no config.toml found — have you run supabase init?`. Ce fichier a été
+généré (`supabase init`) et committé dans ce commit — la CLI peut
+maintenant reconnaître ce dépôt comme un projet Supabase.
+
+**Étapes exactes à exécuter vous-même** (nécessite un compte Supabase avec
+accès à ce projet — impossible à faire à votre place depuis cette session,
+qui n'a pas d'accès réseau sortant vers supabase.co) :
+
 ```bash
-supabase secrets set GOOGLE_MAPS_API_KEY=xxxxx
-supabase functions deploy search-prospects
+# 1. Depuis la racine du dépôt (là où se trouve supabase/config.toml)
+cd saas
+
+# 2. Authentifie la CLI à votre compte Supabase (ouvre un navigateur)
+npx supabase login
+
+# 3. Lie ce dépôt à votre projet Supabase — le <project-ref> est le
+#    sous-domaine dans votre Project URL (https://<project-ref>.supabase.co),
+#    visible dans Project Settings -> General. On vous demandera le mot de
+#    passe de base de données choisi à la création du projet.
+npx supabase link --project-ref <project-ref>
+
+# 4. Déclare le(s) secret(s) dont la fonction a besoin (voir checklist
+#    ci-dessous) — à refaire à chaque fois qu'un secret change.
+npx supabase secrets set GOOGLE_MAPS_API_KEY=xxxxx
+
+# 5. Déploie la fonction elle-même — c'est CETTE commande qui manquait.
+npx supabase functions deploy search-prospects
+
+# 6. Vérifie qu'elle apparaît bien comme déployée :
+npx supabase functions list
 ```
+
+Après l'étape 5, `/prospection` doit fonctionner (recherche réelle) sans
+aucun changement de code côté `webapp/`. Si vous préférez ne pas installer
+la CLI : `npx supabase@latest <commande>` fonctionne directement, aucune
+installation globale nécessaire (c'est ce qui a servi à générer le
+`config.toml` de ce commit).
+
+### Checklist des secrets Supabase pour cette fonction
+
+Déclarés avec `supabase secrets set NOM=valeur` (jamais commités dans ce repo) :
+
+| Secret | Obligatoire ? | Où l'obtenir | Effet si absent |
+|---|---|---|---|
+| `GOOGLE_MAPS_API_KEY` | Recommandé, pas strictement obligatoire | [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → activer **Places API (New)** → Identifiants → créer une clé API | La fonction répond quand même (200) avec les entreprises du registre SIRENE, mais `businessStatus`/`websiteUri`/téléphone/avis restent "à vérifier" — jamais de statut inventé à la place |
+| `SUPABASE_URL` | Auto-injecté | — | — (fourni automatiquement par le runtime Edge Functions, ne jamais le redéfinir soi-même) |
+| `SUPABASE_ANON_KEY` | Auto-injecté | — | — (idem) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-injecté | — | — (idem — utilisé par la fonction pour lire/écrire `verification_cache`, RLS ne l'autorise pas au client) |
+
+Les 3 secrets "auto-injectés" sont fournis par Supabase à toute Edge
+Function déployée — inutile et déconseillé de les redéfinir via
+`supabase secrets set`. Seul `GOOGLE_MAPS_API_KEY` est réellement à votre
+charge.
+
+Vérifier ce qui est déjà déclaré : `npx supabase secrets list`.
 
 ## Notes de coût à garder en tête
 

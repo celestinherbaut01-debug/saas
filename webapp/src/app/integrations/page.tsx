@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -38,10 +38,7 @@ function IntegrationRow({
 }
 
 export default async function IntegrationsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login");
 
   const googleConnected = user.identities?.some((i) => i.provider === "google") ?? false;

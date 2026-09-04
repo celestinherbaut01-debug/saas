@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser } from "@/lib/session";
 import { Card } from "@/components/ui/card";
 import { AppShell } from "@/components/app-shell";
 import { getXpSummary, xpActionLabel } from "@/lib/xp";
@@ -8,11 +9,9 @@ import { PlanIntentBanner } from "@/components/plan-intent";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedUser();
   if (!user) redirect("/login");
+  const supabase = await createClient();
 
   // État applicatif calculé une seule fois, de la même façon partout dans
   // l'app (voir lib/app-state.ts) — évite qu'une page décide "onboarding

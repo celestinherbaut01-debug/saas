@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import type { Plan } from "@/lib/entitlements";
+import { getCachedMembership } from "@/lib/session";
+import { getWorkspacePlan } from "@/lib/plan";
 
 // Source UNIQUE de calcul de l'état applicatif d'un utilisateur connecté.
 // proxy.ts, le dashboard, la prospection, Business OS lisent tous CETTE
@@ -38,9 +40,13 @@ export async function getUserAppState(
 ): Promise<AppState> {
   if (!userId) return EMPTY_STATE;
 
-  const [{ data: profile }, { data: membership }] = await Promise.all([
+  // getCachedMembership / getWorkspacePlan sont mémorisées par requête
+  // (React `cache()`) : si AppShell ou la page ont déjà appelé ces mêmes
+  // fonctions, ceci ne refait aucun aller-retour Supabase — voir
+  // lib/session.ts et lib/plan.ts.
+  const [{ data: profile }, membership] = await Promise.all([
     supabase.from("profiles").select("onboarding_completed").eq("id", userId).maybeSingle(),
-    supabase.from("workspace_members").select("workspace_id").eq("user_id", userId).maybeSingle(),
+    getCachedMembership(userId),
   ]);
 
   const workspaceId = membership?.workspace_id ?? null;
@@ -50,13 +56,11 @@ export async function getUserAppState(
   let ownCategoryId: string | null = null;
 
   if (workspaceId) {
-    const [{ data: subscription }, { data: businessProfile }] = await Promise.all([
-      supabase.from("subscriptions").select("plan, status").eq("workspace_id", workspaceId).maybeSingle(),
+    const [planResult, { data: businessProfile }] = await Promise.all([
+      getWorkspacePlan(workspaceId),
       supabase.from("business_profiles").select("own_category_id").eq("workspace_id", workspaceId).maybeSingle(),
     ]);
-    if (subscription && subscription.status !== "canceled" && subscription.status !== "past_due") {
-      plan = subscription.plan;
-    }
+    plan = planResult;
     businessProfileExists = businessProfile !== null;
     ownCategoryId = businessProfile?.own_category_id ?? null;
   }

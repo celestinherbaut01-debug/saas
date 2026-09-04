@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { planAtLeast, type Plan } from "@/lib/entitlements";
 
@@ -15,8 +16,13 @@ export const PLAN_LABEL: Record<Plan, string> = {
  * Vérité serveur sur le plan d'un workspace. À utiliser dans toute Server
  * Action ou page sensible au plan — jamais en se fiant uniquement à un état
  * masqué côté client, qui ne protège rien.
+ *
+ * Mémorisé par requête (`cache()`, clé = workspaceId) : plusieurs pages
+ * l'appellent (AppShell, la page elle-même, Business OS...) sans multiplier
+ * les lectures de `subscriptions` — voir lib/session.ts pour la même
+ * logique appliquée à l'utilisateur/l'appartenance au workspace.
  */
-export async function getWorkspacePlan(workspaceId: string): Promise<Plan> {
+export const getWorkspacePlan = cache(async (workspaceId: string): Promise<Plan> => {
   const supabase = await createClient();
   const { data } = await supabase
     .from("subscriptions")
@@ -26,7 +32,7 @@ export async function getWorkspacePlan(workspaceId: string): Promise<Plan> {
 
   if (!data || data.status === "canceled" || data.status === "past_due") return "free";
   return data.plan;
-}
+});
 
 /** Lève une erreur explicite (jamais un contournement silencieux) si le plan est insuffisant. */
 export async function requirePlan(workspaceId: string, min: Plan): Promise<void> {

@@ -19,7 +19,7 @@ import { REMEMBER_COOKIE, applyRememberPreference } from "@/lib/supabase/remembe
 // (found=false, cache de redirection, etc.) devient structurellement
 // impossible à ce niveau.
 
-const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth", "/tarifs", "/debug-oauth"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/auth", "/tarifs", "/securite", "/debug-oauth"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -1,67 +1,110 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedUser, getCachedMembership } from "@/lib/session";
+import { getWorkspacePlan } from "@/lib/plan";
 import { NavLink } from "@/components/nav-link";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
-import { ENTITLEMENTS, businessOsAtLeast, type Plan } from "@/lib/entitlements";
+import { ENTITLEMENTS, PLAN_ORDER, businessOsAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Primitives mémorisées par requête : si la page qui a rendu <AppShell>
+  // a déjà appelé getCachedUser()/getCachedMembership() (c'est le cas de
+  // toutes les pages protégées), ces appels ne refont AUCUN aller-retour
+  // réseau — voir lib/session.ts et lib/plan.ts pour le détail.
+  const user = await getCachedUser();
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("workspace_members")
-    .select("workspace_id")
-    .eq("user_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  const membership = await getCachedMembership(user.id);
 
-  const workspace = membership
-    ? (await supabase.from("workspaces").select("name").eq("id", membership.workspace_id).maybeSingle()).data
-    : null;
-
-  const subscription = membership
-    ? (
-        await supabase
-          .from("subscriptions")
-          .select("plan")
-          .eq("workspace_id", membership.workspace_id)
-          .maybeSingle()
-      ).data
-    : null;
-  const plan: Plan = subscription?.plan ?? "free";
+  const supabase = await createClient();
+  const [{ data: workspace }, plan] = await Promise.all([
+    membership
+      ? supabase.from("workspaces").select("name").eq("id", membership.workspace_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    membership ? getWorkspacePlan(membership.workspace_id) : Promise.resolve<Plan>("free"),
+  ]);
   const entitlements = ENTITLEMENTS[plan];
+  const nextPlan = PLAN_ORDER[PLAN_ORDER.indexOf(plan) + 1] as Plan | undefined;
+
+  const navSections: Array<{ label: string; items: React.ReactNode }> = [
+    {
+      label: "Prospection",
+      items: (
+        <>
+          <NavLink href="/dashboard" icon="⌂">
+            Dashboard
+          </NavLink>
+          <NavLink href="/prospection" icon="⌕">
+            Prospection
+          </NavLink>
+          <NavLink href="/crm" icon="▦">
+            CRM
+          </NavLink>
+          <NavLink href="/agent" icon="✦">
+            NOVA
+          </NavLink>
+          <NavLink href="/analytics" icon="◫">
+            Analytics
+          </NavLink>
+        </>
+      ),
+    },
+    {
+      label: "Gestion",
+      items: (
+        <>
+          <NavLink href="/business-os" icon="▣" badge={businessOsAtLeast(plan, "standard") ? undefined : "PRO"}>
+            Business OS
+          </NavLink>
+          <NavLink href="/abonnement" icon="◆">
+            Abonnements
+          </NavLink>
+          <NavLink href="/integrations" icon="◎">
+            Intégrations
+          </NavLink>
+        </>
+      ),
+    },
+    {
+      label: "Compte",
+      items: (
+        <NavLink href="/parametres" icon="⚙">
+          Paramètres
+        </NavLink>
+      ),
+    },
+  ];
 
   const navLinks = (
     <>
-      <NavLink href="/dashboard" icon="⌂">
-        Dashboard
-      </NavLink>
-      <NavLink href="/prospection" icon="⌕">
-        Prospection
-      </NavLink>
-      <NavLink href="/crm" icon="▦">
-        CRM
-      </NavLink>
-      <NavLink href="/agent" icon="✦">
-        Agent IA
-      </NavLink>
-      <NavLink href="/analytics" icon="◫">
-        Analytics
-      </NavLink>
-      <NavLink href="/business-os" icon="▣" badge={businessOsAtLeast(plan, "standard") ? undefined : "PRO"}>
-        Business OS
-      </NavLink>
-      <NavLink href="/integrations" icon="◎">
-        Intégrations
-      </NavLink>
-      <NavLink href="/parametres" icon="⚙">
-        Paramètres
-      </NavLink>
+      {navSections.map((section) => (
+        <div key={section.label} className="flex flex-col gap-1">
+          <p className="px-3 pb-1 pt-3 text-[9.5px] font-bold uppercase tracking-wider text-sidebar-ink-dim/70 first:pt-0">
+            {section.label}
+          </p>
+          {section.items}
+        </div>
+      ))}
     </>
+  );
+
+  const planBadge = (
+    <div className="rounded-xl border border-sidebar-line bg-white/[0.04] p-3">
+      <p className="text-[9px] font-bold uppercase tracking-wider text-sidebar-ink-dim">Forfait actuel</p>
+      <p className="mt-1 font-display text-[13px] font-extrabold text-white">
+        PLAN {entitlements.label.toUpperCase()}
+      </p>
+      {nextPlan && (
+        <Link
+          href="/abonnement"
+          className="mt-2.5 block rounded-lg bg-gradient-to-br from-accent to-[#8fb0ff] px-3 py-1.5 text-center text-[11.5px] font-bold text-white shadow-sm transition-transform hover:-translate-y-px"
+        >
+          Passer à {ENTITLEMENTS[nextPlan].label}
+        </Link>
+      )}
+    </div>
   );
 
   const logo = (
@@ -72,22 +115,20 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <div>
         <p className="font-display text-[13px] font-extrabold text-white">ProspectFlow</p>
         <p className="text-[9px] font-semibold uppercase tracking-wide text-sidebar-ink-dim">
-          Plan {entitlements.label}
+          {workspace?.name ?? "Mon espace"}
         </p>
       </div>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen flex-col md:grid md:grid-cols-[240px_1fr]">
+    <div className="flex min-h-screen flex-col md:grid md:grid-cols-[248px_1fr]">
       {/* Desktop : sidebar fixe. Cachée sous md, remplacée par le menu déroulant mobile ci-dessous. */}
-      <aside className="sticky top-0 hidden h-screen flex-col gap-1 border-r border-sidebar-line bg-sidebar p-3.5 text-sidebar-ink md:flex">
+      <aside className="sticky top-0 hidden h-screen flex-col gap-1 overflow-y-auto border-r border-sidebar-line bg-sidebar p-3.5 text-sidebar-ink md:flex">
         <div className="px-1.5 pb-5 pt-1">{logo}</div>
         {navLinks}
-        <div className="mt-auto border-t border-sidebar-line pt-3 text-[10px] leading-relaxed text-sidebar-ink-dim">
-          <p className="mb-2">
-            Un prospect non vérifié par Google Places reste marqué « à vérifier ».
-          </p>
+        <div className="mt-auto flex flex-col gap-3 border-t border-sidebar-line pt-3.5">
+          {planBadge}
           <form action={signOut}>
             <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
               Se déconnecter
@@ -103,13 +144,16 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-sidebar-line text-lg">
             ☰
           </summary>
-          <div className="absolute right-0 top-11 flex w-56 flex-col gap-1 rounded-xl border border-sidebar-line bg-sidebar p-2.5 shadow-lg">
+          <div className="absolute right-0 top-11 flex max-h-[80vh] w-64 flex-col gap-1 overflow-y-auto rounded-xl border border-sidebar-line bg-sidebar p-2.5 shadow-lg">
             {navLinks}
-            <form action={signOut} className="mt-1 border-t border-sidebar-line pt-2">
-              <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
-                Se déconnecter
-              </Button>
-            </form>
+            <div className="mt-1 flex flex-col gap-3 border-t border-sidebar-line pt-2">
+              {planBadge}
+              <form action={signOut}>
+                <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
+                  Se déconnecter
+                </Button>
+              </form>
+            </div>
           </div>
         </details>
       </header>

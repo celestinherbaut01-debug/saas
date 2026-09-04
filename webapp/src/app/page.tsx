@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
+import { PricingTrust } from "@/components/pricing-trust";
 
 export default async function Home() {
   const supabase = await createClient();
@@ -99,6 +100,10 @@ export default async function Home() {
               a="Non. NOVA rédige des brouillons personnalisés que vous relisez et validez avant tout envoi — aucun envoi automatique n'existe à ce jour."
             />
           </div>
+        </section>
+
+        <section className="w-full max-w-4xl">
+          <PricingTrust />
         </section>
 
         <section className="flex w-full max-w-2xl flex-col items-center gap-4 rounded-2xl border border-line bg-panel p-10 text-center">
