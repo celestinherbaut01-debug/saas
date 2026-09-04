@@ -21,3 +21,22 @@ export const TARGET_RECOMMENDATIONS: Record<string, string[]> = {
 export function recommendedSlugsFor(ownSlug: string | null): string[] | undefined {
   return ownSlug ? TARGET_RECOMMENDATIONS[ownSlug] : undefined;
 }
+
+/**
+ * Affine les slugs recommandés selon le type de clientèle déclaré
+ * (B2B/B2C/les deux) : une cible purement B2B n'a pas de sens à recommander
+ * à un utilisateur qui vend exclusivement en B2C, et inversement. "both"
+ * (des deux côtés) ne filtre jamais rien.
+ */
+export function filterSlugsByAudience<T extends { slug: string; business_type: "b2b" | "b2c" | "both" }>(
+  slugs: string[] | undefined,
+  categories: T[],
+  audience: "b2b" | "b2c" | "both",
+): string[] | undefined {
+  if (!slugs || audience === "both") return slugs;
+  const filtered = slugs.filter((slug) => {
+    const cat = categories.find((c) => c.slug === slug);
+    return !cat || cat.business_type === "both" || cat.business_type === audience;
+  });
+  return filtered.length > 0 ? filtered : slugs;
+}

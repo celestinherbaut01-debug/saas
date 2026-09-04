@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch } from "@/lib/actions/search";
 import { updateOfferAudience } from "@/lib/actions/settings";
-import { recommendedSlugsFor } from "@/lib/target-recommendations";
+import { recommendedSlugsFor, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
 type SearchResult = ProspectionResult;
@@ -100,7 +100,7 @@ export function ProspectionView({
   const ownSlug = businessProfile?.own_category_id
     ? categories.find((c) => c.id === businessProfile.own_category_id)?.slug ?? null
     : null;
-  const recommendedSlugs = recommendedSlugsFor(ownSlug);
+  const recommendedSlugs = filterSlugsByAudience(recommendedSlugsFor(ownSlug), categories, audience);
 
   const displayedResults = useMemo(
     () =>

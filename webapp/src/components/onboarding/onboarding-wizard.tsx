@@ -10,7 +10,7 @@ import { CategoryCombobox } from "@/components/onboarding/category-combobox";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { completeOnboarding } from "@/lib/actions/onboarding";
-import { recommendedSlugsFor } from "@/lib/target-recommendations";
+import { recommendedSlugsFor, filterSlugsByAudience } from "@/lib/target-recommendations";
 
 const STEPS = ["Entreprise", "Votre métier", "Vos cibles", "Localisation"] as const;
 
@@ -32,7 +32,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [showAllTargets, setShowAllTargets] = useState(false);
 
   const ownSlug = categories.find((c) => c.id === ownCategoryId)?.slug ?? null;
-  const recommendedSlugs = recommendedSlugsFor(ownSlug);
+  const recommendedSlugs = filterSlugsByAudience(recommendedSlugsFor(ownSlug), categories, audience);
 
   const targetNames = useMemo(
     () => targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter((n): n is string => Boolean(n)),

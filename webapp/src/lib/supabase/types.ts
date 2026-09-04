@@ -107,6 +107,7 @@ export interface Database {
           icon: string | null;
           naf_codes: string[];
           keywords: string[];
+          business_type: "b2b" | "b2c" | "both";
           sort_order: number;
         };
         Insert: Partial<Database["public"]["Tables"]["business_categories"]["Row"]> & {
