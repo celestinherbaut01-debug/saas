@@ -5,8 +5,6 @@ import type {
   Customer,
   InventoryItem,
   Appointment,
-  Vehicle,
-  RepairOrder,
   Contract,
   Project,
   WasteLogEntry,
@@ -18,26 +16,17 @@ import { cn } from "@/lib/utils";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
 import { AppointmentsModule } from "@/components/business-os/appointments-module";
-import { VehiclesModule } from "@/components/business-os/vehicles-module";
-import { RepairOrdersModule } from "@/components/business-os/repair-orders-module";
 import { ContractsModule } from "@/components/business-os/contracts-module";
 import { ProjectsModule } from "@/components/business-os/projects-module";
 import { WasteLogModule } from "@/components/business-os/waste-log-module";
 
-type TabKey =
-  | "overview"
-  | "customers"
-  | "inventory"
-  | "appointments"
-  | "vehicles"
-  | "repair_orders"
-  | "contracts"
-  | "projects"
-  | "waste_log";
+// Le garage a désormais sa propre vue dédiée (GarageView) bien plus riche —
+// ce composant générique ne gère plus que Nettoyage/Agence/Restaurant/
+// Générique. Voir business-os/page.tsx pour l'aiguillage.
+type TabKey = "overview" | "customers" | "inventory" | "appointments" | "contracts" | "projects" | "waste_log";
 
-const VERTICAL_TABS: Record<BusinessOsVertical, TabKey[]> = {
+const VERTICAL_TABS: Record<Exclude<BusinessOsVertical, "garage">, TabKey[]> = {
   generic: ["overview", "customers", "inventory", "appointments"],
-  garage: ["overview", "customers", "vehicles", "repair_orders", "inventory", "appointments"],
   cleaning: ["overview", "customers", "contracts", "inventory", "appointments"],
   agency: ["overview", "customers", "projects", "inventory", "appointments"],
   restaurant: ["overview", "customers", "inventory", "waste_log", "appointments"],
@@ -54,14 +43,12 @@ export function BusinessOsView({
   customers,
   inventory,
   appointments,
-  vehicles,
-  repairOrders,
   contracts,
   projects,
   wasteLog,
   lowStock,
 }: {
-  vertical: BusinessOsVertical;
+  vertical: Exclude<BusinessOsVertical, "garage">;
   profile: BusinessOsProfile;
   isAdvanced: boolean;
   workspaceId: string;
@@ -71,8 +58,6 @@ export function BusinessOsView({
   customers: Customer[];
   inventory: InventoryItem[];
   appointments: Appointment[];
-  vehicles: Vehicle[];
-  repairOrders: RepairOrder[];
   contracts: Contract[];
   projects: Project[];
   wasteLog: WasteLogEntry[];
@@ -86,8 +71,6 @@ export function BusinessOsView({
     customers: profile.customersLabel,
     inventory: profile.inventoryLabel,
     appointments: profile.appointmentsLabel,
-    vehicles: "Véhicules",
-    repair_orders: "Ordres de réparation",
     contracts: "Contrats",
     projects: "Projets",
     waste_log: "Pertes",
@@ -176,10 +159,6 @@ export function BusinessOsView({
       )}
       {active === "appointments" && (
         <AppointmentsModule workspaceId={workspaceId} initial={appointments} label={profile.appointmentsLabel} />
-      )}
-      {active === "vehicles" && <VehiclesModule workspaceId={workspaceId} initial={vehicles} customers={customers} />}
-      {active === "repair_orders" && (
-        <RepairOrdersModule workspaceId={workspaceId} initial={repairOrders} vehicles={vehicles} />
       )}
       {active === "contracts" && (
         <ContractsModule workspaceId={workspaceId} initial={contracts} customers={customers} />

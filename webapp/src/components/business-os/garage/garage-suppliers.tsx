@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Customer } from "@/lib/supabase/types";
-import { createClient } from "@/lib/supabase/client";
+import type { Supplier } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/select";
@@ -11,95 +10,43 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 
-interface ControlledCustomers {
-  rows: Customer[];
-  onCreate: (input: { name: string; phone: string; email: string; notes: string }) => void;
-  onUpdate: (id: string, patch: Partial<Customer>) => void;
-  onRemove: (id: string) => void;
-}
-
-// Composant partagé entre toutes les verticales (garage/nettoyage/agence/
-// restaurant/générique) — seul le libellé change (Clients/Sites…), la
-// table et le workflow restent identiques.
-//
-// Deux modes : non-contrôlé (état local + appels Supabase directs — usage
-// historique, simple) ou contrôlé via `controlled` (état possédé par un
-// parent, ex. GarageView, qui doit voir les clients à jour dans plusieurs
-// onglets à la fois — sans ça, un client ajouté ici resterait invisible
-// dans le sélecteur "véhicule/ordre de réparation" tant que la page n'est
-// pas rechargée).
-export function CustomersModule({
-  workspaceId,
-  initial,
-  label,
-  controlled,
+// Contrôlé par GarageView (comme Pièces/Techniciens) : la liste des
+// fournisseurs doit être à jour pour le sélecteur de fournisseur de
+// l'onglet Pièces. Réutilisable tel quel par Restaurant plus tard.
+export function SuppliersModule({
+  rows,
+  onCreate,
+  onUpdate,
+  onRemove,
 }: {
-  workspaceId: string;
-  initial: Customer[];
-  label: string;
-  controlled?: ControlledCustomers;
+  rows: Supplier[];
+  onCreate: (input: { name: string; phone: string; email: string; notes: string }) => void;
+  onUpdate: (id: string, patch: Partial<Supplier>) => void;
+  onRemove: (id: string) => void;
 }) {
-  const supabase = createClient();
-  const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Customer | null>(null);
+  const [editing, setEditing] = useState<Supplier | null>(null);
 
-  const rows = controlled ? controlled.rows : localRows;
-
-  async function create(input: { name: string; phone: string; email: string; notes: string }) {
+  function create(input: { name: string; phone: string; email: string; notes: string }) {
     if (!input.name.trim()) return;
-    if (controlled) {
-      controlled.onCreate(input);
-      setCreateOpen(false);
-      return;
-    }
-    const { data, error } = await supabase
-      .from("customers")
-      .insert({
-        workspace_id: workspaceId,
-        name: input.name.trim(),
-        phone: input.phone.trim() || null,
-        email: input.email.trim() || null,
-        notes: input.notes.trim(),
-      })
-      .select("*")
-      .single();
-    if (!error && data) {
-      setLocalRows((prev) => [data, ...prev]);
-      setCreateOpen(false);
-    }
+    onCreate(input);
+    setCreateOpen(false);
   }
 
-  async function update(id: string, patch: Partial<Customer>) {
-    if (controlled) {
-      controlled.onUpdate(id, patch);
-      setEditing(null);
-      return;
-    }
-    const { error } = await supabase.from("customers").update(patch).eq("id", id);
-    if (!error) {
-      setLocalRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-      setEditing(null);
-    }
+  function update(id: string, patch: Partial<Supplier>) {
+    onUpdate(id, patch);
+    setEditing(null);
   }
 
-  async function remove(id: string) {
-    if (controlled) {
-      controlled.onRemove(id);
-      setEditing(null);
-      return;
-    }
-    const { error } = await supabase.from("customers").delete().eq("id", id);
-    if (!error) {
-      setLocalRows((prev) => prev.filter((r) => r.id !== id));
-      setEditing(null);
-    }
+  function remove(id: string) {
+    onRemove(id);
+    setEditing(null);
   }
 
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">{label}</h2>
+        <h2 className="font-display text-sm font-bold">Fournisseurs</h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter
         </Button>
@@ -107,16 +54,7 @@ export function CustomersModule({
 
       {rows.length === 0 ? (
         <div className="mt-4">
-          <EmptyState
-            icon="◈"
-            title={`Aucun élément dans « ${label} »`}
-            description="Ajoutez votre premier enregistrement pour commencer."
-            action={
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                + Ajouter
-              </Button>
-            }
-          />
+          <EmptyState icon="🚚" title="Aucun fournisseur" description="Ajoutez vos fournisseurs pour les lier à vos pièces." action={<Button size="sm" onClick={() => setCreateOpen(true)}>+ Ajouter</Button>} />
         </div>
       ) : (
         <div className="mt-4">
@@ -143,15 +81,9 @@ export function CustomersModule({
         </div>
       )}
 
-      <CustomerDrawer
-        open={createOpen}
-        title={`Ajouter — ${label}`}
-        initial={null}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={create}
-      />
+      <SupplierDrawer open={createOpen} title="Ajouter un fournisseur" initial={null} onClose={() => setCreateOpen(false)} onSubmit={create} />
       {editing && (
-        <CustomerDrawer
+        <SupplierDrawer
           open
           title={editing.name}
           initial={editing}
@@ -164,7 +96,7 @@ export function CustomersModule({
   );
 }
 
-function CustomerDrawer({
+function SupplierDrawer({
   open,
   title,
   initial,
@@ -174,7 +106,7 @@ function CustomerDrawer({
 }: {
   open: boolean;
   title: string;
-  initial: Customer | null;
+  initial: Supplier | null;
   onClose: () => void;
   onSubmit: (input: { name: string; phone: string; email: string; notes: string }) => void;
   onDelete?: () => void;
@@ -183,9 +115,7 @@ function CustomerDrawer({
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
-
   if (!open) return null;
-
   return (
     <Drawer open={open} onClose={onClose} title={title}>
       <div className="flex flex-col gap-3">

@@ -7,7 +7,8 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { businessOsAtLeast } from "@/lib/entitlements";
 import { getBusinessOsProfile } from "@/lib/business-os";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
-import type { Contract, Project, RepairOrder, Vehicle, WasteLogEntry } from "@/lib/supabase/types";
+import { GarageView } from "@/components/business-os/garage/garage-view";
+import type { Contract, Project, WasteLogEntry } from "@/lib/supabase/types";
 
 export default async function BusinessOsPage() {
   const user = await getCachedUser();
@@ -69,24 +70,74 @@ export default async function BusinessOsPage() {
   const profile = getBusinessOsProfile(parentSlug, leafSlug);
   const vertical = profile.vertical;
 
+  const header = (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <h1 className="font-display text-2xl font-extrabold">
+          {profile.icon} {profile.osName}
+        </h1>
+        <p className="mt-1 text-[13px] text-muted">
+          Modules réels adaptés à votre métier — données réelles de votre workspace, jamais de chiffre inventé.
+        </p>
+      </div>
+      <span className="shrink-0 rounded-full bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
+        {isAdvanced ? "Business OS avancé" : "Business OS standard"}
+      </span>
+    </div>
+  );
+
+  // Garage a sa propre vue dédiée (bien plus riche que les 3 modules
+  // génériques) : toutes les tables garage sont chargées ici en une seule
+  // fois et confiées à GarageView, seul propriétaire de cet état côté client.
+  if (vertical === "garage") {
+    const [
+      { data: customers },
+      { data: vehicles },
+      { data: technicians },
+      { data: suppliers },
+      { data: parts },
+      { data: repairOrders },
+      { data: lines },
+      { data: documents },
+    ] = await Promise.all([
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("parts").select("*").eq("workspace_id", workspaceId).order("name"),
+      supabase.from("repair_orders").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("repair_order_parts").select("*").eq("workspace_id", workspaceId),
+      supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
+    ]);
+
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          <GarageView
+            workspaceId={workspaceId}
+            isAdvanced={isAdvanced}
+            initialCustomers={customers ?? []}
+            initialVehicles={vehicles ?? []}
+            initialTechnicians={technicians ?? []}
+            initialSuppliers={suppliers ?? []}
+            initialParts={parts ?? []}
+            initialRepairOrders={repairOrders ?? []}
+            initialLines={lines ?? []}
+            initialDocuments={documents ?? []}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
   // On ne lit les tables spécifiques à un métier que pour ce métier — pas de
-  // requête pour repair_orders sur un workspace "agence", par exemple.
+  // requête pour "projects" sur un workspace "nettoyage", par exemple.
   const [{ data: customers }, { data: inventory }, { data: appointments }, verticalData] = await Promise.all([
     supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
     supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
     (async () => {
-      if (vertical === "garage") {
-        const [{ data: vehicles }, { data: repairOrders }] = await Promise.all([
-          supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-          supabase
-            .from("repair_orders")
-            .select("*")
-            .eq("workspace_id", workspaceId)
-            .order("created_at", { ascending: false }),
-        ]);
-        return { vehicles: vehicles ?? [], repairOrders: repairOrders ?? [] };
-      }
       if (vertical === "cleaning") {
         const { data: contracts } = await supabase
           .from("contracts")
@@ -115,8 +166,6 @@ export default async function BusinessOsPage() {
     })(),
   ]);
 
-  const vehicles: Vehicle[] = verticalData.vehicles ?? [];
-  const repairOrders: RepairOrder[] = verticalData.repairOrders ?? [];
   const contracts: Contract[] = verticalData.contracts ?? [];
   const projects: Project[] = verticalData.projects ?? [];
   const wasteLog: WasteLogEntry[] = verticalData.wasteLog ?? [];
@@ -126,9 +175,6 @@ export default async function BusinessOsPage() {
   );
 
   const now = new Date().getTime();
-  const monthStart = new Date();
-  monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
   const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
   const upcomingAppointments = (appointments ?? []).filter((a) => new Date(a.starts_at).getTime() >= now);
 
@@ -136,34 +182,7 @@ export default async function BusinessOsPage() {
   let untrackedNote: string | undefined;
   let history: { id: string; label: string; date: string }[] = [];
 
-  if (vertical === "garage") {
-    const activeOrders = repairOrders.filter((r) => r.status !== "done" && r.status !== "invoiced");
-    const vehiclesInShop = new Set(activeOrders.map((r) => r.vehicle_id).filter(Boolean)).size;
-    const overdue = activeOrders.filter((r) => r.scheduled_at && new Date(r.scheduled_at).getTime() < now);
-    const revenueThisMonth = repairOrders
-      .filter((r) => r.completed_at && new Date(r.completed_at) >= monthStart && (r.status === "done" || r.status === "invoiced"))
-      .reduce((sum, r) => sum + r.labor_cost + r.parts_cost, 0);
-    kpis = [
-      { label: "Véhicules en atelier", value: String(vehiclesInShop) },
-      { label: "Réparations en retard", value: String(overdue.length) },
-      { label: "Ordres actifs", value: String(activeOrders.length) },
-      { label: "CA réparations (mois)", value: `${revenueThisMonth.toFixed(0)} €` },
-      { label: "Pièces en stock faible", value: String(lowStock.length) },
-      {
-        label: "Prochain rendez-vous",
-        value: upcomingAppointments[0] ? new Date(upcomingAppointments[0].starts_at).toLocaleDateString("fr-FR") : "—",
-      },
-    ];
-    untrackedNote = "planning atelier visuel, devis/factures distincts, fiches techniciens";
-    history = repairOrders
-      .filter((r) => r.status === "done" || r.status === "invoiced")
-      .slice(0, 20)
-      .map((r) => ({
-        id: r.id,
-        label: r.title,
-        date: r.completed_at ? new Date(r.completed_at).toLocaleDateString("fr-FR") : "—",
-      }));
-  } else if (vertical === "cleaning") {
+  if (vertical === "cleaning") {
     const activeContracts = contracts.filter((c) => c.status === "active");
     const renewals = contracts.filter((c) => c.status === "ending_soon");
     kpis = [
@@ -213,19 +232,7 @@ export default async function BusinessOsPage() {
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="font-display text-2xl font-extrabold">
-              {profile.icon} {profile.osName}
-            </h1>
-            <p className="mt-1 text-[13px] text-muted">
-              Modules réels adaptés à votre métier — données réelles de votre workspace, jamais de chiffre inventé.
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
-            {isAdvanced ? "Business OS avancé" : "Business OS standard"}
-          </span>
-        </div>
+        {header}
 
         <BusinessOsView
           vertical={vertical}
@@ -238,8 +245,6 @@ export default async function BusinessOsPage() {
           customers={customers ?? []}
           inventory={inventory ?? []}
           appointments={appointments ?? []}
-          vehicles={vehicles}
-          repairOrders={repairOrders}
           contracts={contracts}
           projects={projects}
           wasteLog={wasteLog}

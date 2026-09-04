@@ -277,10 +277,12 @@ export interface Database {
           workspace_id: string;
           vehicle_id: string | null;
           customer_id: string | null;
+          technician_id: string | null;
           title: string;
-          status: "diagnostic" | "waiting_parts" | "in_progress" | "done" | "invoiced";
+          status: "diagnostic" | "quote" | "accepted" | "in_progress" | "waiting_parts" | "done" | "delivered";
           scheduled_at: string | null;
           completed_at: string | null;
+          delivered_at: string | null;
           labor_cost: number;
           parts_cost: number;
           notes: string;
@@ -292,6 +294,113 @@ export interface Database {
           title: string;
         };
         Update: Partial<Database["public"]["Tables"]["repair_orders"]["Row"]>;
+        Relationships: [];
+      };
+      team_members: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          role: string;
+          phone: string | null;
+          email: string | null;
+          active: boolean;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["team_members"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["team_members"]["Row"]>;
+        Relationships: [];
+      };
+      suppliers: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          phone: string | null;
+          email: string | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["suppliers"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["suppliers"]["Row"]>;
+        Relationships: [];
+      };
+      parts: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          supplier_id: string | null;
+          name: string;
+          reference: string;
+          unit_cost: number;
+          unit_price: number;
+          quantity: number;
+          unit: string;
+          low_stock_threshold: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["parts"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["parts"]["Row"]>;
+        Relationships: [];
+      };
+      repair_order_parts: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          repair_order_id: string;
+          part_id: string | null;
+          part_name: string;
+          quantity: number;
+          unit_cost: number;
+          unit_price: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["repair_order_parts"]["Row"]> & {
+          workspace_id: string;
+          repair_order_id: string;
+          part_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["repair_order_parts"]["Row"]>;
+        Relationships: [];
+      };
+      documents: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          doc_type: "quote" | "invoice";
+          status: "draft" | "sent" | "accepted" | "refused" | "paid" | "overdue" | "canceled";
+          customer_id: string | null;
+          repair_order_id: string | null;
+          project_id: string | null;
+          contract_id: string | null;
+          number: string;
+          total_ht: number;
+          total_ttc: number;
+          issued_at: string;
+          due_at: string | null;
+          paid_at: string | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["documents"]["Row"]> & {
+          workspace_id: string;
+          doc_type: "quote" | "invoice";
+        };
+        Update: Partial<Database["public"]["Tables"]["documents"]["Row"]>;
         Relationships: [];
       };
       contracts: {
@@ -473,3 +582,8 @@ export type RepairOrder = Database["public"]["Tables"]["repair_orders"]["Row"];
 export type Contract = Database["public"]["Tables"]["contracts"]["Row"];
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type WasteLogEntry = Database["public"]["Tables"]["waste_log"]["Row"];
+export type TeamMember = Database["public"]["Tables"]["team_members"]["Row"];
+export type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
+export type Part = Database["public"]["Tables"]["parts"]["Row"];
+export type RepairOrderPart = Database["public"]["Tables"]["repair_order_parts"]["Row"];
+export type BusinessDocument = Database["public"]["Tables"]["documents"]["Row"];

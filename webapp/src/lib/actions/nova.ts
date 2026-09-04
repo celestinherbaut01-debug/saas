@@ -75,17 +75,32 @@ const BUSINESS_OS_TOOL = {
   name: "get_business_os_data",
   description:
     "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
-    "le métier : véhicules/ordres de réparation (garage), contrats de site (nettoyage), projets (agence), pertes " +
-    "(restaurant). Jamais inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
+    "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), contrats de site " +
+    "(nettoyage), projets (agence), pertes (restaurant). Jamais inventé — un module non pertinent pour ce workspace " +
+    "renvoie une liste vide.",
   input_schema: {
     type: "object" as const,
     properties: {
       module: {
         type: "string",
-        enum: ["customers", "inventory", "appointments", "vehicles", "repair_orders", "contracts", "projects", "waste_log"],
+        enum: [
+          "customers",
+          "inventory",
+          "appointments",
+          "vehicles",
+          "repair_orders",
+          "parts",
+          "technicians",
+          "documents",
+          "contracts",
+          "projects",
+          "waste_log",
+        ],
         description:
-          "customers = clients/sites ; inventory = stock/pièces/consommables ; appointments = RDV/interventions/planning ; " +
-          "vehicles/repair_orders = garage ; contracts = nettoyage ; projects = agence ; waste_log = pertes restaurant",
+          "customers = clients/sites ; inventory = stock/pièces/consommables (générique) ; appointments = RDV/interventions/planning ; " +
+          "vehicles/repair_orders/parts/technicians/documents = garage (parts = catalogue de pièces avec quantité en " +
+          "stock, technicians = équipe avec charge de travail réelle, documents = devis/factures avec statut) ; " +
+          "contracts = nettoyage ; projects = agence ; waste_log = pertes restaurant",
       },
       limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
     },
@@ -144,21 +159,65 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
     if (osModule === "repair_orders") {
       const { data } = await supabase
         .from("repair_orders")
-        .select("title, status, scheduled_at, completed_at, labor_cost, parts_cost, notes, vehicle_id")
+        .select("title, status, scheduled_at, completed_at, delivered_at, labor_cost, parts_cost, notes, vehicle_id, technician_id")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
         .limit(limit);
       const vehicleIds = [...new Set((data ?? []).map((r) => r.vehicle_id).filter((id): id is string => Boolean(id)))];
-      const { data: vehicles } =
+      const technicianIds = [...new Set((data ?? []).map((r) => r.technician_id).filter((id): id is string => Boolean(id)))];
+      const [{ data: vehicles }, { data: techs }] = await Promise.all([
         vehicleIds.length > 0
-          ? await supabase.from("vehicles").select("id, registration, make, model").in("id", vehicleIds)
-          : { data: [] };
+          ? supabase.from("vehicles").select("id, registration, make, model").in("id", vehicleIds)
+          : Promise.resolve({ data: [] }),
+        technicianIds.length > 0
+          ? supabase.from("team_members").select("id, name, role").in("id", technicianIds)
+          : Promise.resolve({ data: [] }),
+      ]);
       const vehicleById = new Map((vehicles ?? []).map((v) => [v.id, v]));
-      const results = (data ?? []).map(({ vehicle_id, ...rest }) => ({
+      const techById = new Map((techs ?? []).map((t) => [t.id, t]));
+      const results = (data ?? []).map(({ vehicle_id, technician_id, ...rest }) => ({
         ...rest,
         vehicle: vehicle_id ? vehicleById.get(vehicle_id) ?? null : null,
+        technician: technician_id ? techById.get(technician_id) ?? null : null,
       }));
       return { count: results.length, results };
+    }
+    if (osModule === "parts") {
+      const { data } = await supabase
+        .from("parts")
+        .select("name, reference, quantity, unit, low_stock_threshold, unit_cost, unit_price")
+        .eq("workspace_id", workspaceId)
+        .order("name")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "technicians") {
+      const { data: technicians } = await supabase
+        .from("team_members")
+        .select("id, name, role, active")
+        .eq("workspace_id", workspaceId)
+        .order("name")
+        .limit(limit);
+      const { data: orders } = await supabase
+        .from("repair_orders")
+        .select("technician_id, status")
+        .eq("workspace_id", workspaceId)
+        .not("technician_id", "is", null);
+      const activeStatuses = new Set(["diagnostic", "quote", "accepted", "in_progress", "waiting_parts"]);
+      const results = (technicians ?? []).map((t) => ({
+        ...t,
+        active_repair_orders: (orders ?? []).filter((o) => o.technician_id === t.id && activeStatuses.has(o.status)).length,
+      }));
+      return { count: results.length, results };
+    }
+    if (osModule === "documents") {
+      const { data } = await supabase
+        .from("documents")
+        .select("doc_type, status, number, total_ttc, issued_at, due_at, repair_order_id")
+        .eq("workspace_id", workspaceId)
+        .order("issued_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "contracts") {
       const { data } = await supabase
@@ -273,12 +332,15 @@ function buildSystemPrompt(plan: Plan): string {
   if (businessOsAtLeast(plan, "advanced")) {
     prompt +=
       " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre avec les vraies " +
-      "données métier — clients, stock, rendez-vous, et selon le métier du workspace : véhicules/ordres de " +
-      "réparation (garage — ex. 'quels véhicules attendent une pièce ?' = module repair_orders, statut " +
-      "waiting_parts), contrats de site (nettoyage — ex. contrats bientôt à renouveler = module contracts, statut " +
-      "ending_soon), projets (agence web — ex. projets en maintenance = module projects), pertes (restaurant — " +
-      "ex. pertes récentes = module waste_log). N'appelle jamais un module qui n'a pas de sens pour ce métier ; s'il " +
-      "renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
+      "données métier. Pour un garage : 'quels véhicules attendent une pièce ?' = module repair_orders, filtre " +
+      "toi-même les résultats dont status = waiting_parts (chaque résultat inclut vehicle.registration) ; 'quels " +
+      "produits sont en rupture ?' = module parts, repère toi-même les lignes où quantity <= low_stock_threshold ; " +
+      "'quelle est la charge de chaque technicien ?' = module technicians (active_repair_orders déjà calculé) ; " +
+      "'quels devis sont en attente ?' = module documents, doc_type = quote et status = sent. Pour le nettoyage : " +
+      "contrats bientôt à renouveler = module contracts, statut ending_soon. Pour une agence web : projets en " +
+      "maintenance = module projects. Pour un restaurant : pertes récentes = module waste_log. N'appelle jamais un " +
+      "module qui n'a pas de sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une " +
+      "réponse.";
   }
   return prompt;
 }
