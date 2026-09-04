@@ -151,7 +151,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "5 000+ prospects vérifiés / mois",
       "1 500 requêtes NOVA / mois",
       "Jusqu'à 5 utilisateurs (équipe)",
-      "Business OS AVANCÉ : alertes stock, workflows métier",
+      "Business OS AVANCÉ : alertes stock, historique complet",
       "NOVA connectée aux données Business OS",
       "Automatisations et analytics avancées",
       "Support prioritaire",

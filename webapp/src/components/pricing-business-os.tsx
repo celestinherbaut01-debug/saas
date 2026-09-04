@@ -11,8 +11,9 @@ export function PricingBusinessOs() {
       <div className="flex max-w-lg flex-col items-center gap-3 text-center">
         <h2 className="font-display text-2xl font-extrabold tracking-tight">Bien plus qu&apos;un outil de prospection.</h2>
         <p className="text-[14px] leading-relaxed text-muted">
-          À partir du plan Pro, ProspectFlow devient également votre logiciel de gestion — mêmes modules
-          réels (clients, stock, rendez-vous), vocabulaire adapté à votre métier.
+          À partir du plan Pro, ProspectFlow devient également votre logiciel de gestion — des modules
+          réellement adaptés à votre métier (véhicules et ordres de réparation pour un garage, contrats de
+          site pour le nettoyage, projets pour une agence...), pas un simple CRM relabellé.
         </p>
       </div>
 

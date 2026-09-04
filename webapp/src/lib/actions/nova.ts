@@ -74,21 +74,25 @@ const TOOLS = [
 const BUSINESS_OS_TOOL = {
   name: "get_business_os_data",
   description:
-    "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock/pièces/consommables, " +
-    "ou rendez-vous/interventions/planning selon le métier. Jamais inventé.",
+    "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
+    "le métier : véhicules/ordres de réparation (garage), contrats de site (nettoyage), projets (agence), pertes " +
+    "(restaurant). Jamais inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
   input_schema: {
     type: "object" as const,
     properties: {
       module: {
         type: "string",
-        enum: ["customers", "inventory", "appointments"],
-        description: "customers = clients/sites ; inventory = stock/pièces/consommables ; appointments = RDV/interventions/planning",
+        enum: ["customers", "inventory", "appointments", "vehicles", "repair_orders", "contracts", "projects", "waste_log"],
+        description:
+          "customers = clients/sites ; inventory = stock/pièces/consommables ; appointments = RDV/interventions/planning ; " +
+          "vehicles/repair_orders = garage ; contracts = nettoyage ; projects = agence ; waste_log = pertes restaurant",
       },
       limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
     },
     required: ["module"],
   },
 };
+
 
 function buildTools(plan: Plan) {
   return businessOsAtLeast(plan, "advanced") ? [...TOOLS, BUSINESS_OS_TOOL] : TOOLS;
@@ -125,6 +129,51 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
         .select("title, starts_at, ends_at, notes, customer_id, prospect_id")
         .eq("workspace_id", workspaceId)
         .order("starts_at")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "vehicles") {
+      const { data } = await supabase
+        .from("vehicles")
+        .select("registration, make, model, year, mileage, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "repair_orders") {
+      const { data } = await supabase
+        .from("repair_orders")
+        .select("title, status, scheduled_at, completed_at, labor_cost, parts_cost, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "contracts") {
+      const { data } = await supabase
+        .from("contracts")
+        .select("site_name, frequency, monthly_price, renewal_date, status, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "projects") {
+      const { data } = await supabase
+        .from("projects")
+        .select("name, project_type, status, deadline, budget, notes")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "waste_log") {
+      const { data } = await supabase
+        .from("waste_log")
+        .select("item_name, quantity, unit, reason, estimated_cost, logged_at")
+        .eq("workspace_id", workspaceId)
+        .order("logged_at", { ascending: false })
         .limit(limit);
       return { count: data?.length ?? 0, results: data ?? [] };
     }

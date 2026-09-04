@@ -1,9 +1,13 @@
-// Business OS : mêmes 3 modules réutilisables (clients, stock, rendez-vous)
-// pour tous les métiers — seul le vocabulaire affiché change. Pas 300
-// applications séparées, une config de libellés par famille de métier
-// (slug du groupe parent dans business_categories, cf. 0003_seed_categories.sql).
+// Business OS : le vocabulaire ET les modules changent selon le métier.
+// Les 3 modules génériques (clients/stock/rendez-vous) restent le socle
+// commun à tous les métiers ; les 4 familles ci-dessous ("vertical") gagnent
+// en plus un ou deux modules propres à leur workflow réel (voir 0016) —
+// les autres métiers restent sur le socle générique seul.
+
+export type BusinessOsVertical = "garage" | "cleaning" | "agency" | "restaurant" | "generic";
 
 export interface BusinessOsProfile {
+  vertical: BusinessOsVertical;
   osName: string;
   icon: string;
   customersLabel: string;
@@ -12,6 +16,7 @@ export interface BusinessOsProfile {
 }
 
 const DEFAULT_PROFILE: BusinessOsProfile = {
+  vertical: "generic",
   osName: "Business OS",
   icon: "▣",
   customersLabel: "Clients",
@@ -25,13 +30,15 @@ const DEFAULT_PROFILE: BusinessOsProfile = {
 // le slug du métier précis (feuille), sont vérifiés avant ceux par famille.
 const LEAF_PROFILES: Record<string, BusinessOsProfile> = {
   cleaning: {
+    vertical: "cleaning",
     osName: "Nettoyage OS",
     icon: "🧹",
-    customersLabel: "Sites clients",
+    customersLabel: "Clients",
     inventoryLabel: "Consommables & matériel",
     appointmentsLabel: "Interventions",
   },
   security: {
+    vertical: "generic",
     osName: "Sécurité OS",
     icon: "🔒",
     customersLabel: "Sites sous contrat",
@@ -42,13 +49,15 @@ const LEAF_PROFILES: Record<string, BusinessOsProfile> = {
 
 const PROFILES: Record<string, BusinessOsProfile> = {
   automobile: {
+    vertical: "garage",
     osName: "Garage OS",
     icon: "🔧",
     customersLabel: "Clients",
     inventoryLabel: "Pièces",
-    appointmentsLabel: "Ordres de réparation",
+    appointmentsLabel: "Rendez-vous atelier",
   },
   "beaute-bien-etre": {
+    vertical: "generic",
     osName: "Salon OS",
     icon: "✂️",
     customersLabel: "Clients",
@@ -56,6 +65,7 @@ const PROFILES: Record<string, BusinessOsProfile> = {
     appointmentsLabel: "Rendez-vous",
   },
   restauration: {
+    vertical: "restaurant",
     osName: "Restaurant OS",
     icon: "🍽",
     customersLabel: "Clients",
@@ -63,13 +73,15 @@ const PROFILES: Record<string, BusinessOsProfile> = {
     appointmentsLabel: "Réservations",
   },
   "numerique-communication": {
+    vertical: "agency",
     osName: "Agency OS",
     icon: "💻",
     customersLabel: "Clients",
     inventoryLabel: "Ressources / licences",
-    appointmentsLabel: "Échéances projet",
+    appointmentsLabel: "Échéances",
   },
   "bien-etre-therapies": {
+    vertical: "generic",
     osName: "Practice OS",
     icon: "🧘",
     customersLabel: "Clients",
@@ -77,6 +89,7 @@ const PROFILES: Record<string, BusinessOsProfile> = {
     appointmentsLabel: "Séances",
   },
   "btp-artisans": {
+    vertical: "generic",
     osName: "Chantier OS",
     icon: "🧱",
     customersLabel: "Clients",

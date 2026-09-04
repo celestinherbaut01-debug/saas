@@ -249,6 +249,112 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["appointments"]["Row"]>;
         Relationships: [];
       };
+      vehicles: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          registration: string;
+          make: string;
+          model: string;
+          year: number | null;
+          mileage: number | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["vehicles"]["Row"]> & {
+          workspace_id: string;
+          registration: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["vehicles"]["Row"]>;
+        Relationships: [];
+      };
+      repair_orders: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          vehicle_id: string | null;
+          customer_id: string | null;
+          title: string;
+          status: "diagnostic" | "waiting_parts" | "in_progress" | "done" | "invoiced";
+          scheduled_at: string | null;
+          completed_at: string | null;
+          labor_cost: number;
+          parts_cost: number;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["repair_orders"]["Row"]> & {
+          workspace_id: string;
+          title: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["repair_orders"]["Row"]>;
+        Relationships: [];
+      };
+      contracts: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          site_name: string;
+          frequency: string;
+          monthly_price: number;
+          renewal_date: string | null;
+          status: "active" | "ending_soon" | "ended";
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["contracts"]["Row"]> & {
+          workspace_id: string;
+          site_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["contracts"]["Row"]>;
+        Relationships: [];
+      };
+      projects: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          name: string;
+          project_type: "site" | "maintenance" | "other";
+          status: "in_progress" | "maintenance" | "done";
+          deadline: string | null;
+          budget: number | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["projects"]["Row"]> & {
+          workspace_id: string;
+          name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["projects"]["Row"]>;
+        Relationships: [];
+      };
+      waste_log: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          inventory_item_id: string | null;
+          item_name: string;
+          quantity: number;
+          unit: string;
+          reason: string;
+          estimated_cost: number | null;
+          logged_at: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["waste_log"]["Row"]> & {
+          workspace_id: string;
+          item_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["waste_log"]["Row"]>;
+        Relationships: [];
+      };
       activities: {
         Row: {
           id: string;
@@ -361,3 +467,8 @@ export type Subscription = Database["public"]["Tables"]["subscriptions"]["Row"];
 export type Customer = Database["public"]["Tables"]["customers"]["Row"];
 export type InventoryItem = Database["public"]["Tables"]["inventory_items"]["Row"];
 export type Appointment = Database["public"]["Tables"]["appointments"]["Row"];
+export type Vehicle = Database["public"]["Tables"]["vehicles"]["Row"];
+export type RepairOrder = Database["public"]["Tables"]["repair_orders"]["Row"];
+export type Contract = Database["public"]["Tables"]["contracts"]["Row"];
+export type Project = Database["public"]["Tables"]["projects"]["Row"];
+export type WasteLogEntry = Database["public"]["Tables"]["waste_log"]["Row"];
