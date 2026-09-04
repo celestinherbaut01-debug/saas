@@ -39,6 +39,18 @@ export function Tr({
   );
 }
 
-export function Td({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("px-3 py-2.5 align-middle", className)}>{children}</td>;
+export function Td({
+  children,
+  className,
+  onClick,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
+}) {
+  return (
+    <td onClick={onClick} className={cn("px-3 py-2.5 align-middle", className)}>
+      {children}
+    </td>
+  );
 }

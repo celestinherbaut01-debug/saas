@@ -8,7 +8,8 @@ import { businessOsAtLeast } from "@/lib/entitlements";
 import { getBusinessOsProfile } from "@/lib/business-os";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
-import type { Contract, Project, WasteLogEntry } from "@/lib/supabase/types";
+import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
+import type { Project, WasteLogEntry } from "@/lib/supabase/types";
 
 export default async function BusinessOsPage() {
   const user = await getCachedUser();
@@ -131,21 +132,56 @@ export default async function BusinessOsPage() {
     );
   }
 
+  // Nettoyage a aussi sa propre vue dédiée (mêmes principes que Garage).
+  if (vertical === "cleaning") {
+    const [
+      { data: customers },
+      { data: sites },
+      { data: contracts },
+      { data: interventions },
+      { data: incidents },
+      { data: teamMembers },
+      { data: inventory },
+      { data: documents },
+    ] = await Promise.all([
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("sites").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("contracts").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("interventions").select("*").eq("workspace_id", workspaceId).order("scheduled_at", { ascending: false }),
+      supabase.from("incidents").select("*").eq("workspace_id", workspaceId).order("reported_at", { ascending: false }),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
+      supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
+    ]);
+
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          <CleaningView
+            workspaceId={workspaceId}
+            isAdvanced={isAdvanced}
+            initialCustomers={customers ?? []}
+            initialSites={sites ?? []}
+            initialContracts={contracts ?? []}
+            initialInterventions={interventions ?? []}
+            initialIncidents={incidents ?? []}
+            initialTeamMembers={teamMembers ?? []}
+            initialInventory={inventory ?? []}
+            initialDocuments={documents ?? []}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
   // On ne lit les tables spécifiques à un métier que pour ce métier — pas de
-  // requête pour "projects" sur un workspace "nettoyage", par exemple.
+  // requête pour "projects" sur un workspace "agence", par exemple.
   const [{ data: customers }, { data: inventory }, { data: appointments }, verticalData] = await Promise.all([
     supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
     supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
     (async () => {
-      if (vertical === "cleaning") {
-        const { data: contracts } = await supabase
-          .from("contracts")
-          .select("*")
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false });
-        return { contracts: contracts ?? [] };
-      }
       if (vertical === "agency") {
         const { data: projects } = await supabase
           .from("projects")
@@ -166,7 +202,6 @@ export default async function BusinessOsPage() {
     })(),
   ]);
 
-  const contracts: Contract[] = verticalData.contracts ?? [];
   const projects: Project[] = verticalData.projects ?? [];
   const wasteLog: WasteLogEntry[] = verticalData.wasteLog ?? [];
 
@@ -182,21 +217,7 @@ export default async function BusinessOsPage() {
   let untrackedNote: string | undefined;
   let history: { id: string; label: string; date: string }[] = [];
 
-  if (vertical === "cleaning") {
-    const activeContracts = contracts.filter((c) => c.status === "active");
-    const renewals = contracts.filter((c) => c.status === "ending_soon");
-    kpis = [
-      { label: "Sites sous contrat", value: String(activeContracts.length) },
-      { label: "Contrats à renouveler", value: String(renewals.length) },
-      { label: "Interventions à venir", value: String(upcomingAppointments.length) },
-      { label: "Consommables en stock faible", value: String(lowStock.length) },
-    ];
-    untrackedNote = "employés disponibles, incidents ouverts, suivi qualité";
-    history = contracts
-      .filter((c) => c.status === "ended")
-      .slice(0, 20)
-      .map((c) => ({ id: c.id, label: c.site_name, date: new Date(c.updated_at).toLocaleDateString("fr-FR") }));
-  } else if (vertical === "agency") {
+  if (vertical === "agency") {
     const inProgress = projects.filter((p) => p.status === "in_progress");
     const inMaintenance = projects.filter((p) => p.status === "maintenance");
     const activeClients = new Set(projects.map((p) => p.customer_id).filter(Boolean)).size;
@@ -245,7 +266,6 @@ export default async function BusinessOsPage() {
           customers={customers ?? []}
           inventory={inventory ?? []}
           appointments={appointments ?? []}
-          contracts={contracts}
           projects={projects}
           wasteLog={wasteLog}
           lowStock={lowStock}

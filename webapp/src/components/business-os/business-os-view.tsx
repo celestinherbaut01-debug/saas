@@ -5,7 +5,6 @@ import type {
   Customer,
   InventoryItem,
   Appointment,
-  Contract,
   Project,
   WasteLogEntry,
 } from "@/lib/supabase/types";
@@ -16,18 +15,16 @@ import { cn } from "@/lib/utils";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
 import { AppointmentsModule } from "@/components/business-os/appointments-module";
-import { ContractsModule } from "@/components/business-os/contracts-module";
 import { ProjectsModule } from "@/components/business-os/projects-module";
 import { WasteLogModule } from "@/components/business-os/waste-log-module";
 
-// Le garage a désormais sa propre vue dédiée (GarageView) bien plus riche —
-// ce composant générique ne gère plus que Nettoyage/Agence/Restaurant/
-// Générique. Voir business-os/page.tsx pour l'aiguillage.
-type TabKey = "overview" | "customers" | "inventory" | "appointments" | "contracts" | "projects" | "waste_log";
+// Garage et Nettoyage ont désormais leur propre vue dédiée (GarageView,
+// CleaningView), bien plus riche — ce composant générique ne gère plus que
+// Agence/Restaurant/Générique. Voir business-os/page.tsx pour l'aiguillage.
+type TabKey = "overview" | "customers" | "inventory" | "appointments" | "projects" | "waste_log";
 
-const VERTICAL_TABS: Record<Exclude<BusinessOsVertical, "garage">, TabKey[]> = {
+const VERTICAL_TABS: Record<Exclude<BusinessOsVertical, "garage" | "cleaning">, TabKey[]> = {
   generic: ["overview", "customers", "inventory", "appointments"],
-  cleaning: ["overview", "customers", "contracts", "inventory", "appointments"],
   agency: ["overview", "customers", "projects", "inventory", "appointments"],
   restaurant: ["overview", "customers", "inventory", "waste_log", "appointments"],
 };
@@ -43,12 +40,11 @@ export function BusinessOsView({
   customers,
   inventory,
   appointments,
-  contracts,
   projects,
   wasteLog,
   lowStock,
 }: {
-  vertical: Exclude<BusinessOsVertical, "garage">;
+  vertical: Exclude<BusinessOsVertical, "garage" | "cleaning">;
   profile: BusinessOsProfile;
   isAdvanced: boolean;
   workspaceId: string;
@@ -58,7 +54,6 @@ export function BusinessOsView({
   customers: Customer[];
   inventory: InventoryItem[];
   appointments: Appointment[];
-  contracts: Contract[];
   projects: Project[];
   wasteLog: WasteLogEntry[];
   lowStock: InventoryItem[];
@@ -71,7 +66,6 @@ export function BusinessOsView({
     customers: profile.customersLabel,
     inventory: profile.inventoryLabel,
     appointments: profile.appointmentsLabel,
-    contracts: "Contrats",
     projects: "Projets",
     waste_log: "Pertes",
   };
@@ -159,9 +153,6 @@ export function BusinessOsView({
       )}
       {active === "appointments" && (
         <AppointmentsModule workspaceId={workspaceId} initial={appointments} label={profile.appointmentsLabel} />
-      )}
-      {active === "contracts" && (
-        <ContractsModule workspaceId={workspaceId} initial={contracts} customers={customers} />
       )}
       {active === "projects" && <ProjectsModule workspaceId={workspaceId} initial={projects} customers={customers} />}
       {active === "waste_log" && <WasteLogModule workspaceId={workspaceId} initial={wasteLog} />}

@@ -219,6 +219,8 @@ export interface Database {
           quantity: number;
           unit: string;
           low_stock_threshold: number | null;
+          unit_cost: number;
+          supplier_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -403,11 +405,188 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["documents"]["Row"]>;
         Relationships: [];
       };
+      client_sites: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          project_id: string | null;
+          domain_name: string;
+          hosting_provider: string;
+          domain_renewal_date: string | null;
+          hosting_renewal_date: string | null;
+          next_maintenance_at: string | null;
+          monthly_price: number;
+          status: "active" | "maintenance" | "inactive";
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["client_sites"]["Row"]> & { workspace_id: string };
+        Update: Partial<Database["public"]["Tables"]["client_sites"]["Row"]>;
+        Relationships: [];
+      };
+      tickets: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          site_id: string | null;
+          title: string;
+          priority: "low" | "normal" | "high" | "urgent";
+          status: "open" | "in_progress" | "resolved" | "closed";
+          notes: string;
+          created_at: string;
+          resolved_at: string | null;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["tickets"]["Row"]> & { workspace_id: string; title: string };
+        Update: Partial<Database["public"]["Tables"]["tickets"]["Row"]>;
+        Relationships: [];
+      };
+      tasks: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          project_id: string | null;
+          title: string;
+          done: boolean;
+          due_date: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["tasks"]["Row"]> & { workspace_id: string; title: string };
+        Update: Partial<Database["public"]["Tables"]["tasks"]["Row"]>;
+        Relationships: [];
+      };
+      sites: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          customer_id: string | null;
+          name: string;
+          address: string;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["sites"]["Row"]> & { workspace_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["sites"]["Row"]>;
+        Relationships: [];
+      };
+      interventions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          contract_id: string | null;
+          site_id: string | null;
+          team_member_id: string | null;
+          scheduled_at: string;
+          completed_at: string | null;
+          status: "planned" | "done" | "missed";
+          quality_rating: number | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["interventions"]["Row"]> & { workspace_id: string; scheduled_at: string };
+        Update: Partial<Database["public"]["Tables"]["interventions"]["Row"]>;
+        Relationships: [];
+      };
+      incidents: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          contract_id: string | null;
+          site_id: string | null;
+          title: string;
+          severity: "low" | "medium" | "high";
+          status: "open" | "resolved";
+          notes: string;
+          reported_at: string;
+          resolved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["incidents"]["Row"]> & { workspace_id: string; title: string };
+        Update: Partial<Database["public"]["Tables"]["incidents"]["Row"]>;
+        Relationships: [];
+      };
+      purchase_orders: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          supplier_id: string | null;
+          status: "draft" | "ordered" | "received" | "canceled";
+          total_cost: number;
+          ordered_at: string | null;
+          received_at: string | null;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["purchase_orders"]["Row"]> & { workspace_id: string };
+        Update: Partial<Database["public"]["Tables"]["purchase_orders"]["Row"]>;
+        Relationships: [];
+      };
+      purchase_order_items: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          purchase_order_id: string;
+          inventory_item_id: string | null;
+          item_name: string;
+          quantity: number;
+          unit_cost: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["purchase_order_items"]["Row"]> & {
+          workspace_id: string;
+          purchase_order_id: string;
+          item_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["purchase_order_items"]["Row"]>;
+        Relationships: [];
+      };
+      recipes: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          selling_price: number;
+          notes: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["recipes"]["Row"]> & { workspace_id: string; name: string };
+        Update: Partial<Database["public"]["Tables"]["recipes"]["Row"]>;
+        Relationships: [];
+      };
+      recipe_ingredients: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          recipe_id: string;
+          inventory_item_id: string | null;
+          item_name: string;
+          quantity: number;
+          unit_cost: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["recipe_ingredients"]["Row"]> & {
+          workspace_id: string;
+          recipe_id: string;
+          item_name: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["recipe_ingredients"]["Row"]>;
+        Relationships: [];
+      };
       contracts: {
         Row: {
           id: string;
           workspace_id: string;
           customer_id: string | null;
+          site_id: string | null;
           site_name: string;
           frequency: string;
           monthly_price: number;
@@ -587,3 +766,13 @@ export type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 export type Part = Database["public"]["Tables"]["parts"]["Row"];
 export type RepairOrderPart = Database["public"]["Tables"]["repair_order_parts"]["Row"];
 export type BusinessDocument = Database["public"]["Tables"]["documents"]["Row"];
+export type ClientSite = Database["public"]["Tables"]["client_sites"]["Row"];
+export type Ticket = Database["public"]["Tables"]["tickets"]["Row"];
+export type Task = Database["public"]["Tables"]["tasks"]["Row"];
+export type Site = Database["public"]["Tables"]["sites"]["Row"];
+export type Intervention = Database["public"]["Tables"]["interventions"]["Row"];
+export type Incident = Database["public"]["Tables"]["incidents"]["Row"];
+export type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row"];
+export type PurchaseOrderItem = Database["public"]["Tables"]["purchase_order_items"]["Row"];
+export type Recipe = Database["public"]["Tables"]["recipes"]["Row"];
+export type RecipeIngredient = Database["public"]["Tables"]["recipe_ingredients"]["Row"];

@@ -75,9 +75,9 @@ const BUSINESS_OS_TOOL = {
   name: "get_business_os_data",
   description:
     "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
-    "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), contrats de site " +
-    "(nettoyage), projets (agence), pertes (restaurant). Jamais inventé — un module non pertinent pour ce workspace " +
-    "renvoie une liste vide.",
+    "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), sites/contrats/" +
+    "interventions/incidents (nettoyage), projets (agence), pertes (restaurant). Jamais inventé — un module non " +
+    "pertinent pour ce workspace renvoie une liste vide.",
   input_schema: {
     type: "object" as const,
     properties: {
@@ -92,15 +92,20 @@ const BUSINESS_OS_TOOL = {
           "parts",
           "technicians",
           "documents",
+          "sites",
           "contracts",
+          "interventions",
+          "incidents",
           "projects",
           "waste_log",
         ],
         description:
-          "customers = clients/sites ; inventory = stock/pièces/consommables (générique) ; appointments = RDV/interventions/planning ; " +
-          "vehicles/repair_orders/parts/technicians/documents = garage (parts = catalogue de pièces avec quantité en " +
-          "stock, technicians = équipe avec charge de travail réelle, documents = devis/factures avec statut) ; " +
-          "contracts = nettoyage ; projects = agence ; waste_log = pertes restaurant",
+          "customers = clients/sites (générique) ; inventory = stock/pièces/consommables (générique) ; " +
+          "appointments = RDV/planning (générique) ; vehicles/repair_orders/parts/technicians/documents = garage " +
+          "(parts = catalogue de pièces avec quantité en stock, technicians = équipe avec charge de travail réelle, " +
+          "documents = devis/factures avec statut) ; sites/contracts/interventions/incidents = nettoyage " +
+          "(interventions inclut le statut planned/done/missed et la note qualité, incidents inclut la gravité) ; " +
+          "projects = agence ; waste_log = pertes restaurant",
       },
       limit: { type: "number", description: "Nombre max de résultats (défaut 20, max 50)" },
     },
@@ -216,6 +221,46 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
         .select("doc_type, status, number, total_ttc, issued_at, due_at, repair_order_id")
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false })
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "sites") {
+      const { data } = await supabase
+        .from("sites")
+        .select("name, address, notes")
+        .eq("workspace_id", workspaceId)
+        .order("name")
+        .limit(limit);
+      return { count: data?.length ?? 0, results: data ?? [] };
+    }
+    if (osModule === "interventions") {
+      const { data } = await supabase
+        .from("interventions")
+        .select("scheduled_at, completed_at, status, quality_rating, notes, site_id, team_member_id")
+        .eq("workspace_id", workspaceId)
+        .order("scheduled_at", { ascending: false })
+        .limit(limit);
+      const siteIds = [...new Set((data ?? []).map((i) => i.site_id).filter((id): id is string => Boolean(id)))];
+      const teamIds = [...new Set((data ?? []).map((i) => i.team_member_id).filter((id): id is string => Boolean(id)))];
+      const [{ data: sites }, { data: team }] = await Promise.all([
+        siteIds.length > 0 ? supabase.from("sites").select("id, name").in("id", siteIds) : Promise.resolve({ data: [] }),
+        teamIds.length > 0 ? supabase.from("team_members").select("id, name").in("id", teamIds) : Promise.resolve({ data: [] }),
+      ]);
+      const siteById = new Map((sites ?? []).map((s) => [s.id, s.name]));
+      const teamById = new Map((team ?? []).map((t) => [t.id, t.name]));
+      const results = (data ?? []).map(({ site_id, team_member_id, ...rest }) => ({
+        ...rest,
+        site: site_id ? siteById.get(site_id) ?? null : null,
+        team_member: team_member_id ? teamById.get(team_member_id) ?? null : null,
+      }));
+      return { count: results.length, results };
+    }
+    if (osModule === "incidents") {
+      const { data } = await supabase
+        .from("incidents")
+        .select("title, severity, status, reported_at, resolved_at, notes")
+        .eq("workspace_id", workspaceId)
+        .order("reported_at", { ascending: false })
         .limit(limit);
       return { count: data?.length ?? 0, results: data ?? [] };
     }
@@ -337,10 +382,11 @@ function buildSystemPrompt(plan: Plan): string {
       "produits sont en rupture ?' = module parts, repère toi-même les lignes où quantity <= low_stock_threshold ; " +
       "'quelle est la charge de chaque technicien ?' = module technicians (active_repair_orders déjà calculé) ; " +
       "'quels devis sont en attente ?' = module documents, doc_type = quote et status = sent. Pour le nettoyage : " +
-      "contrats bientôt à renouveler = module contracts, statut ending_soon. Pour une agence web : projets en " +
-      "maintenance = module projects. Pour un restaurant : pertes récentes = module waste_log. N'appelle jamais un " +
-      "module qui n'a pas de sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une " +
-      "réponse.";
+      "contrats bientôt à renouveler = module contracts, statut ending_soon ; 'quelles interventions n'ont pas " +
+      "d'équipe ?' = module interventions, filtre toi-même les résultats où team_member est null. Pour une agence " +
+      "web : projets en maintenance = module projects. Pour un restaurant : pertes récentes = module waste_log. " +
+      "N'appelle jamais un module qui n'a pas de sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt " +
+      "que d'inventer une réponse.";
   }
   return prompt;
 }

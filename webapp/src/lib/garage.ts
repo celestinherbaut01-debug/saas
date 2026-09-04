@@ -47,6 +47,8 @@ export const DOC_STATUS_LABEL: Record<BusinessDocument["status"], { text: string
   canceled: { text: "Annulé", tone: "neutral" },
 };
 
+export { formatEUR } from "@/lib/format";
+
 export function repairOrderTotalPrice(labor_cost: number, partsPrice: number): number {
   return labor_cost + partsPrice;
 }
@@ -112,8 +114,4 @@ export function computeGarageAlerts(
   }
 
   return alerts;
-}
-
-export function formatEUR(n: number): string {
-  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 }

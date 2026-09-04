@@ -23,7 +23,7 @@ import { PartsModule } from "@/components/business-os/garage/garage-parts";
 import { StockModule } from "@/components/business-os/garage/garage-stock";
 import { SuppliersModule } from "@/components/business-os/garage/garage-suppliers";
 import { TechniciansModule } from "@/components/business-os/garage/garage-technicians";
-import { DocumentsModule } from "@/components/business-os/garage/garage-documents";
+import { DocumentsModule } from "@/components/business-os/documents-module";
 import { HistoryModule } from "@/components/business-os/garage/garage-history";
 import { AlertsModule } from "@/components/business-os/garage/garage-alerts";
 import { GarageDashboard } from "@/components/business-os/garage/garage-dashboard";
@@ -409,8 +409,26 @@ export function GarageView({
       {active === "parts" && <PartsModule rows={parts} suppliers={suppliers} onCreate={createPart} onUpdate={updatePart} onRemove={removePart} />}
       {active === "stock" && <StockModule rows={parts} onAdjust={adjustPartQuantity} />}
       {active === "suppliers" && <SuppliersModule rows={suppliers} onCreate={createSupplier} onUpdate={updateSupplier} onRemove={removeSupplier} />}
-      {active === "quotes" && <DocumentsModule docType="quote" rows={documents} repairOrders={repairOrders} customers={customers} onSetStatus={setDocumentStatus} />}
-      {active === "invoices" && <DocumentsModule docType="invoice" rows={documents} repairOrders={repairOrders} customers={customers} onSetStatus={setDocumentStatus} />}
+      {active === "quotes" && (
+        <DocumentsModule
+          docType="quote"
+          rows={documents}
+          customers={customers}
+          resolveLinkedLabel={(d) => (d.repair_order_id ? repairOrders.find((r) => r.id === d.repair_order_id)?.title ?? "—" : "—")}
+          emptyHint="Créés depuis un ordre de réparation."
+          onSetStatus={setDocumentStatus}
+        />
+      )}
+      {active === "invoices" && (
+        <DocumentsModule
+          docType="invoice"
+          rows={documents}
+          customers={customers}
+          resolveLinkedLabel={(d) => (d.repair_order_id ? repairOrders.find((r) => r.id === d.repair_order_id)?.title ?? "—" : "—")}
+          emptyHint="Créées depuis un ordre de réparation, une fois la réparation prête à facturer."
+          onSetStatus={setDocumentStatus}
+        />
+      )}
       {active === "technicians" && isAdvanced && (
         <TechniciansModule rows={technicians} repairOrders={repairOrders} onCreate={(input) => createTechnician(input)} onUpdate={updateTechnician} onRemove={removeTechnician} />
       )}
