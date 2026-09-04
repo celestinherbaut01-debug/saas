@@ -71,6 +71,7 @@ export function ProspectionView({
     null,
   );
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [scoringProfileLabel, setScoringProfileLabel] = useState("Score d'opportunité");
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [manuallyVerified, setManuallyVerified] = useState<Set<number>>(new Set());
   const [adding, setAdding] = useState(false);
@@ -154,6 +155,8 @@ export function ProspectionView({
         maxEstablishmentsPerSiren,
         webFilter,
       },
+      ownCategorySlug: ownSlug,
+      audience,
     });
 
     setSearching(false);
@@ -169,9 +172,11 @@ export function ProspectionView({
       totalReturned: number;
       googleVerifiedCount: number;
       googlePlacesConfigured: boolean;
+      scoringProfileLabel: string;
     };
 
     setResults(data.results ?? []);
+    setScoringProfileLabel(data.scoringProfileLabel ?? "Score d'opportunité");
     setManuallyVerified(new Set());
     setStatus({
       kind: "ok",
@@ -468,6 +473,7 @@ export function ProspectionView({
                 key={r.siret}
                 result={r}
                 activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+                scoreLabel={scoringProfileLabel}
                 checked={checked.has(i)}
                 onToggleCheck={() => toggleChecked(i)}
                 manuallyVerified={manuallyVerified.has(i)}

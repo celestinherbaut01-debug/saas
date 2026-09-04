@@ -20,6 +20,10 @@ export interface SearchRequest {
   filters: SearchFilters;
   /** Plafond de candidats vérifiés via Google Places (contrôle du coût). */
   maxPlacesLookups?: number;
+  /** Slug (feuille) du métier PROPRE à l'utilisateur — détermine le profil de scoring, jamais le prospect. */
+  ownCategorySlug?: string | null;
+  /** Clientèle déclarée par l'utilisateur — affine le profil de scoring quand le métier seul ne suffit pas. */
+  audience?: "b2b" | "b2c" | "both" | null;
 }
 
 /** Établissement brut renvoyé par l'API SIRENE / RNE (recherche-entreprises.api.gouv.fr). */

@@ -59,6 +59,8 @@ function buildReasons(r: ProspectionResult): string[] {
   if (r.verificationSources.no_website) reasons.push("Aucun site confirmé");
   else if (r.verificationSources.weak_website) reasons.push("Site à améliorer");
   if (r.verificationSources.google_operational) reasons.push("Fiche Google active");
+  if (r.verificationSources.large_structure_opportunity) reasons.push("Structure de taille significative");
+  if (r.verificationSources.multi_site_opportunity) reasons.push("Enseigne multi-sites");
   if (r.googleRatingCount) reasons.push(`${r.googleRatingCount} avis Google${r.googleRating ? ` (${r.googleRating}/5)` : ""}`);
   reasons.push(`À ${r.distanceKm.toFixed(1)} km de votre zone`);
   return reasons;
@@ -67,6 +69,7 @@ function buildReasons(r: ProspectionResult): string[] {
 export function ResultCard({
   result: r,
   activityLabel,
+  scoreLabel = "Score d'opportunité",
   checked,
   onToggleCheck,
   manuallyVerified,
@@ -76,6 +79,7 @@ export function ResultCard({
 }: {
   result: ProspectionResult;
   activityLabel: string;
+  scoreLabel?: string;
   checked: boolean;
   onToggleCheck: () => void;
   manuallyVerified: boolean;
@@ -101,6 +105,7 @@ export function ResultCard({
           </div>
         </label>
         <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="text-[9px] font-semibold uppercase tracking-wide text-faint">{scoreLabel}</span>
           <span className="rounded-full bg-soft px-2.5 py-1 font-display text-[13px] font-extrabold">
             {r.qualityScore}
             <span className="text-[9.5px] font-medium text-faint">/100</span>

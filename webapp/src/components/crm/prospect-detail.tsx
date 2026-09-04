@@ -25,9 +25,11 @@ const WEBSITE_QUALITY_LABEL: Record<string, string> = {
 export function ProspectDetail({
   prospect: initialProspect,
   initialActivities,
+  scoreLabel = "Score d'opportunité",
 }: {
   prospect: Prospect;
   initialActivities: Activity[];
+  scoreLabel?: string;
 }) {
   const supabase = createClient();
   const [prospect, setProspect] = useState(initialProspect);
@@ -217,7 +219,10 @@ export function ProspectDetail({
 
         <Card>
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-sm font-bold">Analyse ProspectFlow</h2>
+            <div>
+              <h2 className="font-display text-sm font-bold">Analyse ProspectFlow</h2>
+              <p className="text-[10.5px] font-semibold uppercase tracking-wide text-faint">{scoreLabel}</p>
+            </div>
             <div className="flex items-center gap-2">
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", opportunity.cls)}>
                 Opportunité {opportunity.text}

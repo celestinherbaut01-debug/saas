@@ -18,7 +18,7 @@ import { searchSirene } from "../_shared/sirene.ts";
 import { isAssociationOrPublic, isKnownChain, isLargeGroup } from "../_shared/chains.ts";
 import { verifyWithGooglePlaces } from "../_shared/placesApi.ts";
 import { analyseWebsiteQuality } from "../_shared/websiteQuality.ts";
-import { computeQualityScore } from "../_shared/scoring.ts";
+import { computeQualityScore, resolveScoringProfile, SCORING_PROFILE_LABEL } from "../_shared/scoring.ts";
 import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_shared/types.ts";
 
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
     body.maxPlacesLookups ?? DEFAULT_MAX_PLACES_LOOKUPS,
     HARD_MAX_PLACES_LOOKUPS,
   );
+  const scoringProfile = resolveScoringProfile(body.ownCategorySlug ?? null, body.audience ?? null);
 
   // Service role : nécessaire pour lire/écrire le cache de vérification
   // mutualisé (verification_cache n'autorise pas l'écriture depuis le client).
@@ -259,7 +260,7 @@ Deno.serve(async (req) => {
         placesCheckedAt: checkedAt,
       };
 
-      const { score, sources } = computeQualityScore(base);
+      const { score, sources } = computeQualityScore(base, scoringProfile);
       if (fromCache) sources.cached = true;
 
       enriched.push({ ...base, qualityScore: score, verificationSources: sources });
@@ -294,6 +295,8 @@ Deno.serve(async (req) => {
       totalReturned: results.length,
       googleVerifiedCount: results.filter((r) => r.placeId !== null).length,
       googlePlacesConfigured: Boolean(googleApiKey),
+      scoringProfile,
+      scoringProfileLabel: SCORING_PROFILE_LABEL[scoringProfile],
       results,
     });
   } catch (err) {

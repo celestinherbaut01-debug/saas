@@ -12,6 +12,9 @@ export interface SearchProspectsParams {
   radiusKm: number;
   nafCodes: string[];
   filters: Record<string, unknown>;
+  /** Détermine le profil de scoring (voir lib/scoring-profile.ts) — jamais lié au prospect. */
+  ownCategorySlug?: string | null;
+  audience?: "b2b" | "b2c" | "both" | null;
 }
 
 export interface SearchProspectsResult {
