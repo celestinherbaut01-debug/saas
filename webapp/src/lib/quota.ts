@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getEntitlements, type Plan } from "@/lib/entitlements";
+import { resolvePlanEntitlements, type Plan } from "@/lib/entitlements";
 
 export type QuotaMetric = "nova_requests" | "prospects_added" | "searches";
 
@@ -48,7 +48,12 @@ async function readCount(workspaceId: string, metric: QuotaMetric, periodKey: st
 /** Lecture seule : usage mensuel actuel de ce workspace pour une métrique. */
 export async function getUsage(workspaceId: string, metric: QuotaMetric, plan: Plan): Promise<QuotaStatus> {
   const used = await readCount(workspaceId, metric, currentMonthKey());
-  const limit = getEntitlements(plan)[LIMIT_FIELD[metric]];
+  // resolvePlanEntitlements() plutôt qu'un ENTITLEMENTS[plan] direct : `plan`
+  // est typé Plan, mais rien ne garantit à l'exécution que la valeur reçue
+  // (souvent lue depuis subscriptions.plan) en est réellement une clé
+  // valide — voir la panne "Cannot read properties of undefined
+  // (reading 'novaMonthlyLimit')" que cette défense corrige.
+  const limit = resolvePlanEntitlements(plan, `quota:${metric} workspace ${workspaceId}`)[LIMIT_FIELD[metric]];
   return { metric, used, limit, remaining: Math.max(0, limit - used), exceeded: used >= limit };
 }
 
@@ -92,7 +97,7 @@ export interface NovaQuotaStatus {
 export async function assertNovaQuota(workspaceId: string, plan: Plan): Promise<NovaQuotaStatus> {
   const monthly = await assertQuota(workspaceId, "nova_requests", plan);
 
-  const dailyLimit = getEntitlements(plan).novaDailyLimit;
+  const dailyLimit = resolvePlanEntitlements(plan, `quota:nova_requests:daily workspace ${workspaceId}`).novaDailyLimit;
   if (dailyLimit == null) return { monthly, daily: null };
 
   const used = await readCount(workspaceId, "nova_requests", currentDayKey());

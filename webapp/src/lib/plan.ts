@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { planAtLeast, type Plan } from "@/lib/entitlements";
+import { planAtLeast, resolvePlan, type Plan } from "@/lib/entitlements";
 
 export type { Plan };
 export { planAtLeast };
@@ -34,7 +34,14 @@ export const getWorkspacePlan = cache(async (workspaceId: string): Promise<Plan>
     .maybeSingle();
 
   if (!data || data.status === "canceled" || data.status === "past_due") return "free";
-  return data.plan;
+  // `data.plan` est typé `Plan` par le générique Database, mais ce type ne
+  // garantit rien à l'exécution : c'est la valeur BRUTE de subscriptions.plan
+  // en base. Si la migration 0023 (renommage starter/pro/max vers le
+  // catalogue modulaire) n'a pas encore tourné sur cette base, ou si la
+  // ligne contient une valeur invalide pour toute autre raison, resolvePlan()
+  // la normalise (ou journalise + replie sur "free") au lieu de laisser une
+  // valeur invalide se propager jusqu'à planter sur ENTITLEMENTS[plan].
+  return resolvePlan(data.plan, `workspace ${workspaceId}`);
 });
 
 /** Lève une erreur explicite (jamais un contournement silencieux) si le plan est insuffisant. */

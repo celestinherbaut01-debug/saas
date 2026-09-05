@@ -300,8 +300,81 @@ export function bundleSavingsMonthly(plan: Plan): number {
   return Math.max(0, separate - ENTITLEMENTS[plan].priceMonthly);
 }
 
+// Défense en profondeur : même si `plan` est typé `Plan`, ce type n'est
+// qu'une PROMESSE côté TypeScript — rien ne garantit à l'exécution que la
+// valeur qui arrive ici (souvent lue telle quelle depuis `subscriptions.plan`
+// en base, voir lib/plan.ts) est réellement une des clés de ENTITLEMENTS.
+// Un plan hérité jamais migré (voir LEGACY_PLAN_MAP ci-dessous) planterait
+// sinon ici avec "Cannot read properties of undefined" — repli sur `free`
+// plutôt qu'un crash, jamais l'inverse.
 export function getEntitlements(plan: Plan): PlanEntitlements {
-  return ENTITLEMENTS[plan];
+  return ENTITLEMENTS[plan] ?? ENTITLEMENTS.free;
+}
+
+// Catalogue AVANT la refonte modulaire (migration 0023) : un seul axe
+// linéaire free/starter/pro/max. Équivalence retenue lors de la migration —
+// mêmes droits qu'avant, nouveau nom (voir 0023_modular_pricing.sql) :
+//   starter -> acquisition_starter (aucun Business OS avant)
+//   pro     -> complete            (avait déjà Acquisition + Business OS standard)
+//   max     -> complete_max        (avait déjà Acquisition + Business OS avancé)
+// Nécessaire tant qu'on n'est pas certain que 0023 a été appliquée sur
+// TOUTES les bases réelles (une ligne `subscriptions` créée avant la
+// migration, ou une migration jamais exécutée en production, contiendrait
+// encore ces valeurs littérales).
+const LEGACY_PLAN_MAP: Record<string, Plan> = {
+  free: "free",
+  starter: "acquisition_starter",
+  pro: "complete",
+  max: "complete_max",
+};
+
+/**
+ * Source UNIQUE de normalisation d'une valeur de plan potentiellement non
+ * fiable (lue en base, jamais garantie par le type TypeScript à
+ * l'exécution) vers un `Plan` du catalogue actuel — ne renvoie JAMAIS une
+ * valeur qui ferait planter `ENTITLEMENTS[plan]`. Trois cas :
+ *  1. Déjà une clé valide du catalogue actuel -> renvoyée telle quelle.
+ *  2. Une valeur héritée connue (free/starter/pro/max) -> équivalent moderne,
+ *     avec un avertissement serveur (la ligne DB devrait être migrée).
+ *  3. Une valeur inconnue (typo, donnée corrompue, plan jamais vu) -> repli
+ *     sur "free" (le plan le plus restrictif, jamais un crash), avec une
+ *     erreur claire dans les logs serveur — "contrôlée" plutôt qu'une pile
+ *     d'appels brute côté client.
+ *
+ * `context` sert uniquement à rendre le message de log exploitable (ex.
+ * l'ID du workspace concerné) — n'affecte jamais la valeur renvoyée.
+ */
+export function resolvePlan(rawPlan: string | null | undefined, context?: string): Plan {
+  if (rawPlan && isValidPlan(rawPlan)) return rawPlan;
+
+  const suffix = context ? ` (${context})` : "";
+  if (rawPlan && rawPlan in LEGACY_PLAN_MAP) {
+    const resolved = LEGACY_PLAN_MAP[rawPlan];
+    console.error(
+      `[entitlements] Plan hérité "${rawPlan}" non migré${suffix} — utilisation de l'équivalent moderne "${resolved}". ` +
+        `Vérifiez que la migration 0023_modular_pricing.sql a bien été appliquée sur cette base.`,
+    );
+    return resolved;
+  }
+
+  if (rawPlan) {
+    console.error(
+      `[entitlements] Valeur de plan invalide et inconnue : "${rawPlan}"${suffix} — repli sur "free" pour éviter un crash. ` +
+        `Vérifiez la colonne subscriptions.plan pour ce workspace.`,
+    );
+  }
+  return "free";
+}
+
+/**
+ * Accesseur normalisé demandé pour tout code qui reçoit un plan dont la
+ * provenance n'est pas garantie (lecture DB, payload externe...) — combine
+ * resolvePlan() et le catalogue en un seul appel qui ne renvoie jamais
+ * `undefined`. À utiliser à la place d'un `ENTITLEMENTS[plan]` direct
+ * partout où `plan` n'a pas déjà été validé par isValidPlan()/resolvePlan().
+ */
+export function resolvePlanEntitlements(rawPlan: string | null | undefined, context?: string): PlanEntitlements {
+  return ENTITLEMENTS[resolvePlan(rawPlan, context)];
 }
 
 /** Comparaison utile seulement contre "free" — voir le commentaire sur PLAN_RANK. */
