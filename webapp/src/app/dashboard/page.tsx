@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser } from "@/lib/session";
+import { getCachedUser, getCachedBusinessProfile } from "@/lib/session";
 import { Card } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { UsageBar } from "@/components/ui/usage-bar";
@@ -36,6 +36,15 @@ export default async function DashboardPage() {
   // fait" et une autre "non" à partir de lectures légèrement différentes.
   const appState = await getUserAppState(supabase, user.id);
   const { workspaceId, plan, businessProfileExists } = appState;
+
+  // Module Business OS choisi comme mode principal : le Dashboard réel de
+  // ce client, c'est son Business OS (qui ouvre déjà sur son propre onglet
+  // Dashboard) — pas cette vue orientée prospection, hors-sujet pour qui a
+  // explicitement dit vouloir "gérer son entreprise" plutôt que prospecter.
+  if (workspaceId) {
+    const businessProfile = await getCachedBusinessProfile(workspaceId);
+    if (businessProfile?.product_mode === "business_os") redirect("/business-os");
+  }
 
   const [
     { count: targetCount },

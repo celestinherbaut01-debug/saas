@@ -32,3 +32,25 @@ export const getCachedMembership = cache(async (userId: string): Promise<Members
     .maybeSingle();
   return data;
 });
+
+export interface CachedBusinessProfile {
+  own_category_id: string | null;
+  offer_description: string;
+  audience: "b2b" | "b2c" | "both";
+  product_mode: "acquisition" | "business_os" | "both";
+}
+
+/**
+ * Pilote la navigation/le dashboard (product_mode) — lu par AppShell sur
+ * CHAQUE page protégée, donc mémorisé par requête comme le reste de ce
+ * fichier plutôt que refait à chaque composant qui en a besoin.
+ */
+export const getCachedBusinessProfile = cache(async (workspaceId: string): Promise<CachedBusinessProfile | null> => {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("business_profiles")
+    .select("own_category_id, offer_description, audience, product_mode")
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  return data;
+});

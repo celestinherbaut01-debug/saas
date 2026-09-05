@@ -135,3 +135,31 @@ export async function updateOfferAudience(
   revalidatePath("/parametres");
   return { ok: true };
 }
+
+/**
+ * Change le module mis en avant (Acquisition / Business OS / les deux) —
+ * une préférence de NAVIGATION, jamais un droit facturé : elle ne retire
+ * ni n'ajoute aucun accès, elle change seulement ce que la sidebar et le
+ * dashboard mettent en avant. `revalidatePath("/", "layout")` est
+ * nécessaire ici (contrairement aux autres actions de ce fichier) car
+ * AppShell — donc la sidebar — est rendu par TOUTES les pages protégées.
+ */
+export async function updateProductMode(
+  workspaceId: string,
+  productMode: "acquisition" | "business_os" | "both",
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Session expirée." };
+
+  const { error } = await supabase
+    .from("business_profiles")
+    .update({ product_mode: productMode })
+    .eq("workspace_id", workspaceId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

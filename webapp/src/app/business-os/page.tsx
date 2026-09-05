@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser, getCachedMembership } from "@/lib/session";
+import { getCachedUser, getCachedMembership, getCachedBusinessProfile } from "@/lib/session";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { getWorkspacePlan } from "@/lib/plan";
@@ -44,11 +45,7 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const { data: businessProfile } = await supabase
-    .from("business_profiles")
-    .select("own_category_id")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
+  const businessProfile = await getCachedBusinessProfile(workspaceId);
 
   let parentSlug: string | null = null;
   let leafSlug: string | null = null;
@@ -82,9 +79,16 @@ export default async function BusinessOsPage() {
           Modules réels adaptés à votre métier — données réelles de votre workspace, jamais de chiffre inventé.
         </p>
       </div>
-      <span className="shrink-0 rounded-full bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
-        {isAdvanced ? "Business OS avancé" : "Business OS standard"}
-      </span>
+      <div className="flex shrink-0 flex-col items-end gap-1.5">
+        <span className="rounded-full bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
+          {isAdvanced ? "Business OS avancé" : "Business OS standard"}
+        </span>
+        {businessProfile?.product_mode === "business_os" && (
+          <Link href="/prospection" className="text-[11px] font-semibold text-accent hover:underline">
+            Développer aussi votre clientèle B2B →
+          </Link>
+        )}
+      </div>
     </div>
   );
 

@@ -79,6 +79,7 @@ export interface Database {
           website: string | null;
           offer_description: string;
           audience: "b2b" | "b2c" | "both";
+          product_mode: "acquisition" | "business_os" | "both";
           own_category_id: string | null;
           street: string;
           postal_code: string;

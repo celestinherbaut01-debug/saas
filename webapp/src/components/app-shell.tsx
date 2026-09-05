@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser, getCachedMembership } from "@/lib/session";
+import { getCachedUser, getCachedMembership, getCachedBusinessProfile } from "@/lib/session";
 import { getWorkspacePlan } from "@/lib/plan";
 import { NavLink } from "@/components/nav-link";
 import { Button } from "@/components/ui/button";
@@ -19,76 +19,122 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const membership = await getCachedMembership(user.id);
 
   const supabase = await createClient();
-  const [{ data: workspace }, plan] = await Promise.all([
+  const [{ data: workspace }, plan, businessProfile] = await Promise.all([
     membership
       ? supabase.from("workspaces").select("name").eq("id", membership.workspace_id).maybeSingle()
       : Promise.resolve({ data: null }),
     membership ? getWorkspacePlan(membership.workspace_id) : Promise.resolve<Plan>("free"),
+    membership ? getCachedBusinessProfile(membership.workspace_id) : Promise.resolve(null),
   ]);
   const entitlements = ENTITLEMENTS[plan];
   const nextPlan = PLAN_ORDER[PLAN_ORDER.indexOf(plan) + 1] as Plan | undefined;
 
-  const navSections: Array<{ label: string; items: React.ReactNode }> = [
-    {
-      label: "Prospection",
+  // Deux modules indépendants (Acquisition / Business OS) — le mode choisi
+  // par le client (onboarding, ou changé depuis Paramètres) pilote quelle
+  // partie de la navigation est mise en avant. "both" (par défaut pour tout
+  // compte existant, jamais changé rétroactivement) affiche tout, exactement
+  // comme avant cette évolution — aucun compte ne perd d'accès.
+  const mode = businessProfile?.product_mode ?? "both";
+  const hasBusinessOsPlan = businessOsAtLeast(plan, "standard");
+
+  const acquisitionLinks = (
+    <>
+      <NavLink href="/dashboard" icon="⌂">
+        Dashboard
+      </NavLink>
+      <NavLink href="/prospection" icon="⌕">
+        Prospection
+      </NavLink>
+      <NavLink href="/crm" icon="▦">
+        CRM
+      </NavLink>
+      <NavLink href="/agent" icon="✦">
+        NOVA
+      </NavLink>
+      <NavLink href="/analytics" icon="◫">
+        Analytics
+      </NavLink>
+    </>
+  );
+
+  const accountLinks = (
+    <>
+      <NavLink href="/abonnement" icon="◆">
+        Abonnement
+      </NavLink>
+      <NavLink href="/integrations" icon="◎">
+        Intégrations
+      </NavLink>
+      <NavLink href="/parametres" icon="⚙">
+        Paramètres
+      </NavLink>
+    </>
+  );
+
+  const navSections: Array<{ label: string; items: React.ReactNode }> = [];
+
+  if (mode === "business_os") {
+    // Business OS au premier plan : la Prospection n'est volontairement pas
+    // dans la navigation principale (voir le lien secondaire discret
+    // ci-dessous, sous la sidebar) — un garagiste qui a choisi "gérer mon
+    // entreprise" n'a pas besoin d'un menu de prospection en évidence.
+    navSections.push({
+      label: "",
       items: (
         <>
-          <NavLink href="/dashboard" icon="⌂">
+          <NavLink href="/business-os" icon="⌂" badge={hasBusinessOsPlan ? undefined : "PRO"}>
             Dashboard
-          </NavLink>
-          <NavLink href="/prospection" icon="⌕">
-            Prospection
-          </NavLink>
-          <NavLink href="/crm" icon="▦">
-            CRM
           </NavLink>
           <NavLink href="/agent" icon="✦">
             NOVA
           </NavLink>
-          <NavLink href="/analytics" icon="◫">
-            Analytics
-          </NavLink>
         </>
       ),
-    },
-    {
+    });
+  } else if (mode === "acquisition") {
+    navSections.push({ label: "", items: acquisitionLinks });
+  } else {
+    navSections.push({ label: "Acquisition", items: acquisitionLinks });
+    navSections.push({
       label: "Gestion",
       items: (
-        <>
-          <NavLink href="/business-os" icon="▣" badge={businessOsAtLeast(plan, "standard") ? undefined : "PRO"}>
-            Business OS
-          </NavLink>
-          <NavLink href="/abonnement" icon="◆">
-            Abonnements
-          </NavLink>
-          <NavLink href="/integrations" icon="◎">
-            Intégrations
-          </NavLink>
-        </>
-      ),
-    },
-    {
-      label: "Compte",
-      items: (
-        <NavLink href="/parametres" icon="⚙">
-          Paramètres
+        <NavLink href="/business-os" icon="▣" badge={hasBusinessOsPlan ? undefined : "PRO"}>
+          Business OS
         </NavLink>
       ),
-    },
-  ];
+    });
+  }
+
+  navSections.push({ label: "Compte", items: accountLinks });
 
   const navLinks = (
     <>
-      {navSections.map((section) => (
-        <div key={section.label} className="flex flex-col gap-1">
-          <p className="px-3 pb-1 pt-3 text-[9.5px] font-bold uppercase tracking-wider text-sidebar-ink-dim/70 first:pt-0">
-            {section.label}
-          </p>
+      {navSections.map((section, i) => (
+        <div key={section.label || `section-${i}`} className="flex flex-col gap-1">
+          {section.label && (
+            <p className="px-3 pb-1 pt-3 text-[9.5px] font-bold uppercase tracking-wider text-sidebar-ink-dim/70 first:pt-0">
+              {section.label}
+            </p>
+          )}
           {section.items}
         </div>
       ))}
     </>
   );
+
+  // Lien secondaire discret vers l'autre module — jamais un vrai lien de
+  // navigation (pas de badge actif), juste une porte d'entrée visible sans
+  // encombrer le menu principal (spec produit : "bouton secondaire").
+  const crossModuleLink =
+    mode === "business_os" ? (
+      <Link href="/prospection" className="rounded-lg border border-dashed border-sidebar-line px-3 py-2 text-[11px] font-semibold text-sidebar-ink-dim hover:border-accent hover:text-white">
+        + Développer votre clientèle B2B
+      </Link>
+    ) : mode === "acquisition" ? (
+      <Link href="/business-os" className="rounded-lg border border-dashed border-sidebar-line px-3 py-2 text-[11px] font-semibold text-sidebar-ink-dim hover:border-accent hover:text-white">
+        + Business OS {hasBusinessOsPlan ? "" : "(option)"}
+      </Link>
+    ) : null;
 
   const planBadge = (
     <div className="rounded-xl border border-sidebar-line bg-white/[0.04] p-3">
@@ -128,6 +174,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <div className="px-1.5 pb-5 pt-1">{logo}</div>
         {navLinks}
         <div className="mt-auto flex flex-col gap-3 border-t border-sidebar-line pt-3.5">
+          {crossModuleLink}
           {planBadge}
           <form action={signOut}>
             <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
@@ -147,6 +194,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <div className="absolute right-0 top-11 flex max-h-[80vh] w-64 flex-col gap-1 overflow-y-auto rounded-xl border border-sidebar-line bg-sidebar p-2.5 shadow-lg">
             {navLinks}
             <div className="mt-1 flex flex-col gap-3 border-t border-sidebar-line pt-2">
+              {crossModuleLink}
               {planBadge}
               <form action={signOut}>
                 <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
