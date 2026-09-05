@@ -319,6 +319,31 @@ export function acquisitionAtLeast(plan: Plan, min: AcquisitionLevel): boolean {
   return rank[ENTITLEMENTS[plan].acquisitionLevel] >= rank[min];
 }
 
+export type NovaContext = "commercial" | "metier";
+
+/**
+ * Quels contextes NOVA doit couvrir pour ce plan — dérivé des deux mêmes
+ * axes que le reste du catalogue, jamais un troisième champ à maintenir en
+ * synchro à part. NOVA Commercial (prospection/CRM/relances) suit l'accès
+ * Acquisition ; NOVA Métier (données Business OS) suit l'accès Business OS
+ * dès le niveau STANDARD.
+ *
+ * Bug corrigé : le code NOVA gatait auparavant get_business_os_data sur
+ * `businessOsAtLeast(plan, "advanced")` alors que le plan `business_os`
+ * (standard) promet lui-même "300 requêtes NOVA métier / mois" dans ses
+ * features, et que `complete` promet "NOVA commercial ET NOVA métier" tout
+ * en ayant un businessOsLevel "standard" — les deux plans payaient pour une
+ * fonctionnalité que le code ne livrait jamais. Et symétriquement, un plan
+ * Business OS seul (acquisitionLevel "none") recevait quand même les outils
+ * commerciaux (search_prospects, etc.) sans aucun accès Acquisition réel.
+ */
+export function novaContexts(plan: Plan): NovaContext[] {
+  const contexts: NovaContext[] = [];
+  if (acquisitionAtLeast(plan, "starter")) contexts.push("commercial");
+  if (businessOsAtLeast(plan, "standard")) contexts.push("metier");
+  return contexts;
+}
+
 export function isValidPlan(value: string): value is Plan {
   return (PLAN_ORDER as string[]).includes(value);
 }

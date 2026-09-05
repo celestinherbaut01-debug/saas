@@ -10,6 +10,7 @@ import { getXpSummary, xpActionLabel } from "@/lib/xp";
 import { getUserAppState } from "@/lib/app-state";
 import { getUsage } from "@/lib/quota";
 import { isNovaConfigured } from "@/lib/actions/nova";
+import { novaContexts } from "@/lib/entitlements";
 import { ACTIVITY_LABEL } from "@/lib/activity-labels";
 import type { ProspectStatus } from "@/lib/crm-status";
 import { PlanIntentBanner } from "@/components/plan-intent";
@@ -198,7 +199,9 @@ export default async function DashboardPage() {
           <h2 className="font-display text-sm font-bold">NOVA</h2>
           {novaConfigured ? (
             <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              NOVA peut rédiger vos prochains emails de prospection à partir de vos vraies données CRM.{" "}
+              {novaContexts(plan).includes("commercial")
+                ? "NOVA peut rédiger vos prochains emails de prospection à partir de vos vraies données CRM."
+                : "NOVA peut répondre à partir des vraies données de votre Business OS (planning, stock, clients)."}{" "}
               <Link href="/agent" className="font-semibold text-accent">
                 Ouvrir NOVA →
               </Link>

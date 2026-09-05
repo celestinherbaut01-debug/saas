@@ -4,28 +4,48 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { askNova, type NovaMessage } from "@/lib/actions/nova";
+import type { NovaContext } from "@/lib/entitlements";
 
-const SUGGESTIONS = [
+// NOVA Commercial (prospection/CRM/relances) et NOVA Métier (Business OS)
+// sont deux contextes distincts — voir novaContexts() dans lib/entitlements.ts.
+// Les suggestions affichées suivent les mêmes contextes que les outils
+// réellement disponibles côté serveur : jamais une suggestion que NOVA ne
+// pourrait pas honorer avec ce plan.
+const COMMERCIAL_SUGGESTIONS = [
   "Fais-moi le récap du jour",
   "Qui dois-je relancer ?",
   "Trouve-moi les prospects sans site confirmé",
   "Rédige un email pour mon prospect le mieux noté",
+];
+const METIER_SUGGESTIONS = [
+  "Quels rendez-vous ai-je cette semaine ?",
+  "Quels produits sont en stock faible ?",
+  "Fais-moi un résumé de mon activité",
 ];
 
 export function AgentChat({
   workspaceId,
   configured,
   initialPrompt,
+  contexts,
 }: {
   workspaceId: string;
   configured: boolean;
   initialPrompt?: string;
+  contexts: NovaContext[];
 }) {
   const [messages, setMessages] = useState<NovaMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoSent = useRef(false);
+
+  const hasCommercial = contexts.includes("commercial");
+  const hasMetier = contexts.includes("metier");
+  const suggestions = [
+    ...(hasCommercial ? COMMERCIAL_SUGGESTIONS : []),
+    ...(hasMetier ? METIER_SUGGESTIONS : []),
+  ];
 
   async function send(text: string) {
     if (!text.trim() || sending) return;
@@ -59,9 +79,27 @@ export function AgentChat({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <h1 className="font-display text-2xl font-extrabold">Agent IA — NOVA</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="font-display text-2xl font-extrabold">Agent IA — NOVA</h1>
+          <div className="flex gap-1.5">
+            {hasCommercial && (
+              <span className="rounded-full border border-line bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
+                NOVA Commercial
+              </span>
+            )}
+            {hasMetier && (
+              <span className="rounded-full border border-line bg-soft px-2.5 py-1 text-[10.5px] font-bold text-muted">
+                NOVA Métier
+              </span>
+            )}
+          </div>
+        </div>
         <p className="mt-1 text-[13px] text-muted">
-          Répond avec les vraies données de votre workspace (CRM, prospects) — jamais une supposition.
+          {hasCommercial && hasMetier
+            ? "Répond avec les vraies données de votre workspace — CRM/prospects et Business OS — jamais une supposition."
+            : hasCommercial
+              ? "Répond avec les vraies données de votre CRM et de vos prospects — jamais une supposition."
+              : "Répond avec les vraies données de votre Business OS — jamais une supposition."}
         </p>
       </div>
 
@@ -80,9 +118,15 @@ export function AgentChat({
         <div className="flex-1 overflow-y-auto">
           {messages.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <p className="text-[13px] text-muted">Posez une question sur vos prospects ou votre CRM.</p>
+              <p className="text-[13px] text-muted">
+                {hasCommercial && hasMetier
+                  ? "Posez une question sur vos prospects, votre CRM, ou votre activité."
+                  : hasCommercial
+                    ? "Posez une question sur vos prospects ou votre CRM."
+                    : "Posez une question sur votre activité."}
+              </p>
               <div className="flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((s) => (
+                {suggestions.map((s) => (
                   <button
                     key={s}
                     onClick={() => send(s)}
@@ -128,7 +172,13 @@ export function AgentChat({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={configured ? "Ex. Qui dois-je relancer ?" : "Configurez ANTHROPIC_API_KEY pour activer NOVA"}
+            placeholder={
+              !configured
+                ? "Configurez ANTHROPIC_API_KEY pour activer NOVA"
+                : hasCommercial
+                  ? "Ex. Qui dois-je relancer ?"
+                  : "Ex. Quels rendez-vous ai-je cette semaine ?"
+            }
             disabled={!configured || sending}
             className="flex-1 rounded-lg border border-line bg-soft px-3 py-2 text-[13px] disabled:opacity-50"
           />

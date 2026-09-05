@@ -3,7 +3,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
-import { businessOsAtLeast, type Plan } from "@/lib/entitlements";
+import { businessOsAtLeast, novaContexts, type Plan } from "@/lib/entitlements";
 import { assertNovaQuota, getUsage, incrementNovaUsage } from "@/lib/quota";
 import { isValidProspectStatus } from "@/lib/crm-status";
 
@@ -23,7 +23,8 @@ export async function getNovaUsage(workspaceId: string) {
 
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
-const TOOLS = [
+// NOVA Commercial : prospection, CRM, relances — suit l'accès Acquisition.
+const COMMERCIAL_TOOLS = [
   {
     name: "get_my_business_profile",
     description:
@@ -71,7 +72,9 @@ const TOOLS = [
   },
 ];
 
-const BUSINESS_OS_TOOL = {
+// NOVA Métier : données Business OS — suit l'accès Business OS (dès le
+// niveau standard, voir novaContexts() dans lib/entitlements.ts).
+const METIER_TOOL = {
   name: "get_business_os_data",
   description:
     "Business OS avancé : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
@@ -122,12 +125,16 @@ const BUSINESS_OS_TOOL = {
 
 
 function buildTools(plan: Plan) {
-  return businessOsAtLeast(plan, "advanced") ? [...TOOLS, BUSINESS_OS_TOOL] : TOOLS;
+  const contexts = novaContexts(plan);
+  return [
+    ...(contexts.includes("commercial") ? COMMERCIAL_TOOLS : []),
+    ...(contexts.includes("metier") ? [METIER_TOOL] : []),
+  ];
 }
 
 async function runTool(workspaceId: string, plan: Plan, name: string, input: Record<string, unknown>) {
   if (name === "get_business_os_data") {
-    if (!businessOsAtLeast(plan, "advanced")) return { error: "NOVA connectée aux données Business OS : réservé au Business OS avancé." };
+    if (!businessOsAtLeast(plan, "standard")) return { error: "NOVA connectée aux données Business OS : réservé aux plans avec Business OS." };
     const supabase = await createClient();
     const limit = typeof input.limit === "number" ? Math.min(input.limit, 50) : 20;
     const osModule = input.module;
@@ -425,17 +432,35 @@ async function runCrmTool(workspaceId: string, name: string, input: Record<strin
 }
 
 function buildSystemPrompt(plan: Plan): string {
-  let prompt =
-    "Tu es NOVA, l'assistant commercial de ProspectFlow OS. Réponds en français, de façon concise et concrète. " +
-    "Utilise TOUJOURS un outil pour obtenir des données réelles avant de répondre à une question sur les prospects, " +
-    "le CRM ou des statistiques — ne devine et n'invente jamais un chiffre ou un nom d'entreprise. " +
-    "Si une donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse. " +
-    "Pour rédiger un email, consulte TOUJOURS get_my_business_profile (l'entreprise qui envoie) ET get_prospect " +
-    "(le destinataire) avant d'écrire — jamais un email générique. Précise toujours qu'il doit être relu et validé " +
-    "avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
-  if (businessOsAtLeast(plan, "advanced")) {
+  const contexts = novaContexts(plan);
+  const hasCommercial = contexts.includes("commercial");
+  const hasMetier = contexts.includes("metier");
+
+  // L'identité de NOVA reflète ce que CE workspace a réellement payé —
+  // jamais "assistant commercial" par défaut pour un client Business OS
+  // seul (acquisitionLevel "none"), qui n'a ni prospects ni CRM à interroger.
+  let prompt = hasCommercial && hasMetier
+    ? "Tu es NOVA, l'assistant IA de ProspectFlow OS : à la fois NOVA Commercial (prospection, CRM, relances) et " +
+      "NOVA Métier (gestion de l'activité). "
+    : hasCommercial
+      ? "Tu es NOVA Commercial, l'assistant IA de ProspectFlow OS dédié à la prospection et au CRM. "
+      : "Tu es NOVA Métier, l'assistant IA de ProspectFlow OS dédié à la gestion de l'activité. ";
+
+  prompt +=
+    "Réponds en français, de façon concise et concrète. Utilise TOUJOURS un outil pour obtenir des données réelles " +
+    "avant de répondre à une question sur le workspace — ne devine et n'invente jamais un chiffre ou un nom. Si une " +
+    "donnée n'est pas disponible via tes outils, dis-le clairement plutôt que d'inventer une réponse.";
+
+  if (hasCommercial) {
     prompt +=
-      " Ce workspace a le Business OS avancé : utilise get_business_os_data pour répondre avec les vraies " +
+      " Pour rédiger un email, consulte TOUJOURS get_my_business_profile (l'entreprise qui envoie) ET get_prospect " +
+      "(le destinataire) avant d'écrire — jamais un email générique. Précise toujours qu'il doit être relu et " +
+      "validé avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
+  }
+
+  if (hasMetier) {
+    prompt +=
+      " Ce workspace a le Business OS activé : utilise get_business_os_data pour répondre avec les vraies " +
       "données métier. Pour un garage : 'quels véhicules attendent une pièce ?' = module repair_orders, filtre " +
       "toi-même les résultats dont status = waiting_parts (chaque résultat inclut vehicle.registration) ; 'quels " +
       "produits sont en rupture ?' = module parts, repère toi-même les lignes où quantity <= low_stock_threshold ; " +
@@ -447,9 +472,11 @@ function buildSystemPrompt(plan: Plan): string {
       "regarde domain_renewal_date/hosting_renewal_date ; tickets ouverts = module tickets, statut open/in_progress. " +
       "Pour un restaurant : pertes récentes = module waste_log ; commandes fournisseurs en attente = module " +
       "purchase_orders, statut ordered ; 'quel plat a le food cost le plus élevé ?' = module recipes, compare " +
-      "food_cost_percent (déjà calculé, ne recalcule jamais toi-même). N'appelle jamais un module qui n'a pas de " +
-      "sens pour ce métier ; s'il renvoie une liste vide, dis-le plutôt que d'inventer une réponse.";
+      "food_cost_percent (déjà calculé, ne recalcule jamais toi-même). Pour tout métier, appointments donne les " +
+      "rendez-vous/planning. N'appelle jamais un module qui n'a pas de sens pour ce métier ; s'il renvoie une " +
+      "liste vide, dis-le plutôt que d'inventer une réponse.";
   }
+
   return prompt;
 }
 
