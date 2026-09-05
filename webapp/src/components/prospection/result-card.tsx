@@ -32,6 +32,10 @@ export interface ProspectionResult {
   placesCheckedAt: string | null;
   qualityScore: number;
   verificationSources: Record<string, boolean>;
+
+  relevanceScore: number;
+  relevanceTier: "primary" | "secondary";
+  relevanceReasons: string[];
 }
 
 const BUSINESS_STATUS_LABEL: Record<string, { text: string; cls: string }> = {
@@ -55,7 +59,7 @@ function independenceLabel(r: ProspectionResult): { text: string; cls: string } 
 }
 
 function buildReasons(r: ProspectionResult): string[] {
-  const reasons: string[] = [];
+  const reasons: string[] = [...r.relevanceReasons];
   if (r.verificationSources.no_website) reasons.push("Aucun site confirmé");
   else if (r.verificationSources.weak_website) reasons.push("Site à améliorer");
   if (r.verificationSources.google_operational) reasons.push("Fiche Google active");
@@ -122,6 +126,11 @@ export function ResultCard({
         <span className={cn("rounded-full px-2 py-0.5 font-bold", verifStatus.cls)}>{verifStatus.text}</span>
         {indepStatus && (
           <span className={cn("rounded-full px-2 py-0.5 font-bold", indepStatus.cls)}>{indepStatus.text}</span>
+        )}
+        {r.relevanceTier === "secondary" && (
+          <span className="rounded-full bg-amber-bg px-2 py-0.5 font-bold text-amber-fg" title="Pertinence incertaine par rapport à votre audience déclarée">
+            Résultat secondaire
+          </span>
         )}
         {manuallyVerified && (
           <span className="rounded-full bg-accent/15 px-2 py-0.5 font-bold text-accent">✓ Vérifié par vous</span>

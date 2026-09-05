@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch } from "@/lib/actions/search";
 import { updateOfferAudience } from "@/lib/actions/settings";
-import { recommendedSlugsFor, filterSlugsByAudience } from "@/lib/target-recommendations";
+import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
+import { resolveScoringProfile } from "@/lib/scoring-profile";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
 type SearchResult = ProspectionResult;
@@ -101,7 +102,18 @@ export function ProspectionView({
   const ownSlug = businessProfile?.own_category_id
     ? categories.find((c) => c.id === businessProfile.own_category_id)?.slug ?? null
     : null;
-  const recommendedSlugs = filterSlugsByAudience(recommendedSlugsFor(ownSlug), categories, audience);
+  const scoringProfile = resolveScoringProfile(ownSlug, audience);
+  // "Besoin digital" (site web) n'est un critère pertinent que pour les
+  // profils où la présence web du prospect EST le signal d'opportunité —
+  // l'afficher pour un profil "potentiel contrat" (nettoyage) ou "B2B" est
+  // trompeur : ce qui compte là, c'est la taille/structure, pas le site.
+  const webCriteriaRelevant = scoringProfile === "digital_opportunity" || scoringProfile === "marketing_potential" || scoringProfile === "generic";
+
+  const offerRecommendation = useMemo(
+    () => recommendedSlugsForOffer(offerDescription, ownSlug, categories),
+    [offerDescription, ownSlug, categories],
+  );
+  const recommendedSlugs = filterSlugsByAudience(offerRecommendation.slugs, categories, audience);
 
   const displayedResults = useMemo(
     () =>
@@ -110,6 +122,9 @@ export function ProspectionView({
         .filter(({ r }) => (!phoneOnly || r.phone) && (!googleFicheOnly || r.placeId)),
     [results, phoneOnly, googleFicheOnly],
   );
+  const primaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "primary");
+  const secondaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "secondary");
+  const [showSecondary, setShowSecondary] = useState(false);
 
   async function saveOffer() {
     setSavingOffer(true);
@@ -318,6 +333,21 @@ export function ProspectionView({
 
       <Card>
         <h2 className="font-display text-sm font-bold">2. Qui voulez-vous démarcher ?</h2>
+        {recommendedSlugs && recommendedSlugs.length > 0 && (
+          <p className="mt-1 text-[11.5px] text-muted">
+            {offerRecommendation.basedOnOffer ? (
+              <>
+                Recommandations basées sur votre offre
+                {offerRecommendation.matchedRules.length > 0 && (
+                  <> — <span className="font-semibold text-ink">{offerRecommendation.matchedRules.join(", ")}</span></>
+                )}
+                .
+              </>
+            ) : (
+              "Recommandations basées sur votre métier — décrivez votre offre ci-dessus pour des cibles plus précises."
+            )}
+          </p>
+        )}
         <div className="mt-3">
           <TargetCategoryPicker
             categories={categories}
@@ -363,23 +393,25 @@ export function ProspectionView({
         <Card>
           <h2 className="font-display text-sm font-bold">4. Qualité des prospects</h2>
           <div className="mt-3 flex flex-col gap-3">
-            <div>
-              <label className="text-[11px] font-semibold text-muted">Besoin digital</label>
-              <select
-                value={webFilter}
-                onChange={(e) => setWebFilter(e.target.value as typeof webFilter)}
-                className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
-              >
-                <option value="all">Tous les statuts web</option>
-                <option value="no_or_weak">Sans site confirmé + site faible</option>
-                <option value="none">Sans site confirmé uniquement</option>
-                <option value="weak">Site à améliorer uniquement</option>
-                <option value="unknown">À vérifier uniquement</option>
-              </select>
-              <p className="mt-1 text-[10.5px] text-faint">
-                Sans Google Places configuré, tout reste « à vérifier » — laissez sur « Tous » pour ne rien masquer.
-              </p>
-            </div>
+            {webCriteriaRelevant && (
+              <div>
+                <label className="text-[11px] font-semibold text-muted">Besoin digital</label>
+                <select
+                  value={webFilter}
+                  onChange={(e) => setWebFilter(e.target.value as typeof webFilter)}
+                  className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
+                >
+                  <option value="all">Tous les statuts web</option>
+                  <option value="no_or_weak">Sans site confirmé + site faible</option>
+                  <option value="none">Sans site confirmé uniquement</option>
+                  <option value="weak">Site à améliorer uniquement</option>
+                  <option value="unknown">À vérifier uniquement</option>
+                </select>
+                <p className="mt-1 text-[10.5px] text-faint">
+                  Sans Google Places configuré, tout reste « à vérifier » — laissez sur « Tous » pour ne rien masquer.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2 text-[12px]">
               <Filter label="Écarter fermés" checked={operationalOnly} onChange={setOperationalOnly} />
               <Filter label="Écarter fermés temp." checked={excludeTempClosed} onChange={setExcludeTempClosed} />
@@ -466,25 +498,117 @@ export function ProspectionView({
           <p className="mt-4 text-[13px] text-muted">
             Aucun résultat ne correspond aux filtres « Téléphone disponible » / « Fiche Google disponible ».
           </p>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {displayedResults.map(({ r, i }) => (
-              <ResultCard
-                key={r.siret}
-                result={r}
-                activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
-                scoreLabel={scoringProfileLabel}
-                checked={checked.has(i)}
-                onToggleCheck={() => toggleChecked(i)}
-                manuallyVerified={manuallyVerified.has(i)}
-                onMarkVerified={() => markVerified(i)}
-                onViewDetail={() => viewDetail(i)}
-                viewingDetail={viewingIndex === i}
-              />
-            ))}
+        ) : primaryResults.length === 0 ? (
+          <div className="mt-4 flex flex-col gap-3">
+            <p className="rounded-lg bg-amber-bg px-3 py-2.5 text-[13px] text-amber-fg">
+              Aucune cible suffisamment pertinente trouvée pour cette offre et cette audience dans le registre — plutôt
+              que d&apos;afficher des résultats hors-cible, ils sont regroupés ci-dessous en résultats secondaires.
+            </p>
+            <SecondaryResultsSection
+              results={secondaryResults}
+              open
+              onToggle={() => setShowSecondary((v) => !v)}
+              nafToLabel={nafToLabel}
+              scoringProfileLabel={scoringProfileLabel}
+              checked={checked}
+              toggleChecked={toggleChecked}
+              manuallyVerified={manuallyVerified}
+              markVerified={markVerified}
+              viewingIndex={viewingIndex}
+              viewDetail={viewDetail}
+            />
           </div>
+        ) : (
+          <>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {primaryResults.map(({ r, i }) => (
+                <ResultCard
+                  key={r.siret}
+                  result={r}
+                  activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+                  scoreLabel={scoringProfileLabel}
+                  checked={checked.has(i)}
+                  onToggleCheck={() => toggleChecked(i)}
+                  manuallyVerified={manuallyVerified.has(i)}
+                  onMarkVerified={() => markVerified(i)}
+                  onViewDetail={() => viewDetail(i)}
+                  viewingDetail={viewingIndex === i}
+                />
+              ))}
+            </div>
+            {secondaryResults.length > 0 && (
+              <div className="mt-5 border-t border-line pt-4">
+                <SecondaryResultsSection
+                  results={secondaryResults}
+                  open={showSecondary}
+                  onToggle={() => setShowSecondary((v) => !v)}
+                  nafToLabel={nafToLabel}
+                  scoringProfileLabel={scoringProfileLabel}
+                  checked={checked}
+                  toggleChecked={toggleChecked}
+                  manuallyVerified={manuallyVerified}
+                  markVerified={markVerified}
+                  viewingIndex={viewingIndex}
+                  viewDetail={viewDetail}
+                />
+              </div>
+            )}
+          </>
         )}
       </Card>
+    </div>
+  );
+}
+
+function SecondaryResultsSection({
+  results,
+  open,
+  onToggle,
+  nafToLabel,
+  scoringProfileLabel,
+  checked,
+  toggleChecked,
+  manuallyVerified,
+  markVerified,
+  viewingIndex,
+  viewDetail,
+}: {
+  results: { r: SearchResult; i: number }[];
+  open: boolean;
+  onToggle: () => void;
+  nafToLabel: Map<string, string>;
+  scoringProfileLabel: string;
+  checked: Set<number>;
+  toggleChecked: (i: number) => void;
+  manuallyVerified: Set<number>;
+  markVerified: (i: number) => void;
+  viewingIndex: number | null;
+  viewDetail: (i: number) => void;
+}) {
+  if (results.length === 0) return null;
+  return (
+    <div>
+      <button type="button" onClick={onToggle} className="text-[12.5px] font-semibold text-muted hover:text-ink">
+        {open ? "▾" : "▸"} Résultats secondaires ({results.length}) — pertinence incertaine par rapport à votre audience
+      </button>
+      {open && (
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {results.map(({ r, i }) => (
+            <ResultCard
+              key={r.siret}
+              result={r}
+              activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+              scoreLabel={scoringProfileLabel}
+              checked={checked.has(i)}
+              onToggleCheck={() => toggleChecked(i)}
+              manuallyVerified={manuallyVerified.has(i)}
+              onMarkVerified={() => markVerified(i)}
+              onViewDetail={() => viewDetail(i)}
+              viewingDetail={viewingIndex === i}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

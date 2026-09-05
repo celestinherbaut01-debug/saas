@@ -78,4 +78,9 @@ export interface EnrichedProspect extends SireneEtablissement {
 
   qualityScore: number;
   verificationSources: Record<string, boolean>;
+
+  /** Pertinence par rapport à l'offre/audience déclarée — voir _shared/relevance.ts. Distinct du qualityScore. */
+  relevanceScore: number;
+  relevanceTier: "primary" | "secondary";
+  relevanceReasons: string[];
 }

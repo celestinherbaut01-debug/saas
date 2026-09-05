@@ -19,6 +19,7 @@ import { isAssociationOrPublic, isKnownChain, isLargeGroup } from "../_shared/ch
 import { verifyWithGooglePlaces } from "../_shared/placesApi.ts";
 import { analyseWebsiteQuality } from "../_shared/websiteQuality.ts";
 import { computeQualityScore, resolveScoringProfile, SCORING_PROFILE_LABEL } from "../_shared/scoring.ts";
+import { computeRelevance } from "../_shared/relevance.ts";
 import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_shared/types.ts";
 
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
@@ -100,15 +101,27 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceRoleKey);
 
   try {
-    // 3. Registre officiel des entreprises.
-    const raw = await searchSirene({
-      lat,
-      lng,
-      radiusKm,
-      nafCodes,
-      operationalOnly: filters.operationalOnly,
-      maxEstablishmentsPerSiren: filters.maxEstablishmentsPerSiren,
-    });
+    // 3. Registre officiel des entreprises + catalogue (pour la pertinence :
+    // le business_type de la catégorie du NAF de CHAQUE candidat, comparé à
+    // l'audience déclarée — voir _shared/relevance.ts).
+    const [raw, { data: categoryRows }] = await Promise.all([
+      searchSirene({
+        lat,
+        lng,
+        radiusKm,
+        nafCodes,
+        operationalOnly: filters.operationalOnly,
+        maxEstablishmentsPerSiren: filters.maxEstablishmentsPerSiren,
+      }),
+      admin.from("business_categories").select("naf_codes, business_type").order("sort_order"),
+    ]);
+
+    const nafToBusinessType = new Map<string, "b2b" | "b2c" | "both">();
+    for (const cat of categoryRows ?? []) {
+      for (const code of cat.naf_codes as string[]) {
+        if (!nafToBusinessType.has(code)) nafToBusinessType.set(code, cat.business_type as "b2b" | "b2c" | "both");
+      }
+    }
 
     // 4. Distance exacte + filtres registre (indépendance, statut).
     const perSirenCount = new Map<string, number>();
@@ -263,7 +276,16 @@ Deno.serve(async (req) => {
       const { score, sources } = computeQualityScore(base, scoringProfile);
       if (fromCache) sources.cached = true;
 
-      enriched.push({ ...base, qualityScore: score, verificationSources: sources });
+      const relevance = computeRelevance(c.nafCode, body.audience ?? null, nafToBusinessType);
+
+      enriched.push({
+        ...base,
+        qualityScore: score,
+        verificationSources: sources,
+        relevanceScore: relevance.score,
+        relevanceTier: relevance.tier,
+        relevanceReasons: relevance.reasons,
+      });
     }
 
     // 6. Filtre "besoin digital" — optionnel, "all" par défaut côté client :
@@ -280,19 +302,28 @@ Deno.serve(async (req) => {
       if (allowed) results = results.filter((r) => allowed.includes(r.websiteQuality));
     }
 
+    // 7. Tri : la pertinence (primary avant secondary) prime toujours sur le
+    // score commercial — un prospect très rentable mais hors-cible reste
+    // affiché, mais jamais devant les prospects réellement pertinents.
+    const tierRank = (t: EnrichedProspect["relevanceTier"]) => (t === "primary" ? 0 : 1);
     if (filters.needContact) {
       results = [...results].sort((a, b) => {
         const aHas = a.phone || a.websiteUri ? 1 : 0;
         const bHas = b.phone || b.websiteUri ? 1 : 0;
-        return bHas - aHas || b.qualityScore - a.qualityScore;
+        return tierRank(a.relevanceTier) - tierRank(b.relevanceTier) || bHas - aHas || b.qualityScore - a.qualityScore;
       });
     } else {
-      results.sort((a, b) => b.qualityScore - a.qualityScore);
+      results.sort((a, b) => tierRank(a.relevanceTier) - tierRank(b.relevanceTier) || b.qualityScore - a.qualityScore);
     }
+
+    const primaryCount = results.filter((r) => r.relevanceTier === "primary").length;
 
     return jsonResponse({
       totalMatchedInRegistry: totalMatched,
       totalReturned: results.length,
+      primaryCount,
+      secondaryCount: results.length - primaryCount,
+      noPrimaryResults: results.length > 0 && primaryCount === 0,
       googleVerifiedCount: results.filter((r) => r.placeId !== null).length,
       googlePlacesConfigured: Boolean(googleApiKey),
       scoringProfile,
