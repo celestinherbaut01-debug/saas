@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
       const { score, sources } = computeQualityScore(base, scoringProfile);
       if (fromCache) sources.cached = true;
 
-      const relevance = computeRelevance(c.nafCode, body.audience ?? null, nafToBusinessType);
+      const relevance = computeRelevance(c.nafCode, body.audience ?? null, nafToBusinessType, scoringProfile);
 
       enriched.push({
         ...base,

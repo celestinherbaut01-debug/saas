@@ -64,7 +64,8 @@ export const OFFER_INTENT_RULES: OfferIntentRule[] = [
   {
     id: "web-presence",
     keywords: [
-      "creation de site", "création de site", "site internet", "site web",
+      "creation de site", "création de site", "site internet", "site web", "site vitrine", "sites vitrines",
+      "creons des sites", "créons des sites", "creer des sites", "créer des sites", "concevons des sites", "concevoir des sites",
       "refonte de site", "presence en ligne", "présence en ligne", "visibilite en ligne", "visibilité en ligne",
     ],
     leaves: ["restaurants", "hair", "beauty", "garages", "realestate", "dentists", "physio"],
