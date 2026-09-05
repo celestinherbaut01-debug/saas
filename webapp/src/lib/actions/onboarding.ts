@@ -17,6 +17,8 @@ export interface OnboardingPayload {
     lng: number;
   } | null;
   targetCategoryIds: string[];
+  /** "Que souhaitez-vous faire avec ProspectFlow ?" — pilote la navigation, jamais un droit facturé. */
+  productMode: "acquisition" | "business_os" | "both";
 }
 
 export interface OnboardingResult {
@@ -48,7 +50,9 @@ export async function completeOnboarding(
   if (!user) return { error: "Session expirée — reconnectez-vous." };
   if (!payload.companyName.trim()) return { error: "Le nom de l'entreprise est requis." };
   if (!payload.address) return { error: "Adresse de départ manquante — validez une adresse." };
-  if (payload.targetCategoryIds.length === 0) {
+  // Cibles obligatoires SAUF si le client a explicitement dit ne pas vouloir
+  // prospecter ("Gérer mon entreprise" uniquement) — voir 0022.
+  if (payload.productMode !== "business_os" && payload.targetCategoryIds.length === 0) {
     return { error: "Sélectionnez au moins un métier à démarcher." };
   }
 
@@ -84,6 +88,7 @@ export async function completeOnboarding(
     p_target_category_ids: payload.targetCategoryIds,
     // Rayon volontairement absent : n'est plus choisi à l'onboarding, mais
     // sur la page Prospection (dépend du forfait) — voir 0014.
+    p_product_mode: payload.productMode,
   });
 
   if (error) {

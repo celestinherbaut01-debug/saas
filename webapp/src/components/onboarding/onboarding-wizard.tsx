@@ -11,8 +11,8 @@ import { TargetCategoryPicker } from "@/components/onboarding/target-category-pi
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import { recommendedSlugsFor, filterSlugsByAudience } from "@/lib/target-recommendations";
-
-const STEPS = ["Entreprise", "Votre métier", "Vos cibles", "Localisation"] as const;
+import { PRODUCT_MODE_OPTIONS, type ProductMode } from "@/lib/product-mode";
+import { cn } from "@/lib/utils";
 
 export function OnboardingWizard({ categories }: { categories: BusinessCategory[] }) {
   const [step, setStep] = useState(0);
@@ -26,10 +26,19 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [audience, setAudience] = useState<"b2b" | "b2c" | "both">("both");
 
   const [ownCategoryId, setOwnCategoryId] = useState<string | null>(null);
+  const [productMode, setProductMode] = useState<ProductMode>("both");
   const [targetIds, setTargetIds] = useState<string[]>([]);
 
   const [address, setAddress] = useState<AddressValue | null>(null);
   const [showAllTargets, setShowAllTargets] = useState(false);
+
+  // "Gérer mon entreprise" uniquement : pas la peine de choisir des cibles
+  // de prospection qu'on ne va pas utiliser — voir spec produit §12.
+  const needsTargets = productMode !== "business_os";
+  const STEPS = needsTargets
+    ? (["Entreprise", "Votre métier", "Votre objectif", "Vos cibles", "Localisation"] as const)
+    : (["Entreprise", "Votre métier", "Votre objectif", "Localisation"] as const);
+  const stepName = STEPS[step];
 
   const ownSlug = categories.find((c) => c.id === ownCategoryId)?.slug ?? null;
   const recommendedSlugs = filterSlugsByAudience(recommendedSlugsFor(ownSlug), categories, audience);
@@ -42,11 +51,12 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const hiddenTargetCount = targetNames.length - visibleTargetNames.length;
 
   const canNext = useMemo(() => {
-    if (step === 0) return companyName.trim().length > 0 && offer.trim().length > 0;
-    if (step === 1) return true; // optionnel
-    if (step === 2) return targetIds.length > 0;
+    if (stepName === "Entreprise") return companyName.trim().length > 0 && offer.trim().length > 0;
+    if (stepName === "Votre métier") return true; // optionnel
+    if (stepName === "Votre objectif") return true; // "both" présélectionné
+    if (stepName === "Vos cibles") return targetIds.length > 0;
     return true;
-  }, [step, companyName, offer, targetIds]);
+  }, [stepName, companyName, offer, targetIds]);
 
   const canSubmit = address !== null;
 
@@ -64,6 +74,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           ? { street: address.street, postalCode: address.postalCode, city: address.city, lat: address.lat, lng: address.lng }
           : null,
         targetCategoryIds: targetIds,
+        productMode,
       });
       // En cas d'erreur : on reste sur cette même étape (pas de retour à
       // l'étape 1), rien n'est réinitialisé — toutes les données saisies
@@ -103,9 +114,9 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
         <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">
           Étape {step + 1} sur {STEPS.length}
         </p>
-        <h1 className="mt-1 font-display text-[21px] font-extrabold tracking-tight text-ink">{STEPS[step]}</h1>
+        <h1 className="mt-1 font-display text-[21px] font-extrabold tracking-tight text-ink">{stepName}</h1>
 
-        {step === 0 && (
+        {stepName === "Entreprise" && (
           <div className="mt-5 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="companyName">Nom de l&apos;entreprise</Label>
@@ -146,7 +157,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           </div>
         )}
 
-        {step === 1 && (
+        {stepName === "Votre métier" && (
           <div className="mt-4 flex flex-col gap-3">
             <p className="text-[13px] text-muted">
               Votre métier — distinct des métiers que vous allez démarcher à l&apos;étape suivante.
@@ -155,7 +166,35 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           </div>
         )}
 
-        {step === 2 && (
+        {stepName === "Votre objectif" && (
+          <div className="mt-4 flex flex-col gap-3">
+            <p className="text-[13px] text-muted">Que souhaitez-vous faire avec ProspectFlow ?</p>
+            <div className="grid gap-2 sm:grid-cols-1">
+              {PRODUCT_MODE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setProductMode(opt.value)}
+                  className={cn(
+                    "rounded-lg border px-4 py-3 text-left transition-colors",
+                    productMode === opt.value ? "border-ink bg-ink text-bg" : "border-line bg-panel hover:bg-soft",
+                  )}
+                >
+                  <p className="text-[14px] font-bold">{opt.label}</p>
+                  <p className={cn("mt-0.5 text-[12px]", productMode === opt.value ? "text-bg/70" : "text-muted")}>{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+            {!needsTargets && (
+              <p className="text-[11.5px] text-faint">
+                Pas de souci — la prospection reste disponible en option à tout moment (Paramètres, ou directement
+                depuis Business OS).
+              </p>
+            )}
+          </div>
+        )}
+
+        {stepName === "Vos cibles" && (
           <div className="mt-4">
             <TargetCategoryPicker
               categories={categories}
@@ -166,7 +205,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           </div>
         )}
 
-        {step === 3 && (
+        {stepName === "Localisation" && (
           <div className="mt-4 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>Adresse de départ exacte</Label>
@@ -184,6 +223,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
                 {categories.find((c) => c.id === ownCategoryId)?.name ?? "Métier non précisé"}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {!needsTargets && <span className="text-[11.5px] text-faint">Prospection non activée pour l&apos;instant.</span>}
                 {visibleTargetNames.map((name) => (
                   <span
                     key={name}

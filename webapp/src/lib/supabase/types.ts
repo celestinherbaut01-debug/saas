@@ -729,6 +729,7 @@ export interface Database {
           p_lng: number;
           p_target_category_ids: string[];
           p_radius_km?: number | null;
+          p_product_mode?: string;
         };
         Returns: string;
       };

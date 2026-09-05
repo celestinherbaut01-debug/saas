@@ -9,12 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { updateBusinessProfile, updateProductMode, type SettingsActionState } from "@/lib/actions/settings";
-
-const PRODUCT_MODE_OPTIONS = [
-  { value: "acquisition" as const, label: "Trouver plus de clients", desc: "Prospection, CRM et NOVA commercial mis en avant." },
-  { value: "business_os" as const, label: "Gérer mon entreprise", desc: "Business OS mis en avant, prospection en option." },
-  { value: "both" as const, label: "Les deux", desc: "Acquisition et Business OS visibles ensemble." },
-];
+import { PRODUCT_MODE_OPTIONS } from "@/lib/product-mode";
 
 export function SettingsView({
   workspaceId,
