@@ -76,7 +76,7 @@ export function BusinessOsView({
           {isAdvanced && history.length > 0 && (
             <Card>
               <h2 className="text-[13px] font-bold text-ink">
-                Historique complet <span className="font-normal text-faint">— réservé au plan Max</span>
+                Historique complet <span className="font-normal text-faint">— réservé au Business OS avancé</span>
               </h2>
               <ul className="mt-2 flex flex-col gap-1 text-[12.5px] text-muted">
                 {history.slice(0, 8).map((h) => (
@@ -105,10 +105,10 @@ export function BusinessOsView({
           {!isAdvanced && (
             <Card className="border-line bg-soft text-center">
               <p className="text-[12.5px] text-muted">
-                Le plan Max ajoute les alertes de stock bas, NOVA connectée à ces données, et l&apos;équipe
-                (jusqu&apos;à 5 utilisateurs).{" "}
+                Le Business OS avancé ajoute les alertes de stock bas, NOVA connectée à ces données, et
+                l&apos;équipe (jusqu&apos;à 5 utilisateurs).{" "}
                 <a href="/abonnement" className="font-semibold text-accent">
-                  Voir le plan Max
+                  Voir Business OS avancé
                 </a>
               </p>
             </Card>

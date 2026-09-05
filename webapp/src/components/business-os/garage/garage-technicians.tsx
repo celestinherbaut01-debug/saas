@@ -11,10 +11,11 @@ import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { REPAIR_STATUS_ACTIVE } from "@/lib/garage";
 
-// Module dédié réservé au plan Max : gestion de l'équipe (rôle, actif/inactif)
-// + charge de travail réelle (ordres actifs assignés) — au plan Pro,
-// l'assignation d'un technicien reste possible via le sélecteur intégré à
-// l'ordre de réparation, mais pas cette vue de gestion/charge d'équipe.
+// Module dédié réservé au Business OS avancé : gestion de l'équipe (rôle,
+// actif/inactif) + charge de travail réelle (ordres actifs assignés) — au
+// Business OS standard, l'assignation d'un technicien reste possible via le
+// sélecteur intégré à l'ordre de réparation, mais pas cette vue de
+// gestion/charge d'équipe.
 export function TechniciansModule({
   rows,
   repairOrders,

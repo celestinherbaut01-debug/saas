@@ -69,9 +69,9 @@ export interface GarageAlert {
 
 /**
  * Alertes calculées en direct depuis les vraies données — jamais une valeur
- * stockée ou inventée. `advanced` (plan Max) ajoute des signaux
+ * stockée ou inventée. `advanced` (Business OS avancé) ajoute des signaux
  * supplémentaires (devis en attente, charge technicien) au-delà du socle
- * simple (stock bas + retards) disponible au plan Pro.
+ * simple (stock bas + retards) disponible dès le Business OS standard.
  */
 export function computeGarageAlerts(
   { parts, repairOrders, documents, technicians }: { parts: Part[]; repairOrders: RepairOrder[]; documents: BusinessDocument[]; technicians: TeamMember[] },

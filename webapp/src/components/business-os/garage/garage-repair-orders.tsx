@@ -426,7 +426,7 @@ function RepairOrderDetail({
               </div>
             )}
             {!canManageTechnicians && (
-              <p className="mt-1 text-[10.5px] text-faint">Gestion complète de l&apos;équipe réservée au plan Max.</p>
+              <p className="mt-1 text-[10.5px] text-faint">Gestion complète de l&apos;équipe réservée au Business OS avancé.</p>
             )}
           </div>
           <div>

@@ -6,7 +6,7 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { NavLink } from "@/components/nav-link";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
-import { ENTITLEMENTS, PLAN_ORDER, businessOsAtLeast, type Plan } from "@/lib/entitlements";
+import { ENTITLEMENTS, upgradeOptions, businessOsAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
   // Primitives mémorisées par requête : si la page qui a rendu <AppShell>
@@ -27,7 +27,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     membership ? getCachedBusinessProfile(membership.workspace_id) : Promise.resolve(null),
   ]);
   const entitlements = ENTITLEMENTS[plan];
-  const nextPlan = PLAN_ORDER[PLAN_ORDER.indexOf(plan) + 1] as Plan | undefined;
+  // Le module le moins cher qui AJOUTE quelque chose sans rien retirer —
+  // jamais un simple "plan suivant" dans une liste, qui suggérerait à tort
+  // par ex. de passer d'Acquisition Pro à Business OS (perdrait Acquisition
+  // entière) ou de Business OS Advanced à Complete (repasserait le Business
+  // OS en standard). Voir upgradeOptions() dans lib/entitlements.ts.
+  const cheapestUpgrade = upgradeOptions(plan).sort(
+    (a, b) => ENTITLEMENTS[a].priceMonthly - ENTITLEMENTS[b].priceMonthly,
+  )[0] as Plan | undefined;
 
   // Deux modules indépendants (Acquisition / Business OS) — le mode choisi
   // par le client (onboarding, ou changé depuis Paramètres) pilote quelle
@@ -142,12 +149,12 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       <p className="mt-1 font-display text-[13px] font-extrabold text-white">
         PLAN {entitlements.label.toUpperCase()}
       </p>
-      {nextPlan && (
+      {cheapestUpgrade && (
         <Link
           href="/abonnement"
           className="mt-2.5 block rounded-lg bg-gradient-to-br from-accent to-[#8fb0ff] px-3 py-1.5 text-center text-[11.5px] font-bold text-white shadow-sm transition-transform hover:-translate-y-px"
         >
-          Passer à {ENTITLEMENTS[nextPlan].label}
+          Passer à {ENTITLEMENTS[cheapestUpgrade].label}
         </Link>
       )}
     </div>

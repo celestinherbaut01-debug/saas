@@ -74,7 +74,7 @@ const TOOLS = [
 const BUSINESS_OS_TOOL = {
   name: "get_business_os_data",
   description:
-    "Business OS (plan Max) : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
+    "Business OS avancé : accède aux vraies données métier du workspace — clients, stock, rendez-vous, et selon " +
     "le métier : véhicules/ordres de réparation/pièces/techniciens/devis-factures (garage), sites/contrats/" +
     "interventions/incidents (nettoyage), projets/sites clients/tickets (agence), pertes/commandes/recettes " +
     "(restaurant). Jamais inventé — un module non pertinent pour ce workspace renvoie une liste vide.",
@@ -127,7 +127,7 @@ function buildTools(plan: Plan) {
 
 async function runTool(workspaceId: string, plan: Plan, name: string, input: Record<string, unknown>) {
   if (name === "get_business_os_data") {
-    if (!businessOsAtLeast(plan, "advanced")) return { error: "NOVA connectée au Business OS réservé au plan Max." };
+    if (!businessOsAtLeast(plan, "advanced")) return { error: "NOVA connectée aux données Business OS : réservé au Business OS avancé." };
     const supabase = await createClient();
     const limit = typeof input.limit === "number" ? Math.min(input.limit, 50) : 20;
     const osModule = input.module;
@@ -435,7 +435,7 @@ function buildSystemPrompt(plan: Plan): string {
     "avant envoi : aucun envoi automatique n'existe encore dans ProspectFlow.";
   if (businessOsAtLeast(plan, "advanced")) {
     prompt +=
-      " Ce workspace a le Business OS (plan Max) : utilise get_business_os_data pour répondre avec les vraies " +
+      " Ce workspace a le Business OS avancé : utilise get_business_os_data pour répondre avec les vraies " +
       "données métier. Pour un garage : 'quels véhicules attendent une pièce ?' = module repair_orders, filtre " +
       "toi-même les résultats dont status = waiting_parts (chaque résultat inclut vehicle.registration) ; 'quels " +
       "produits sont en rupture ?' = module parts, repère toi-même les lignes où quantity <= low_stock_threshold ; " +

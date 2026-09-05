@@ -11,9 +11,10 @@ export function PricingBusinessOs() {
       <div className="flex max-w-lg flex-col items-center gap-3 text-center">
         <h2 className="font-display text-2xl font-extrabold tracking-tight">Bien plus qu&apos;un outil de prospection.</h2>
         <p className="text-[14px] leading-relaxed text-muted">
-          À partir du plan Pro, ProspectFlow devient également votre logiciel de gestion — des modules
+          Avec le module Business OS, ProspectFlow devient également votre logiciel de gestion — des modules
           réellement adaptés à votre métier (véhicules et ordres de réparation pour un garage, contrats de
-          site pour le nettoyage, projets pour une agence...), pas un simple CRM relabellé.
+          site pour le nettoyage, projets pour une agence...), pas un simple CRM relabellé. Indépendant du
+          module Acquisition : activez-le seul, ou combinez les deux à prix réduit.
         </p>
       </div>
 
@@ -32,11 +33,11 @@ export function PricingBusinessOs() {
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <span className="flex items-center gap-2 rounded-full border border-line bg-bg px-4 py-2 text-[12px] font-semibold">
-          <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-bg">PRO</span>
-          Business OS Standard
+          <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-bg">STANDARD</span>
+          Business OS
         </span>
         <span className="flex items-center gap-2 rounded-full border border-accent/40 bg-bg px-4 py-2 text-[12px] font-semibold">
-          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">MAX</span>
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">ADVANCED</span>
           Business OS Advanced
         </span>
       </div>

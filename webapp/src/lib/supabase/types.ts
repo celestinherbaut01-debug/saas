@@ -37,7 +37,7 @@ export interface Database {
           id: string;
           name: string;
           created_by: string;
-          plan: "free" | "starter" | "pro" | "max";
+          plan: "free" | "acquisition_starter" | "acquisition_pro" | "business_os" | "business_os_advanced" | "complete" | "complete_max";
           created_at: string;
           updated_at: string;
         };
@@ -45,7 +45,7 @@ export interface Database {
           id?: string;
           name: string;
           created_by: string;
-          plan?: "free" | "starter" | "pro" | "max";
+          plan?: "free" | "acquisition_starter" | "acquisition_pro" | "business_os" | "business_os_advanced" | "complete" | "complete_max";
         };
         Update: Partial<Database["public"]["Tables"]["workspaces"]["Row"]>;
         Relationships: [];
@@ -179,7 +179,7 @@ export interface Database {
       subscriptions: {
         Row: {
           workspace_id: string;
-          plan: "free" | "starter" | "pro" | "max";
+          plan: "free" | "acquisition_starter" | "acquisition_pro" | "business_os" | "business_os_advanced" | "complete" | "complete_max";
           status: "active" | "trialing" | "past_due" | "canceled";
           billing_period: "monthly" | "yearly" | null;
           stripe_customer_id: string | null;

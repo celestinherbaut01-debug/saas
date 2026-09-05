@@ -7,9 +7,12 @@ export { planAtLeast };
 
 export const PLAN_LABEL: Record<Plan, string> = {
   free: "Free",
-  starter: "Starter",
-  pro: "Pro",
-  max: "Max",
+  acquisition_starter: "Acquisition Starter",
+  acquisition_pro: "Acquisition Pro",
+  business_os: "Business OS",
+  business_os_advanced: "Business OS Advanced",
+  complete: "Complete",
+  complete_max: "Complete Max",
 };
 
 /**

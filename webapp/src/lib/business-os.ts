@@ -148,3 +148,13 @@ export function getBusinessOsProfile(parentSlug: string | null, leafSlug: string
   if (!parentSlug) return DEFAULT_PROFILE;
   return PROFILES[parentSlug] ?? DEFAULT_PROFILE;
 }
+
+/**
+ * Nom court du métier pour affichage ailleurs que le Business OS lui-même
+ * (ex. page Abonnement : "Business OS — Garage"). `null` pour le profil
+ * générique : "Business OS — Business" n'aurait aucun sens.
+ */
+export function verticalLabelFromProfile(profile: BusinessOsProfile): string | null {
+  if (profile.vertical === "generic") return null;
+  return profile.osName.replace(/\s*OS$/i, "");
+}

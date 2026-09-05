@@ -4,7 +4,7 @@ import { getCachedUser, getCachedMembership, getCachedBusinessProfile } from "@/
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
-import { getWorkspacePlan } from "@/lib/plan";
+import { getWorkspacePlan, PLAN_LABEL } from "@/lib/plan";
 import { businessOsAtLeast } from "@/lib/entitlements";
 import { getBusinessOsProfile } from "@/lib/business-os";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
@@ -28,11 +28,11 @@ export default async function BusinessOsPage() {
     return (
       <AppShell>
         <Card className="mx-auto max-w-lg text-center">
-          <h1 className="font-display text-lg font-extrabold">Business OS — plan Pro ou Max</h1>
+          <h1 className="font-display text-lg font-extrabold">Business OS non activé</h1>
           <p className="mt-2 text-[13px] text-muted">
-            Le Business OS (gestion adaptée à votre métier) est réservé aux plans Pro et Max. Votre workspace est
-            actuellement sur le plan {plan}. Passez à Pro (Business OS standard) ou Max (Business OS avancé + NOVA
-            métier) depuis{" "}
+            Le Business OS (gestion adaptée à votre métier) fait partie des plans Business OS, Business OS Advanced,
+            Complete et Complete Max. Votre workspace est actuellement sur le plan {PLAN_LABEL[plan]}. Activez-le
+            depuis{" "}
             <a href="/abonnement" className="font-semibold text-accent">
               Abonnements
             </a>

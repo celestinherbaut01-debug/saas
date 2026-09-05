@@ -12,7 +12,7 @@ export function AlertsModule({ alerts, advanced }: { alerts: GarageAlert[]; adva
       <p className="mt-1 text-[11.5px] text-muted">
         {advanced
           ? "Stock bas, retards, devis sans réponse, charge technicien — calculées en direct sur vos données."
-          : "Stock bas et retards. Le plan Max ajoute les devis en attente et la charge par technicien."}
+          : "Stock bas et retards. Le Business OS avancé ajoute les devis en attente et la charge par technicien."}
       </p>
 
       {alerts.length === 0 ? (
