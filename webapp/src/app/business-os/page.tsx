@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getCachedUser, getCachedMembership, getCachedBusinessProfile } from "@/lib/session";
+import {
+  getCachedUser,
+  getCachedMembership,
+  getCachedBusinessProfile,
+  getCachedBusinessOsProfile,
+  getCachedAutomationSettings,
+} from "@/lib/session";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { getWorkspacePlan, PLAN_LABEL } from "@/lib/plan";
 import { businessOsAtLeast } from "@/lib/entitlements";
-import { getBusinessOsProfile } from "@/lib/business-os";
+import { buildAppointmentInsights, buildLowStockInsight, buildRenewalInsight, type ProactiveInsight } from "@/lib/automation-insights";
+import { ProactiveInsights } from "@/components/business-os/proactive-insights";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
@@ -45,28 +52,11 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const businessProfile = await getCachedBusinessProfile(workspaceId);
-
-  let parentSlug: string | null = null;
-  let leafSlug: string | null = null;
-  if (businessProfile?.own_category_id) {
-    const { data: ownCategory } = await supabase
-      .from("business_categories")
-      .select("slug, parent_id")
-      .eq("id", businessProfile.own_category_id)
-      .maybeSingle();
-    leafSlug = ownCategory?.slug ?? null;
-    if (ownCategory?.parent_id) {
-      const { data: parent } = await supabase
-        .from("business_categories")
-        .select("slug")
-        .eq("id", ownCategory.parent_id)
-        .maybeSingle();
-      parentSlug = parent?.slug ?? null;
-    }
-  }
-
-  const profile = getBusinessOsProfile(parentSlug, leafSlug);
+  const [businessProfile, profile, automationSettings] = await Promise.all([
+    getCachedBusinessProfile(workspaceId),
+    getCachedBusinessOsProfile(workspaceId),
+    getCachedAutomationSettings(workspaceId),
+  ]);
   const vertical = profile.vertical;
 
   const header = (
@@ -116,10 +106,21 @@ export default async function BusinessOsPage() {
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
 
+    const activeStatuses = new Set(["diagnostic", "quote", "accepted", "in_progress", "waiting_parts"]);
+    const upcomingDates = (repairOrders ?? [])
+      .filter((r) => r.scheduled_at && activeStatuses.has(r.status))
+      .map((r) => r.scheduled_at as string);
+    const lowStockCount = (parts ?? []).filter((p) => p.low_stock_threshold != null && p.quantity <= p.low_stock_threshold).length;
+    const insights: ProactiveInsight[] = [
+      ...buildAppointmentInsights(upcomingDates, automationSettings),
+      buildLowStockInsight(lowStockCount, automationSettings),
+    ].filter((i): i is ProactiveInsight => i !== null);
+
     return (
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          <ProactiveInsights insights={insights} />
           <GarageView
             workspaceId={workspaceId}
             isAdvanced={isAdvanced}
@@ -159,10 +160,18 @@ export default async function BusinessOsPage() {
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
 
+    const upcomingDates = (interventions ?? []).filter((i) => i.status === "planned").map((i) => i.scheduled_at);
+    const lowStockCount = (inventory ?? []).filter((i) => i.low_stock_threshold != null && i.quantity <= i.low_stock_threshold).length;
+    const insights: ProactiveInsight[] = [
+      ...buildAppointmentInsights(upcomingDates, automationSettings),
+      buildLowStockInsight(lowStockCount, automationSettings),
+    ].filter((i): i is ProactiveInsight => i !== null);
+
     return (
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          <ProactiveInsights insights={insights} />
           <CleaningView
             workspaceId={workspaceId}
             isAdvanced={isAdvanced}
@@ -200,10 +209,21 @@ export default async function BusinessOsPage() {
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
 
+    const in30Days = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
+    const renewalCount = (sites ?? []).filter(
+      (s) =>
+        (s.domain_renewal_date && new Date(s.domain_renewal_date).getTime() < in30Days) ||
+        (s.hosting_renewal_date && new Date(s.hosting_renewal_date).getTime() < in30Days),
+    ).length;
+    const insights: ProactiveInsight[] = [buildRenewalInsight(renewalCount, automationSettings)].filter(
+      (i): i is ProactiveInsight => i !== null,
+    );
+
     return (
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          <ProactiveInsights insights={insights} />
           <AgencyView
             workspaceId={workspaceId}
             isAdvanced={isAdvanced}
@@ -246,10 +266,18 @@ export default async function BusinessOsPage() {
       supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     ]);
 
+    const upcomingDates = (appointments ?? []).map((a) => a.starts_at);
+    const lowStockCount = (inventory ?? []).filter((i) => i.low_stock_threshold != null && i.quantity <= i.low_stock_threshold).length;
+    const insights: ProactiveInsight[] = [
+      ...buildAppointmentInsights(upcomingDates, automationSettings),
+      buildLowStockInsight(lowStockCount, automationSettings),
+    ].filter((i): i is ProactiveInsight => i !== null);
+
     return (
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          <ProactiveInsights insights={insights} />
           <RestaurantView
             workspaceId={workspaceId}
             isAdvanced={isAdvanced}
@@ -288,10 +316,16 @@ export default async function BusinessOsPage() {
     { label: "Prochain rendez-vous", value: upcomingAppointments[0] ? new Date(upcomingAppointments[0].starts_at).toLocaleDateString("fr-FR") : "—" },
   ];
 
+  const insights: ProactiveInsight[] = [
+    ...buildAppointmentInsights(upcomingAppointments.map((a) => a.starts_at), automationSettings),
+    buildLowStockInsight(lowStock.length, automationSettings),
+  ].filter((i): i is ProactiveInsight => i !== null);
+
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
         {header}
+        <ProactiveInsights insights={insights} />
 
         <BusinessOsView
           profile={profile}

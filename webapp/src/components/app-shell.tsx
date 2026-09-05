@@ -95,6 +95,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <NavLink href="/agent" icon="✦">
             NOVA
           </NavLink>
+          <NavLink href="/automatisations" icon="⚡">
+            Automatisations
+          </NavLink>
         </>
       ),
     });
@@ -105,9 +108,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     navSections.push({
       label: "Gestion",
       items: (
-        <NavLink href="/business-os" icon="▣" badge={hasBusinessOsPlan ? undefined : "PRO"}>
-          Business OS
-        </NavLink>
+        <>
+          <NavLink href="/business-os" icon="▣" badge={hasBusinessOsPlan ? undefined : "PRO"}>
+            Business OS
+          </NavLink>
+          <NavLink href="/automatisations" icon="⚡">
+            Automatisations
+          </NavLink>
+        </>
       ),
     });
   }

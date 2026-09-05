@@ -461,7 +461,9 @@ function buildSystemPrompt(plan: Plan): string {
   if (hasMetier) {
     prompt +=
       " Ce workspace a le Business OS activé : utilise get_business_os_data pour répondre avec les vraies " +
-      "données métier. Pour un garage : 'quels véhicules attendent une pièce ?' = module repair_orders, filtre " +
+      "données métier. Pour un garage, 'qui a rendez-vous bientôt ?' = module repair_orders, regarde scheduled_at " +
+      "(pas de table appointments pour ce métier : le rendez-vous, c'est l'ordre de réparation planifié) ; 'quels " +
+      "véhicules attendent une pièce ?' = module repair_orders, filtre " +
       "toi-même les résultats dont status = waiting_parts (chaque résultat inclut vehicle.registration) ; 'quels " +
       "produits sont en rupture ?' = module parts, repère toi-même les lignes où quantity <= low_stock_threshold ; " +
       "'quelle est la charge de chaque technicien ?' = module technicians (active_repair_orders déjà calculé) ; " +

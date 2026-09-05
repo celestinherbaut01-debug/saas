@@ -99,6 +99,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["business_profiles"]["Row"]>;
         Relationships: [];
       };
+      automation_settings: {
+        Row: {
+          workspace_id: string;
+          appointment_reminder_24h: boolean;
+          appointment_reminder_2h: boolean;
+          custom_reminder_hours_before: number | null;
+          low_stock_alert: boolean;
+          renewal_alert: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["automation_settings"]["Row"]> & {
+          workspace_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["automation_settings"]["Row"]>;
+        Relationships: [];
+      };
       business_categories: {
         Row: {
           id: string;
