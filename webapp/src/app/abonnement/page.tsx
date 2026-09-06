@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getCachedUser, getCachedMembership, getCachedBusinessOsProfile } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
 import { SubscriptionView } from "@/components/settings/subscription-view";
+import { PricingTrust } from "@/components/pricing-trust";
 import { getWorkspacePlan } from "@/lib/plan";
 import { getUsage } from "@/lib/quota";
 import { verticalLabelFromProfile } from "@/lib/business-os";
@@ -29,13 +30,16 @@ export default async function AbonnementPage() {
 
   return (
     <AppShell>
-      <SubscriptionView
-        workspaceId={workspaceId}
-        currentPlan={plan}
-        usage={{ nova, prospects, searches }}
-        isDev={process.env.NODE_ENV !== "production"}
-        businessOsVerticalLabel={businessOsVerticalLabel}
-      />
+      <div className="flex flex-col gap-6">
+        <SubscriptionView
+          workspaceId={workspaceId}
+          currentPlan={plan}
+          usage={{ nova, prospects, searches }}
+          isDev={process.env.NODE_ENV !== "production"}
+          businessOsVerticalLabel={businessOsVerticalLabel}
+        />
+        <PricingTrust />
+      </div>
     </AppShell>
   );
 }
