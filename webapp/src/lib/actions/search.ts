@@ -5,6 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
 import { assertQuota, incrementUsage } from "@/lib/quota";
 import { ENTITLEMENTS } from "@/lib/entitlements";
+import { normalizeSearchResponse, type ProspectionSearchResponse } from "@/lib/search-response";
+
+export type { ProspectionSearchResponse };
 
 export interface SearchProspectsParams {
   lat: number;
@@ -22,7 +25,7 @@ export interface SearchProspectsResult {
   error?: string;
   /** Diagnostic complet (jamais inventé) — présent uniquement hors production. */
   devDetail?: string;
-  data?: unknown;
+  data?: ProspectionSearchResponse;
 }
 
 const GENERIC_SEARCH_ERROR =
@@ -185,5 +188,5 @@ export async function runProspectSearch(
   }
 
   await incrementUsage(workspaceId, "searches");
-  return { ok: true, data };
+  return { ok: true, data: normalizeSearchResponse(data) };
 }

@@ -10,7 +10,7 @@ import { TargetCategoryPicker } from "@/components/onboarding/target-category-pi
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
 import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
-import { runProspectSearch } from "@/lib/actions/search";
+import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions/search";
 import { updateOfferAudience } from "@/lib/actions/settings";
 import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { resolveScoringProfile } from "@/lib/scoring-profile";
@@ -72,6 +72,11 @@ export function ProspectionView({
     null,
   );
   const [results, setResults] = useState<SearchResult[]>([]);
+  // Distingue "jamais cherché" de "cherché, zéro résultat" — les deux
+  // avaient le même message avant ("Aucun résultat pour l'instant — lancez
+  // une recherche."), ce qui est trompeur après une recherche réellement
+  // terminée sans résultat dans le registre.
+  const [hasSearched, setHasSearched] = useState(false);
   const [scoringProfileLabel, setScoringProfileLabel] = useState("Score d'opportunité");
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [manuallyVerified, setManuallyVerified] = useState<Set<number>>(new Set());
@@ -181,25 +186,33 @@ export function ProspectionView({
       return;
     }
 
-    const data = result.data as {
-      results: SearchResult[];
-      totalMatchedInRegistry: number;
-      totalReturned: number;
-      googleVerifiedCount: number;
-      googlePlacesConfigured: boolean;
-      scoringProfileLabel: string;
+    // result.data est déjà une structure stable et entièrement défautée
+    // (normalizeSearchResponse côté serveur, lib/actions/search.ts) — aucun
+    // champ ne peut être undefined ici, même si l'Edge Function déployée est
+    // en retard sur ce code (voir les commentaires de cette fonction).
+    const data: ProspectionSearchResponse = result.data ?? {
+      registryFound: 0,
+      displayed: 0,
+      googleVerified: 0,
+      googlePlacesConfigured: false,
+      scoringProfileLabel: "Score d'opportunité",
+      results: [],
+      warnings: [],
     };
 
-    setResults(data.results ?? []);
-    setScoringProfileLabel(data.scoringProfileLabel ?? "Score d'opportunité");
+    setResults(data.results);
+    setScoringProfileLabel(data.scoringProfileLabel);
     setManuallyVerified(new Set());
+    setHasSearched(true);
+
+    const warningSuffix = data.warnings.length > 0 ? ` (${data.warnings.join(" ")})` : "";
     setStatus({
       kind: "ok",
-      text: `${data.totalMatchedInRegistry} établissement(s) trouvé(s) dans le registre, ${data.totalReturned} affiché(s), ${data.googleVerifiedCount} vérifié(s) par Google${
+      text: `${data.registryFound} établissement(s) trouvé(s) dans le registre, ${data.displayed} affiché(s), ${data.googleVerified} vérifié(s) par Google${
         data.googlePlacesConfigured
           ? "."
           : " — clé Google Places non configurée côté serveur : les entreprises restent affichées avec le statut « À vérifier »."
-      }`,
+      }${warningSuffix}`,
     });
   }
 
@@ -493,7 +506,11 @@ export function ProspectionView({
         </div>
 
         {results.length === 0 ? (
-          <p className="mt-4 text-[13px] text-muted">Aucun résultat pour l&apos;instant — lancez une recherche.</p>
+          <p className="mt-4 text-[13px] text-muted">
+            {hasSearched
+              ? "Aucune cible pertinente trouvée dans le registre pour cette offre, cette audience et cette zone — essayez d'élargir le rayon, de revoir les métiers ciblés, ou de reformuler votre offre."
+              : "Aucun résultat pour l'instant — lancez une recherche."}
+          </p>
         ) : displayedResults.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">
             Aucun résultat ne correspond aux filtres « Téléphone disponible » / « Fiche Google disponible ».
