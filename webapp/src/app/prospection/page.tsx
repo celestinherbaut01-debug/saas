@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { ProspectionView } from "@/components/prospection/prospection-view";
 import { getWorkspacePlan } from "@/lib/plan";
 import { ENTITLEMENTS } from "@/lib/entitlements";
+import { normalizeProspectionFilters } from "@/lib/prospecting-config";
 
 export default async function ProspectionPage() {
   const user = await getCachedUser();
@@ -61,6 +62,7 @@ export default async function ProspectionPage() {
         categories={categories ?? []}
         businessProfile={businessProfile}
         defaultTargetIds={(targets ?? []).map((t) => t.category_id)}
+        initialFilters={normalizeProspectionFilters(businessProfile.search_filters)}
         maxRadiusKm={ENTITLEMENTS[plan].maxRadiusKm}
         planLabel={ENTITLEMENTS[plan].label}
       />

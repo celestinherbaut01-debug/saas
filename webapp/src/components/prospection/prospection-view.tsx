@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
@@ -11,18 +11,22 @@ import { AddressField, type AddressValue } from "@/components/onboarding/address
 import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions/search";
-import { updateOfferAudience } from "@/lib/actions/settings";
+import { saveProspectingConfig } from "@/lib/actions/prospecting";
+import { type ProspectionFilters } from "@/lib/prospecting-config";
 import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { resolveScoringProfile } from "@/lib/scoring-profile";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
 type SearchResult = ProspectionResult;
 
+const AUTOSAVE_DEBOUNCE_MS = 900;
+
 export function ProspectionView({
   workspaceId,
   categories,
   businessProfile,
   defaultTargetIds,
+  initialFilters,
   maxRadiusKm,
   planLabel,
 }: {
@@ -30,6 +34,7 @@ export function ProspectionView({
   categories: BusinessCategory[];
   businessProfile: BusinessProfile | null;
   defaultTargetIds: string[];
+  initialFilters: ProspectionFilters;
   maxRadiusKm: number;
   planLabel: string;
 }) {
@@ -53,19 +58,16 @@ export function ProspectionView({
   // depuis rétrogradé.
   const [radiusKm, setRadiusKm] = useState(Math.min(businessProfile?.default_radius_km ?? 20, maxRadiusKm));
 
-  const [operationalOnly, setOperationalOnly] = useState(true);
-  const [excludeTempClosed, setExcludeTempClosed] = useState(true);
-  const [excludeChains, setExcludeChains] = useState(true);
-  const [excludeAssociations, setExcludeAssociations] = useState(true);
-  const [excludeLargeGroups, setExcludeLargeGroups] = useState(true);
-  const [needContact, setNeedContact] = useState(false);
-  const [maxEstablishmentsPerSiren, setMaxEstablishmentsPerSiren] = useState(8);
-  // "all" par défaut : le registre suffit à afficher un prospect, Google
-  // Places ne fait qu'enrichir — un filtre par défaut plus restrictif
-  // masquait TOUS les résultats tant que Google Places n'était pas
-  // configuré (websiteQuality reste "unknown" sans Google, exclu par
-  // l'ancien filtre "no_or_weak").
-  const [webFilter, setWebFilter] = useState<"all" | "no_or_weak" | "none" | "weak" | "unknown">("all");
+  const [operationalOnly, setOperationalOnly] = useState(initialFilters.operationalOnly);
+  const [excludeTempClosed, setExcludeTempClosed] = useState(initialFilters.excludeTempClosed);
+  const [excludeChains, setExcludeChains] = useState(initialFilters.excludeChains);
+  const [excludeAssociations, setExcludeAssociations] = useState(initialFilters.excludeAssociations);
+  const [excludeLargeGroups, setExcludeLargeGroups] = useState(initialFilters.excludeLargeGroups);
+  const [needContact, setNeedContact] = useState(initialFilters.needContact);
+  const [maxEstablishmentsPerSiren, setMaxEstablishmentsPerSiren] = useState(initialFilters.maxEstablishmentsPerSiren);
+  const [webFilter, setWebFilter] = useState<ProspectionFilters["webFilter"]>(initialFilters.webFilter);
+  const [phoneOnly, setPhoneOnly] = useState(initialFilters.phoneOnly);
+  const [googleFicheOnly, setGoogleFicheOnly] = useState(initialFilters.googleFicheOnly);
 
   const [searching, setSearching] = useState(false);
   const [status, setStatus] = useState<{ kind: "info" | "ok" | "err"; text: string; devDetail?: string } | null>(
@@ -86,13 +88,72 @@ export function ProspectionView({
 
   const [offerDescription, setOfferDescription] = useState(businessProfile?.offer_description ?? "");
   const [audience, setAudience] = useState<"b2b" | "b2c" | "both">(businessProfile?.audience ?? "both");
-  const [savingOffer, setSavingOffer] = useState(false);
-  const [offerSaved, setOfferSaved] = useState(false);
-  const offerChanged =
-    offerDescription !== (businessProfile?.offer_description ?? "") || audience !== (businessProfile?.audience ?? "both");
 
-  const [phoneOnly, setPhoneOnly] = useState(false);
-  const [googleFicheOnly, setGoogleFicheOnly] = useState(false);
+  // Persistance automatique : TOUTE la configuration (offre, audience,
+  // métiers ciblés, adresse, rayon, filtres) est sauvegardée en base après
+  // une courte pause de saisie — jamais un simple useState qui disparaît en
+  // changeant de page. Le premier rendu ne déclenche jamais de sauvegarde
+  // (l'état initial vient déjà de la base).
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    if (!address) return; // rien d'exploitable à sauvegarder sans adresse
+
+    const timeout = setTimeout(() => {
+      setSaveStatus("saving");
+      void saveProspectingConfig(workspaceId, {
+        offerDescription,
+        audience,
+        street: address.street,
+        postalCode: address.postalCode,
+        city: address.city,
+        lat: address.lat,
+        lng: address.lng,
+        radiusKm,
+        targetCategoryIds: targetIds,
+        filters: {
+          operationalOnly,
+          excludeTempClosed,
+          excludeChains,
+          excludeAssociations,
+          excludeLargeGroups,
+          needContact,
+          maxEstablishmentsPerSiren,
+          webFilter,
+          phoneOnly,
+          googleFicheOnly,
+        },
+      }).then((result) => {
+        setSaveStatus(result.ok ? "saved" : "error");
+        setSaveError(result.ok ? null : (result.error ?? "Échec de l'enregistrement."));
+      });
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    offerDescription,
+    audience,
+    targetIds,
+    address,
+    radiusKm,
+    operationalOnly,
+    excludeTempClosed,
+    excludeChains,
+    excludeAssociations,
+    excludeLargeGroups,
+    needContact,
+    maxEstablishmentsPerSiren,
+    webFilter,
+    phoneOnly,
+    googleFicheOnly,
+  ]);
 
   const nafToLabel = useMemo(() => {
     const map = new Map<string, string>();
@@ -130,18 +191,6 @@ export function ProspectionView({
   const primaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "primary");
   const secondaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "secondary");
   const [showSecondary, setShowSecondary] = useState(false);
-
-  async function saveOffer() {
-    setSavingOffer(true);
-    setOfferSaved(false);
-    const result = await updateOfferAudience(workspaceId, offerDescription, audience);
-    setSavingOffer(false);
-    if (!result.ok) {
-      setStatus({ kind: "err", text: result.error ?? "Impossible d'enregistrer votre offre." });
-    } else {
-      setOfferSaved(true);
-    }
-  }
 
   function nafCodesForSelection(): string[] {
     const set = new Set<string>();
@@ -290,12 +339,32 @@ export function ProspectionView({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="font-display text-2xl font-extrabold">Prospection</h1>
-        <p className="mt-1 text-[13px] text-muted">
-          Adresse GPS précise → rayon exact → registre officiel → Google Places → filtres
-          d&apos;indépendance. Rien n&apos;est présenté comme vérifié s&apos;il ne l&apos;est pas.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold">Prospection</h1>
+          <p className="mt-1 text-[13px] text-muted">
+            Adresse GPS précise → rayon exact → registre officiel → Google Places → filtres
+            d&apos;indépendance. Rien n&apos;est présenté comme vérifié s&apos;il ne l&apos;est pas.
+          </p>
+        </div>
+        {/* Toute la configuration (offre, audience, métiers, adresse, rayon,
+            filtres) se sauvegarde seule — jamais de bouton "Enregistrer" par
+            section à retenir de cliquer avant de changer de page. */}
+        <span
+          className={cn(
+            "shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold",
+            saveStatus === "saving" && "bg-soft text-muted",
+            saveStatus === "saved" && "bg-green-bg text-green-fg",
+            saveStatus === "error" && "bg-red-bg text-red-fg",
+            saveStatus === "idle" && "bg-soft text-faint",
+          )}
+          title={saveStatus === "error" ? (saveError ?? undefined) : undefined}
+        >
+          {saveStatus === "saving" && "Enregistrement…"}
+          {saveStatus === "saved" && "✓ Configuration enregistrée"}
+          {saveStatus === "error" && "⚠ Échec de l'enregistrement"}
+          {saveStatus === "idle" && "Configuration sauvegardée automatiquement"}
+        </span>
       </div>
 
       <Card>
@@ -305,10 +374,7 @@ export function ProspectionView({
             <label className="text-[11px] font-semibold text-muted">Que vendez-vous ?</label>
             <textarea
               value={offerDescription}
-              onChange={(e) => {
-                setOfferDescription(e.target.value);
-                setOfferSaved(false);
-              }}
+              onChange={(e) => setOfferDescription(e.target.value)}
               rows={2}
               placeholder="Ex. Création de sites internet pour commerçants et artisans."
               className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
@@ -321,10 +387,7 @@ export function ProspectionView({
                 <button
                   key={a}
                   type="button"
-                  onClick={() => {
-                    setAudience(a);
-                    setOfferSaved(false);
-                  }}
+                  onClick={() => setAudience(a)}
                   className={cn(
                     "rounded-lg border px-3 py-1.5 text-[13px]",
                     audience === a ? "border-ink bg-ink text-bg" : "border-line bg-panel text-ink",
@@ -334,12 +397,6 @@ export function ProspectionView({
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={saveOffer} disabled={savingOffer || !offerChanged}>
-              {savingOffer ? "Enregistrement…" : "Enregistrer"}
-            </Button>
-            {offerSaved && !offerChanged && <span className="text-[11.5px] text-green-fg">✓ Enregistré</span>}
           </div>
         </div>
       </Card>

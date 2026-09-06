@@ -87,6 +87,7 @@ export interface Database {
           lat: number | null;
           lng: number | null;
           default_radius_km: number;
+          search_filters: Record<string, unknown>;
           tone: string;
           signature: string;
           agent_instruction: string;

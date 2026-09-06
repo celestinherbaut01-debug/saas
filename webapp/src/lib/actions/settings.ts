@@ -109,34 +109,6 @@ export async function updateBusinessProfile(
 }
 
 /**
- * Enregistre l'offre + le type de clientèle depuis la page Prospection
- * elle-même (section "Votre offre" / "Type de clientèle") — mêmes colonnes
- * que Paramètres, réutilisées pour que scoring/recommandations/NOVA restent
- * cohérents partout plutôt que de dupliquer ces champs.
- */
-export async function updateOfferAudience(
-  workspaceId: string,
-  offerDescription: string,
-  audience: "b2b" | "b2c" | "both",
-): Promise<{ ok: boolean; error?: string }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Session expirée." };
-
-  const { error } = await supabase
-    .from("business_profiles")
-    .update({ offer_description: offerDescription.trim(), audience })
-    .eq("workspace_id", workspaceId);
-
-  if (error) return { ok: false, error: error.message };
-  revalidatePath("/prospection");
-  revalidatePath("/parametres");
-  return { ok: true };
-}
-
-/**
  * Change le module mis en avant (Acquisition / Business OS / les deux) —
  * une préférence de NAVIGATION, jamais un droit facturé : elle ne retire
  * ni n'ajoute aucun accès, elle change seulement ce que la sidebar et le
