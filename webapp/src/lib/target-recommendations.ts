@@ -68,13 +68,21 @@ export const OFFER_INTENT_RULES: OfferIntentRule[] = [
       "creons des sites", "créons des sites", "creer des sites", "créer des sites", "concevons des sites", "concevoir des sites",
       "refonte de site", "presence en ligne", "présence en ligne", "visibilite en ligne", "visibilité en ligne",
     ],
-    leaves: ["restaurants", "hair", "beauty", "garages", "realestate", "dentists", "physio"],
+    // Familles ajoutées : "commerce" (petits commerces indépendants) et
+    // "btp-artisans" (artisans) sont typiquement sous-équipés en site web,
+    // exactement les cibles citées en exemple ("artisans, commerces").
+    families: ["commerce", "btp-artisans"],
+    leaves: ["restaurants", "hair", "beauty", "garages", "realestate", "dentists", "physio", "hotels"],
     label: "Entreprises locales avec besoin de présence en ligne",
   },
   {
     id: "site-cleaning",
-    keywords: ["bureaux", "hotel", "hôtel", "local commercial", "locaux", "nettoyage de locaux", "proprete", "propreté", "entretien de locaux"],
-    leaves: ["hotels", "realestate", "supermarkets", "gyms"],
+    keywords: ["bureaux", "hotel", "hôtel", "local commercial", "locaux", "nettoyage de locaux", "proprete", "propreté", "entretien de locaux", "cabinet", "cabinets"],
+    // "services-b2b" (cabinets comptables/avocats/conseil...) et "sante"
+    // (cabinets médicaux, centres de santé) couvrent "cabinets"/"centres
+    // médicaux" ; "commerce" couvre les commerces (inclut déjà supermarkets).
+    families: ["services-b2b", "sante", "commerce"],
+    leaves: ["hotels", "realestate", "gyms"],
     label: "Sites physiques nécessitant un entretien régulier",
   },
   {
