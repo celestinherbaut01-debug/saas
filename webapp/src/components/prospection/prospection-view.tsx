@@ -14,7 +14,7 @@ import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions
 import { saveProspectingConfig } from "@/lib/actions/prospecting";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
 import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
-import { resolveScoringProfile } from "@/lib/scoring-profile";
+import { getProspectingFilterProfile } from "@/lib/prospecting-filter-profile";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 
 type SearchResult = ProspectionResult;
@@ -168,12 +168,14 @@ export function ProspectionView({
   const ownSlug = businessProfile?.own_category_id
     ? categories.find((c) => c.id === businessProfile.own_category_id)?.slug ?? null
     : null;
-  const scoringProfile = resolveScoringProfile(ownSlug, audience);
-  // "Besoin digital" (site web) n'est un critère pertinent que pour les
-  // profils où la présence web du prospect EST le signal d'opportunité —
-  // l'afficher pour un profil "potentiel contrat" (nettoyage) ou "B2B" est
-  // trompeur : ce qui compte là, c'est la taille/structure, pas le site.
-  const webCriteriaRelevant = scoringProfile === "digital_opportunity" || scoringProfile === "marketing_potential" || scoringProfile === "generic";
+  // "Besoin digital" (site web) n'est un critère pertinent que pour une
+  // offre réellement liée au web/digital — décidé par l'OFFRE elle-même
+  // (getProspectingFilterProfile), pas par le profil de scoring commercial :
+  // ce dernier dépend aussi de l'audience B2B/B2C, qui n'a rien à voir avec
+  // la pertinence du statut du site d'un prospect (un vendeur de matériel
+  // industriel B2B ne doit jamais voir ce filtre, même si son audience
+  // déclarée le ferait tomber sur le profil "generic").
+  const webCriteriaRelevant = getProspectingFilterProfile(offerDescription, ownSlug).showWebCriteria;
 
   const offerRecommendation = useMemo(
     () => recommendedSlugsForOffer(offerDescription, ownSlug, categories),

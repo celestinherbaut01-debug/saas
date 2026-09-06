@@ -113,6 +113,19 @@ function normalize(text: string): string {
     .replace(/[̀-ͯ]/g, "");
 }
 
+/**
+ * Vérifie si le texte libre de l'offre déclenche une règle d'intention
+ * précise — réutilisé par getProspectingFilterProfile() (lib/prospecting-
+ * filter-profile.ts) pour ne montrer les filtres "besoin digital" que sur
+ * une offre réellement liée au web, sans dupliquer la liste de mots-clés.
+ */
+export function offerMatchesIntentRule(offerDescription: string, ruleId: string): boolean {
+  const rule = OFFER_INTENT_RULES.find((r) => r.id === ruleId);
+  if (!rule) return false;
+  const normalized = normalize(offerDescription || "");
+  return normalized.trim().length > 0 && rule.keywords.some((kw) => normalized.includes(normalize(kw)));
+}
+
 export interface OfferRecommendation {
   slugs: string[];
   matchedRules: string[]; // labels des règles d'intention déclenchées, pour affichage ("basé sur : ...")
