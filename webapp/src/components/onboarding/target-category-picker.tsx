@@ -78,6 +78,13 @@ export function TargetCategoryPicker({
   function clearAll() {
     onChange([]);
   }
+  function selectFamily(familyChildren: BusinessCategory[]) {
+    onChange(Array.from(new Set([...value, ...familyChildren.map((c) => c.id)])));
+  }
+  function deselectFamily(familyChildren: BusinessCategory[]) {
+    const familyIds = new Set(familyChildren.map((c) => c.id));
+    onChange(value.filter((id) => !familyIds.has(id)));
+  }
 
   const activeParent = activeParentId ? parents.find((p) => p.id === activeParentId) ?? null : null;
   const activeChildren = activeParentId ? byParentAll.get(activeParentId) ?? [] : [];
@@ -170,7 +177,27 @@ export function TargetCategoryPicker({
           >
             ← Toutes les catégories
           </button>
-          <p className="mb-2.5 font-display text-[13.5px] font-bold text-ink">{activeParent.name}</p>
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <p className="font-display text-[13.5px] font-bold text-ink">{activeParent.name}</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => selectFamily(activeChildren)}
+                className="text-[11.5px] font-semibold text-accent hover:underline"
+              >
+                Sélectionner toute la famille
+              </button>
+              {activeChildren.some((c) => selected.has(c.id)) && (
+                <button
+                  type="button"
+                  onClick={() => deselectFamily(activeChildren)}
+                  className="text-[11.5px] font-semibold text-faint hover:text-muted hover:underline"
+                >
+                  Désélectionner
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex max-h-[320px] flex-wrap content-start gap-2 overflow-y-auto pr-1">
             {activeChildren.map((c) => (
               <Chip key={c.id} label={c.name} icon={c.icon} selected={selected.has(c.id)} onClick={() => toggle(c.id)} />
@@ -183,26 +210,34 @@ export function TargetCategoryPicker({
             const items = byParentAll.get(parent.id) ?? [];
             if (items.length === 0) return null;
             const countSelected = items.filter((c) => selected.has(c.id)).length;
+            const fullySelected = countSelected === items.length;
             return (
-              <button
+              <div
                 key={parent.id}
-                type="button"
-                onClick={() => setActiveParentId(parent.id)}
                 className={cn(
-                  "group flex flex-col items-start gap-1 rounded-2xl border p-4 text-left transition",
+                  "flex flex-col items-start gap-1 rounded-2xl border p-4 text-left transition",
                   countSelected > 0
                     ? "border-accent/40 bg-accent/[0.05]"
                     : "border-line bg-panel hover:border-ink/25 hover:bg-soft",
                 )}
               >
-                <span className="font-display text-[13.5px] font-bold text-ink">{parent.name}</span>
-                <span className="text-[11px] text-faint">
-                  {items.length} métier{items.length > 1 ? "s" : ""}
-                  {countSelected > 0 && (
-                    <span className="font-semibold text-accent"> · {countSelected} sélectionné{countSelected > 1 ? "s" : ""}</span>
-                  )}
-                </span>
-              </button>
+                <button type="button" onClick={() => setActiveParentId(parent.id)} className="flex w-full flex-col items-start gap-1 text-left">
+                  <span className="font-display text-[13.5px] font-bold text-ink">{parent.name}</span>
+                  <span className="text-[11px] text-faint">
+                    {items.length} métier{items.length > 1 ? "s" : ""}
+                    {countSelected > 0 && (
+                      <span className="font-semibold text-accent"> · {countSelected} sélectionné{countSelected > 1 ? "s" : ""}</span>
+                    )}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => (fullySelected ? deselectFamily(items) : selectFamily(items))}
+                  className="mt-1 text-[10.5px] font-semibold text-accent hover:underline"
+                >
+                  {fullySelected ? "Désélectionner la famille" : "Sélectionner toute la famille"}
+                </button>
+              </div>
             );
           })}
         </div>
