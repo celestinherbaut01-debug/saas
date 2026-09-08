@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { formatEUR } from "@/lib/garage";
 
 interface PartInput {
@@ -33,7 +34,7 @@ export function PartsModule({
   suppliers: Supplier[];
   onCreate: (input: PartInput) => void;
   onUpdate: (id: string, patch: Partial<Part>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Part | null>(null);
@@ -114,7 +115,8 @@ export function PartsModule({
             });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
         />
       )}
     </Card>
@@ -128,6 +130,7 @@ function PartDrawer({
   suppliers,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -136,6 +139,7 @@ function PartDrawer({
   suppliers: Supplier[];
   onClose: () => void;
   onSubmit: (input: PartInput) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -197,11 +201,7 @@ function PartDrawer({
         >
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`la pièce « ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

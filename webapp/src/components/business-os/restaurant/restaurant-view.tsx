@@ -89,8 +89,11 @@ export function RestaurantView({
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
-  async function removeCustomer(id: string) {
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+  async function removeCustomer(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("customers").delete().eq("id", id);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -106,8 +109,11 @@ export function RestaurantView({
     const { error } = await supabase.from("inventory_items").update(patch).eq("id", id);
     if (!error) setInventory((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }
-  async function removeInventoryItem(id: string) {
-    const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+  async function removeInventoryItem(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("inventory_items").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("inventory_items").delete().eq("id", id);
     if (!error) setInventory((prev) => prev.filter((i) => i.id !== id));
   }
 
@@ -119,8 +125,11 @@ export function RestaurantView({
     const { error } = await supabase.from("suppliers").update(patch).eq("id", id);
     if (!error) setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
-  async function removeSupplier(id: string) {
-    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+  async function removeSupplier(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("suppliers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("suppliers").delete().eq("id", id);
     if (!error) setSuppliers((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -195,8 +204,11 @@ export function RestaurantView({
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
     if (!error) setTeamMembers((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
-  async function removeTeamMember(id: string) {
-    const { error } = await supabase.from("team_members").delete().eq("id", id);
+  async function removeTeamMember(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("team_members").delete().eq("id", id);
     if (!error) setTeamMembers((prev) => prev.filter((t) => t.id !== id));
   }
 

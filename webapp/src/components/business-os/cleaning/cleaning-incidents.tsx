@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { INCIDENT_SEVERITY_LABEL } from "@/lib/cleaning";
 
 interface IncidentInput {
@@ -175,11 +176,7 @@ function IncidentDrawer({
               {initial?.status === "open" ? "Marquer résolu" : "Rouvrir"}
             </Button>
           )}
-          {onDelete && (
-            <Button variant="outline" onClick={onDelete}>
-              Supprimer
-            </Button>
-          )}
+          {onDelete && <ConfirmDeleteButton itemLabel={`l'incident « ${initial?.title ?? ""} »`} onConfirm={onDelete} />}
         </div>
       </div>
     </Drawer>

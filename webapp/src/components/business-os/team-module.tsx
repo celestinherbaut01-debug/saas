@@ -9,6 +9,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 // Équipe générique (Employés/Équipe selon le libellé) — réutilisé par
 // Nettoyage, Agence, Restaurant. Le Garage a sa propre version
@@ -28,7 +29,7 @@ export function TeamModule({
   workloadOf?: (memberId: string) => string;
   onCreate: (input: { name: string; role: string; phone: string; email: string }) => void;
   onUpdate: (id: string, patch: Partial<TeamMember>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
@@ -87,7 +88,8 @@ export function TeamModule({
             setEditing(null);
           }}
           onToggleActive={() => { onUpdate(editing.id, { active: !editing.active }); setEditing(null); }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
         />
       )}
     </Card>
@@ -101,6 +103,7 @@ function TeamMemberDrawer({
   onClose,
   onSubmit,
   onToggleActive,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -109,6 +112,7 @@ function TeamMemberDrawer({
   onClose: () => void;
   onSubmit: (input: { name: string; role: string; phone: string; email: string }) => void;
   onToggleActive?: () => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -146,11 +150,7 @@ function TeamMemberDrawer({
               {initial?.active ? "Marquer inactif" : "Marquer actif"}
             </Button>
           )}
-          {onDelete && (
-            <Button variant="outline" onClick={onDelete}>
-              Supprimer
-            </Button>
-          )}
+          {onDelete && <ConfirmDeleteButton itemLabel={`« ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
         </div>
       </div>
     </Drawer>

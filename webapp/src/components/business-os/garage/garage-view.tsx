@@ -130,8 +130,11 @@ export function GarageView({
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
-  async function removeCustomer(id: string) {
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+  async function removeCustomer(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("customers").delete().eq("id", id);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -156,8 +159,11 @@ export function GarageView({
     const { error } = await supabase.from("vehicles").update(patch).eq("id", id);
     if (!error) setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
-  async function removeVehicle(id: string) {
-    const { error } = await supabase.from("vehicles").delete().eq("id", id);
+  async function removeVehicle(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("vehicles").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("vehicles").delete().eq("id", id);
     if (!error) setVehicles((prev) => prev.filter((v) => v.id !== id));
   }
 
@@ -174,8 +180,11 @@ export function GarageView({
     const { error } = await supabase.from("suppliers").update(patch).eq("id", id);
     if (!error) setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
-  async function removeSupplier(id: string) {
-    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+  async function removeSupplier(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("suppliers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("suppliers").delete().eq("id", id);
     if (!error) setSuppliers((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -201,8 +210,11 @@ export function GarageView({
     const { error } = await supabase.from("parts").update(patch).eq("id", id);
     if (!error) setParts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
-  async function removePart(id: string) {
-    const { error } = await supabase.from("parts").delete().eq("id", id);
+  async function removePart(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("parts").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("parts").delete().eq("id", id);
     if (!error) setParts((prev) => prev.filter((p) => p.id !== id));
   }
   async function adjustPartQuantity(id: string, delta: number) {
@@ -229,8 +241,11 @@ export function GarageView({
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
     if (!error) setTechnicians((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
-  async function removeTechnician(id: string) {
-    const { error } = await supabase.from("team_members").delete().eq("id", id);
+  async function removeTechnician(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("team_members").delete().eq("id", id);
     if (!error) setTechnicians((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -266,8 +281,11 @@ export function GarageView({
     await patchOrder(order.id, patch);
   }
 
-  async function removeOrder(id: string) {
-    const { error } = await supabase.from("repair_orders").delete().eq("id", id);
+  async function removeOrder(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("repair_orders").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("repair_orders").delete().eq("id", id);
     if (!error) {
       setRepairOrders((prev) => prev.filter((r) => r.id !== id));
       setOpenDetailId((cur) => (cur === id ? null : cur));

@@ -78,8 +78,11 @@ export function CleaningView({
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
-  async function removeCustomer(id: string) {
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+  async function removeCustomer(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("customers").delete().eq("id", id);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -91,8 +94,11 @@ export function CleaningView({
     const { error } = await supabase.from("sites").update(patch).eq("id", id);
     if (!error) setSites((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
-  async function removeSite(id: string) {
-    const { error } = await supabase.from("sites").delete().eq("id", id);
+  async function removeSite(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("sites").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("sites").delete().eq("id", id);
     if (!error) setSites((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -118,8 +124,11 @@ export function CleaningView({
     const { error } = await supabase.from("contracts").update(patch).eq("id", id);
     if (!error) setContracts((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
-  async function removeContract(id: string) {
-    const { error } = await supabase.from("contracts").delete().eq("id", id);
+  async function removeContract(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("contracts").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("contracts").delete().eq("id", id);
     if (!error) setContracts((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -167,8 +176,11 @@ export function CleaningView({
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
     if (!error) setTeamMembers((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
-  async function removeTeamMember(id: string) {
-    const { error } = await supabase.from("team_members").delete().eq("id", id);
+  async function removeTeamMember(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("team_members").delete().eq("id", id);
     if (!error) setTeamMembers((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -184,8 +196,11 @@ export function CleaningView({
     const { error } = await supabase.from("inventory_items").update(patch).eq("id", id);
     if (!error) setInventory((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }
-  async function removeInventoryItem(id: string) {
-    const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+  async function removeInventoryItem(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("inventory_items").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("inventory_items").delete().eq("id", id);
     if (!error) setInventory((prev) => prev.filter((i) => i.id !== id));
   }
 
@@ -230,7 +245,16 @@ export function CleaningView({
       )}
       {active === "sites" && <SitesModule rows={sites} customers={customers} onCreate={createSite} onUpdate={updateSite} onRemove={removeSite} />}
       {active === "contracts" && (
-        <ContractsModule rows={contracts} sites={sites} customers={customers} onCreate={createContract} onUpdate={updateContract} onRemove={removeContract} onCreateInvoice={createInvoiceFromContract} />
+        <ContractsModule
+          rows={contracts}
+          sites={sites}
+          customers={customers}
+          documents={documents}
+          onCreate={createContract}
+          onUpdate={updateContract}
+          onRemove={removeContract}
+          onCreateInvoice={createInvoiceFromContract}
+        />
       )}
       {active === "interventions" && <InterventionsModule rows={interventions} contracts={contracts} sites={sites} teamMembers={teamMembers} onCreate={createIntervention} onUpdate={updateIntervention} onRemove={removeIntervention} />}
       {active === "planning" && <PlanningModule rows={interventions} sites={sites} teamMembers={teamMembers} onOpenDetail={() => setActive("interventions")} />}

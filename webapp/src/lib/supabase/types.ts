@@ -220,6 +220,7 @@ export interface Database {
           phone: string | null;
           email: string | null;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -240,6 +241,7 @@ export interface Database {
           low_stock_threshold: number | null;
           unit_cost: number;
           supplier_id: string | null;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -282,6 +284,7 @@ export interface Database {
           year: number | null;
           mileage: number | null;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -307,6 +310,7 @@ export interface Database {
           labor_cost: number;
           parts_cost: number;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -327,6 +331,7 @@ export interface Database {
           email: string | null;
           active: boolean;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -345,6 +350,7 @@ export interface Database {
           phone: string | null;
           email: string | null;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -367,6 +373,7 @@ export interface Database {
           quantity: number;
           unit: string;
           low_stock_threshold: number | null;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -438,6 +445,7 @@ export interface Database {
           monthly_price: number;
           status: "active" | "maintenance" | "inactive";
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -486,6 +494,7 @@ export interface Database {
           name: string;
           address: string;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -612,6 +621,7 @@ export interface Database {
           renewal_date: string | null;
           status: "active" | "ending_soon" | "ended";
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -633,6 +643,7 @@ export interface Database {
           deadline: string | null;
           budget: number | null;
           notes: string;
+          archived_at: string | null;
           created_at: string;
           updated_at: string;
         };

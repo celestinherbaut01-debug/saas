@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 export function WasteLogModule({ workspaceId, initial }: { workspaceId: string; initial: WasteLogEntry[] }) {
   const supabase = createClient();
@@ -75,9 +76,7 @@ export function WasteLogModule({ workspaceId, initial }: { workspaceId: string; 
               {r.reason && <span className="text-faint"> · {r.reason}</span>}
               {r.estimated_cost != null && <span className="text-faint"> · {r.estimated_cost} €</span>}
             </span>
-            <button onClick={() => remove(r.id)} className="text-[11px] text-faint hover:text-red-fg">
-              Supprimer
-            </button>
+            <ConfirmDeleteButton itemLabel={`« ${r.item_name} »`} onConfirm={() => remove(r.id)} size="sm" />
           </li>
         ))}
       </ul>

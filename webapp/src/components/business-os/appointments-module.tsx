@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 export function AppointmentsModule({
   workspaceId,
@@ -65,9 +66,7 @@ export function AppointmentsModule({
                 — {new Date(r.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
               </span>
             </span>
-            <button onClick={() => remove(r.id)} className="text-[11px] text-faint hover:text-red-fg">
-              Supprimer
-            </button>
+            <ConfirmDeleteButton itemLabel={`« ${r.title} »`} onConfirm={() => remove(r.id)} size="sm" />
           </li>
         ))}
       </ul>

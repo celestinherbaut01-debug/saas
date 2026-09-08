@@ -10,6 +10,7 @@ const buttonVariants = cva(
         primary: "bg-ink text-bg hover:opacity-90",
         outline: "border border-line bg-panel text-ink hover:bg-soft",
         ghost: "text-ink hover:bg-soft",
+        danger: "bg-red-fg text-white hover:opacity-90",
       },
       size: {
         default: "h-10 px-4",

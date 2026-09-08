@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import {
   REPAIR_STATUS_ORDER,
   REPAIR_STATUS_LABEL,
@@ -44,7 +45,7 @@ interface Props {
   onCreate: (input: { title: string; vehicleId: string; scheduledAt: string }) => void;
   onPatch: (id: string, patch: Partial<RepairOrder>) => void;
   onSetStatus: (order: RepairOrder, status: RepairOrder["status"]) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
   onAddTechnician: (name: string) => Promise<string | null>;
   onAddLine: (
     orderId: string,
@@ -229,8 +230,8 @@ export function RepairOrdersModule({
           onClose={() => setDetailId(null)}
           onPatch={(patch) => onPatch(detailOrder.id, patch)}
           onSetStatus={(s) => onSetStatus(detailOrder, s)}
-          onRemove={() => {
-            onRemove(detailOrder.id);
+          onRemove={(mode) => {
+            onRemove(detailOrder.id, mode);
             setDetailId(null);
           }}
           onAddTechnician={onAddTechnician}
@@ -331,7 +332,7 @@ function RepairOrderDetail({
   onClose: () => void;
   onPatch: (patch: Partial<RepairOrder>) => void;
   onSetStatus: (s: RepairOrder["status"]) => void;
-  onRemove: () => void;
+  onRemove: (mode: "archive" | "delete") => void;
   onAddTechnician: (name: string) => Promise<string | null>;
   onAddLine: (input: { partId: string; partName: string; quantity: number; unitCost: number; unitPrice: number }) => void;
   onRemoveLine: (line: RepairOrderPart) => void;
@@ -547,9 +548,16 @@ function RepairOrderDetail({
           />
         </div>
 
-        <button type="button" onClick={onRemove} className="self-start text-[11.5px] font-semibold text-faint hover:text-red-fg">
-          Supprimer cet ordre de réparation
-        </button>
+        <ConfirmDeleteButton
+          itemLabel={`l'ordre de réparation « ${order.title} »`}
+          onArchive={() => onRemove("archive")}
+          onConfirm={() => onRemove("delete")}
+          forceArchiveReason={
+            documents.length > 0
+              ? "Cet ordre a un devis ou une facture lié — il sera archivé plutôt que supprimé pour ne pas perdre ce document."
+              : undefined
+          }
+        />
       </div>
     </Drawer>
   );

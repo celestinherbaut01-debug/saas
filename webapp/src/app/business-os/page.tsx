@@ -96,12 +96,12 @@ export default async function BusinessOsPage() {
       { data: lines },
       { data: documents },
     ] = await Promise.all([
-      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("parts").select("*").eq("workspace_id", workspaceId).order("name"),
-      supabase.from("repair_orders").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("parts").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
+      supabase.from("repair_orders").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("repair_order_parts").select("*").eq("workspace_id", workspaceId),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
@@ -150,13 +150,13 @@ export default async function BusinessOsPage() {
       { data: inventory },
       { data: documents },
     ] = await Promise.all([
-      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("sites").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("contracts").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("sites").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("contracts").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("interventions").select("*").eq("workspace_id", workspaceId).order("scheduled_at", { ascending: false }),
       supabase.from("incidents").select("*").eq("workspace_id", workspaceId).order("reported_at", { ascending: false }),
-      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
 
@@ -200,12 +200,12 @@ export default async function BusinessOsPage() {
       { data: teamMembers },
       { data: documents },
     ] = await Promise.all([
-      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("projects").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("client_sites").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("projects").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("client_sites").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("tickets").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
       supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("due_date"),
-      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
     ]);
 
@@ -254,16 +254,16 @@ export default async function BusinessOsPage() {
       { data: appointments },
       { data: teamMembers },
     ] = await Promise.all([
-      supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
-      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
+      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("purchase_orders").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
       supabase.from("purchase_order_items").select("*").eq("workspace_id", workspaceId),
       supabase.from("recipes").select("*").eq("workspace_id", workspaceId).order("name"),
       supabase.from("recipe_ingredients").select("*").eq("workspace_id", workspaceId),
       supabase.from("waste_log").select("*").eq("workspace_id", workspaceId).order("logged_at", { ascending: false }),
       supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
-      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
     ]);
 
     const upcomingDates = (appointments ?? []).map((a) => a.starts_at);
@@ -299,8 +299,8 @@ export default async function BusinessOsPage() {
 
   // Métier générique (aucune verticale dédiée) : les 3 modules communs.
   const [{ data: customers }, { data: inventory }, { data: appointments }] = await Promise.all([
-    supabase.from("customers").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-    supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).order("name"),
+    supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+    supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
     supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
   ]);
 

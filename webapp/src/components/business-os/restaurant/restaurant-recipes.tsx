@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { cn } from "@/lib/utils";
 import { recipeCost, foodCostPercent, formatEUR } from "@/lib/restaurant";
 
@@ -229,9 +230,7 @@ function RecipeDetail({
           </div>
         </div>
 
-        <button type="button" onClick={onRemove} className="self-start text-[11.5px] font-semibold text-faint hover:text-red-fg">
-          Supprimer cette recette
-        </button>
+        <ConfirmDeleteButton itemLabel={`la recette « ${recipe.name} »`} onConfirm={onRemove} />
       </div>
     </Drawer>
   );

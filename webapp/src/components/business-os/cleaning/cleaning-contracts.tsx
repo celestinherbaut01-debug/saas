@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Contract, Customer, Site } from "@/lib/supabase/types";
+import type { Contract, Customer, Site, BusinessDocument } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, Textarea } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { CONTRACT_STATUS_LABEL } from "@/lib/cleaning";
 import { formatEUR } from "@/lib/format";
 
@@ -27,6 +28,7 @@ export function ContractsModule({
   rows,
   sites,
   customers,
+  documents = [],
   onCreate,
   onUpdate,
   onRemove,
@@ -35,9 +37,11 @@ export function ContractsModule({
   rows: Contract[];
   sites: Site[];
   customers: Customer[];
+  /** Sert uniquement à savoir si une facture est liée (voir onDelete du drawer) — pas affiché ici. */
+  documents?: BusinessDocument[];
   onCreate: (input: ContractInput) => void;
   onUpdate: (id: string, patch: Partial<Contract>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
   onCreateInvoice?: (contract: Contract) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -118,7 +122,9 @@ export function ContractsModule({
             });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
+          hasInvoices={documents.some((d) => d.contract_id === editing.id)}
           onCreateInvoice={onCreateInvoice ? () => onCreateInvoice(editing) : undefined}
         />
       )}
@@ -135,7 +141,9 @@ function ContractDrawer({
   onClose,
   onSubmit,
   onStatusChange,
+  onArchive,
   onDelete,
+  hasInvoices,
   onCreateInvoice,
 }: {
   open: boolean;
@@ -146,7 +154,9 @@ function ContractDrawer({
   onClose: () => void;
   onSubmit: (input: ContractInput) => void;
   onStatusChange?: (status: Contract["status"]) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
+  hasInvoices?: boolean;
   onCreateInvoice?: () => void;
 }) {
   const [siteId, setSiteId] = useState(initial?.site_id ?? "");
@@ -233,9 +243,12 @@ function ContractDrawer({
             </Button>
           )}
           {onDelete && (
-            <Button variant="outline" onClick={onDelete}>
-              Supprimer
-            </Button>
+            <ConfirmDeleteButton
+              itemLabel={`le contrat « ${title} »`}
+              onArchive={onArchive}
+              onConfirm={onDelete}
+              forceArchiveReason={hasInvoices ? "Ce contrat a une facture liée — il sera archivé plutôt que supprimé pour ne pas perdre ce document." : undefined}
+            />
           )}
         </div>
       </div>

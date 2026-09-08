@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { PURCHASE_ORDER_STATUS_LABEL, formatEUR } from "@/lib/restaurant";
 
 // "Commandes" + "Réceptions" consolidées : un même bon de commande
@@ -206,9 +207,7 @@ function PurchaseOrderDetail({
           <span className="font-display text-[15px] font-extrabold">{formatEUR(items.reduce((s, i) => s + i.unit_cost * i.quantity, 0))}</span>
         </div>
 
-        <button type="button" onClick={onRemove} className="self-start text-[11.5px] font-semibold text-faint hover:text-red-fg">
-          Supprimer cette commande
-        </button>
+        <ConfirmDeleteButton itemLabel="cette commande" onConfirm={onRemove} />
       </div>
     </Drawer>
   );

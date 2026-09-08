@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { cn } from "@/lib/utils";
 
 export function TasksModule({
@@ -79,9 +80,7 @@ export function TasksModule({
                 </span>
                 <span className="flex items-center gap-2">
                   {t.due_date && <span className={cn("text-[11px]", overdue ? "font-bold text-red-fg" : "text-faint")}>{new Date(t.due_date).toLocaleDateString("fr-FR")}</span>}
-                  <button onClick={() => onRemove(t.id)} className="text-[11px] text-faint hover:text-red-fg">
-                    Supprimer
-                  </button>
+                  <ConfirmDeleteButton itemLabel={`la tâche « ${t.title} »`} onConfirm={() => onRemove(t.id)} size="sm" />
                 </span>
               </label>
             );
@@ -96,9 +95,7 @@ export function TasksModule({
                       <input type="checkbox" checked={t.done} onChange={(e) => onToggle(t.id, e.target.checked)} />
                       {t.title}
                     </span>
-                    <button onClick={() => onRemove(t.id)} className="text-[11px] no-underline hover:text-red-fg">
-                      Supprimer
-                    </button>
+                    <ConfirmDeleteButton itemLabel={`la tâche « ${t.title} »`} onConfirm={() => onRemove(t.id)} size="sm" />
                   </label>
                 ))}
               </div>

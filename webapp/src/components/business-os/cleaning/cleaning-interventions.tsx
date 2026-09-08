@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { INTERVENTION_STATUS_LABEL } from "@/lib/cleaning";
 
 interface InterventionInput {
@@ -258,9 +259,7 @@ function DetailDrawer({
           <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={() => onPatch({ notes })} />
         </label>
 
-        <button type="button" onClick={onRemove} className="self-start text-[11.5px] font-semibold text-faint hover:text-red-fg">
-          Supprimer cette intervention
-        </button>
+        <ConfirmDeleteButton itemLabel="cette intervention" onConfirm={onRemove} />
       </div>
     </Drawer>
   );

@@ -11,13 +11,14 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { REPAIR_STATUS_LABEL } from "@/lib/garage";
 
 interface ControlledVehicles {
   rows: Vehicle[];
   onCreate: (input: { registration: string; make: string; model: string; year: string; mileage: string; customerId: string; notes: string }) => void;
   onUpdate: (id: string, patch: Partial<Vehicle>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }
 
 export function VehiclesModule({
@@ -87,13 +88,16 @@ export function VehiclesModule({
     }
   }
 
-  async function remove(id: string) {
+  async function remove(id: string, mode: "archive" | "delete") {
     if (controlled) {
-      controlled.onRemove(id);
+      controlled.onRemove(id, mode);
       setEditing(null);
       return;
     }
-    const { error } = await supabase.from("vehicles").delete().eq("id", id);
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("vehicles").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("vehicles").delete().eq("id", id);
     if (!error) {
       setLocalRows((prev) => prev.filter((r) => r.id !== id));
       setEditing(null);
@@ -173,7 +177,8 @@ export function VehiclesModule({
               notes: input.notes.trim(),
             })
           }
-          onDelete={() => remove(editing.id)}
+          onArchive={() => remove(editing.id, "archive")}
+          onDelete={() => remove(editing.id, "delete")}
         />
       )}
     </Card>
@@ -188,6 +193,7 @@ function VehicleDrawer({
   history,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -197,6 +203,7 @@ function VehicleDrawer({
   history?: RepairOrder[];
   onClose: () => void;
   onSubmit: (input: { registration: string; make: string; model: string; year: string; mileage: string; customerId: string; notes: string }) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [registration, setRegistration] = useState(initial?.registration ?? "");
@@ -273,11 +280,7 @@ function VehicleDrawer({
         >
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le véhicule « ${initial?.registration ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

@@ -10,12 +10,14 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 interface ControlledCustomers {
   rows: Customer[];
   onCreate: (input: { name: string; phone: string; email: string; notes: string }) => void;
   onUpdate: (id: string, patch: Partial<Customer>) => void;
-  onRemove: (id: string) => void;
+  /** `mode` "archive" masque le client des listes actives sans rien supprimer (préféré s'il a des données liées — véhicules, ordres, projets...) ; "delete" le supprime définitivement. */
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }
 
 // Composant partagé entre toutes les verticales (garage/nettoyage/agence/
@@ -83,13 +85,16 @@ export function CustomersModule({
     }
   }
 
-  async function remove(id: string) {
+  async function remove(id: string, mode: "archive" | "delete") {
     if (controlled) {
-      controlled.onRemove(id);
+      controlled.onRemove(id, mode);
       setEditing(null);
       return;
     }
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("customers").delete().eq("id", id);
     if (!error) {
       setLocalRows((prev) => prev.filter((r) => r.id !== id));
       setEditing(null);
@@ -157,7 +162,8 @@ export function CustomersModule({
           initial={editing}
           onClose={() => setEditing(null)}
           onSubmit={(input) => update(editing.id, { name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() })}
-          onDelete={() => remove(editing.id)}
+          onArchive={() => remove(editing.id, "archive")}
+          onDelete={() => remove(editing.id, "delete")}
         />
       )}
     </Card>
@@ -170,6 +176,7 @@ function CustomerDrawer({
   initial,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -177,6 +184,7 @@ function CustomerDrawer({
   initial: Customer | null;
   onClose: () => void;
   onSubmit: (input: { name: string; phone: string; email: string; notes: string }) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -210,11 +218,7 @@ function CustomerDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ name, phone: phone ?? "", email: email ?? "", notes })} disabled={!name.trim()}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le client « ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

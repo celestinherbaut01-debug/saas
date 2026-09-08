@@ -9,6 +9,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { REPAIR_STATUS_ACTIVE } from "@/lib/garage";
 
 // Module dédié réservé au Business OS avancé : gestion de l'équipe (rôle,
@@ -27,7 +28,7 @@ export function TechniciansModule({
   repairOrders: RepairOrder[];
   onCreate: (input: { name: string; role: string; phone: string; email: string }) => void;
   onUpdate: (id: string, patch: Partial<TeamMember>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
@@ -96,7 +97,8 @@ export function TechniciansModule({
             onUpdate(editing.id, { active: !editing.active });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
         />
       )}
     </Card>
@@ -110,6 +112,7 @@ function TechnicianDrawer({
   onClose,
   onSubmit,
   onToggleActive,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -118,6 +121,7 @@ function TechnicianDrawer({
   onClose: () => void;
   onSubmit: (input: { name: string; role: string; phone: string; email: string }) => void;
   onToggleActive?: () => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -155,11 +159,7 @@ function TechnicianDrawer({
               {initial?.active ? "Marquer inactif" : "Marquer actif"}
             </Button>
           )}
-          {onDelete && (
-            <Button variant="outline" onClick={onDelete}>
-              Supprimer
-            </Button>
-          )}
+          {onDelete && <ConfirmDeleteButton itemLabel={`« ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
         </div>
       </div>
     </Drawer>

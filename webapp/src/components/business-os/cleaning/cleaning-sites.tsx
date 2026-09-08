@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 interface SiteInput {
   name: string;
@@ -28,7 +29,7 @@ export function SitesModule({
   customers: Customer[];
   onCreate: (input: SiteInput) => void;
   onUpdate: (id: string, patch: Partial<Site>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Site | null>(null);
@@ -87,7 +88,8 @@ export function SitesModule({
             onUpdate(editing.id, { name: input.name.trim(), address: input.address.trim(), customer_id: input.customerId || null, notes: input.notes.trim() });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
         />
       )}
     </Card>
@@ -101,6 +103,7 @@ function SiteDrawer({
   customers,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -109,6 +112,7 @@ function SiteDrawer({
   customers: Customer[];
   onClose: () => void;
   onSubmit: (input: SiteInput) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -147,11 +151,7 @@ function SiteDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ name, address, customerId, notes })} disabled={!name.trim()}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le site « ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

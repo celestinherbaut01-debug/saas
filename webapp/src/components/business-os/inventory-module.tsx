@@ -11,6 +11,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 interface ItemInput {
   name: string;
@@ -25,7 +26,7 @@ interface ControlledInventory {
   rows: InventoryItem[];
   onCreate: (input: ItemInput) => void;
   onUpdate: (id: string, patch: Partial<InventoryItem>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }
 
 // Composant partagé (générique/nettoyage/restaurant) — "Stock" couvre à la
@@ -102,13 +103,16 @@ export function InventoryModule({
     await update(id, { quantity: Math.max(0, row.quantity + delta) });
   }
 
-  async function remove(id: string) {
+  async function remove(id: string, mode: "archive" | "delete") {
     if (controlled) {
-      controlled.onRemove(id);
+      controlled.onRemove(id, mode);
       setEditing(null);
       return;
     }
-    const { error } = await supabase.from("inventory_items").delete().eq("id", id);
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("inventory_items").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("inventory_items").delete().eq("id", id);
     if (!error) {
       setLocalRows((prev) => prev.filter((r) => r.id !== id));
       setEditing(null);
@@ -189,7 +193,8 @@ export function InventoryModule({
               supplier_id: input.supplierId || null,
             })
           }
-          onDelete={() => remove(editing.id)}
+          onArchive={() => remove(editing.id, "archive")}
+          onDelete={() => remove(editing.id, "delete")}
         />
       )}
     </Card>
@@ -203,6 +208,7 @@ function ItemDrawer({
   suppliers,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -211,6 +217,7 @@ function ItemDrawer({
   suppliers: Supplier[];
   onClose: () => void;
   onSubmit: (input: ItemInput) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -265,11 +272,7 @@ function ItemDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ name, quantity, unit, lowStockThreshold, unitCost, supplierId })} disabled={!name.trim()}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`« ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

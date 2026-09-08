@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { TICKET_STATUS_LABEL, TICKET_PRIORITY_LABEL } from "@/lib/agency";
 
 interface TicketInput {
@@ -205,11 +206,7 @@ function TicketDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ title: ticketTitle, customerId, siteId, priority, notes })} disabled={!ticketTitle.trim()}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le ticket « ${initial?.title ?? ""} »`} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

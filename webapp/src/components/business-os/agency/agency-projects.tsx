@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Project, Customer } from "@/lib/supabase/types";
+import type { Project, Customer, BusinessDocument } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, Textarea } from "@/components/ui/select";
@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { PROJECT_STATUS_LABEL } from "@/lib/agency";
 
 interface ProjectInput {
@@ -24,6 +25,7 @@ interface ProjectInput {
 export function ProjectsModule({
   rows,
   customers,
+  documents = [],
   onCreate,
   onUpdate,
   onRemove,
@@ -31,9 +33,10 @@ export function ProjectsModule({
 }: {
   rows: Project[];
   customers: Customer[];
+  documents?: BusinessDocument[];
   onCreate: (input: ProjectInput) => void;
   onUpdate: (id: string, patch: Partial<Project>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
   onCreateInvoice?: (project: Project) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
@@ -113,7 +116,9 @@ export function ProjectsModule({
             });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
+          hasInvoices={documents.some((d) => d.project_id === editing.id)}
           onCreateInvoice={onCreateInvoice ? () => onCreateInvoice(editing) : undefined}
         />
       )}
@@ -129,7 +134,9 @@ function ProjectDrawer({
   onClose,
   onSubmit,
   onStatusChange,
+  onArchive,
   onDelete,
+  hasInvoices,
   onCreateInvoice,
 }: {
   open: boolean;
@@ -139,7 +146,9 @@ function ProjectDrawer({
   onClose: () => void;
   onSubmit: (input: ProjectInput) => void;
   onStatusChange?: (status: Project["status"]) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
+  hasInvoices?: boolean;
   onCreateInvoice?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -216,9 +225,12 @@ function ProjectDrawer({
           </Button>
         )}
         {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
+          <ConfirmDeleteButton
+            itemLabel={`le projet « ${title} »`}
+            onArchive={onArchive}
+            onConfirm={onDelete}
+            forceArchiveReason={hasInvoices ? "Ce projet a une facture liée — il sera archivé plutôt que supprimé pour ne pas perdre ce document." : undefined}
+          />
         )}
         </div>
       </div>

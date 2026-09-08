@@ -71,8 +71,11 @@ export function AgencyView({
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
-  async function removeCustomer(id: string) {
-    const { error } = await supabase.from("customers").delete().eq("id", id);
+  async function removeCustomer(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("customers").delete().eq("id", id);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -88,8 +91,11 @@ export function AgencyView({
     const { error } = await supabase.from("projects").update(patch).eq("id", id);
     if (!error) setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
-  async function removeProject(id: string) {
-    const { error } = await supabase.from("projects").delete().eq("id", id);
+  async function removeProject(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("projects").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("projects").delete().eq("id", id);
     if (!error) setProjects((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -116,8 +122,11 @@ export function AgencyView({
     const { error } = await supabase.from("client_sites").update(patch).eq("id", id);
     if (!error) setSites((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
-  async function removeSite(id: string) {
-    const { error } = await supabase.from("client_sites").delete().eq("id", id);
+  async function removeSite(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("client_sites").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("client_sites").delete().eq("id", id);
     if (!error) setSites((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -159,8 +168,11 @@ export function AgencyView({
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
     if (!error) setTeamMembers((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
-  async function removeTeamMember(id: string) {
-    const { error } = await supabase.from("team_members").delete().eq("id", id);
+  async function removeTeamMember(id: string, mode: "archive" | "delete") {
+    const { error } =
+      mode === "archive"
+        ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
+        : await supabase.from("team_members").delete().eq("id", id);
     if (!error) setTeamMembers((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -203,7 +215,15 @@ export function AgencyView({
         <CustomersModule workspaceId={workspaceId} initial={customers} label="Clients" controlled={{ rows: customers, onCreate: createCustomer, onUpdate: updateCustomer, onRemove: removeCustomer }} />
       )}
       {active === "projects" && (
-        <ProjectsModule rows={projects} customers={customers} onCreate={createProject} onUpdate={updateProject} onRemove={removeProject} onCreateInvoice={createInvoiceFromProject} />
+        <ProjectsModule
+          rows={projects}
+          customers={customers}
+          documents={documents}
+          onCreate={createProject}
+          onUpdate={updateProject}
+          onRemove={removeProject}
+          onCreateInvoice={createInvoiceFromProject}
+        />
       )}
       {active === "sites" && <SitesModule rows={sites} customers={customers} projects={projects} onCreate={createSite} onUpdate={updateSite} onRemove={removeSite} />}
       {active === "tickets" && <TicketsModule rows={tickets} customers={customers} sites={sites} onCreate={createTicket} onUpdate={updateTicket} onRemove={removeTicket} />}

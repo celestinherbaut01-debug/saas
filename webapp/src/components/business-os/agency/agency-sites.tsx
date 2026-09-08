@@ -10,6 +10,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { SITE_STATUS_LABEL, formatEUR } from "@/lib/agency";
 
 interface SiteInput {
@@ -40,7 +41,7 @@ export function SitesModule({
   projects: Project[];
   onCreate: (input: SiteInput) => void;
   onUpdate: (id: string, patch: Partial<ClientSite>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<ClientSite | null>(null);
@@ -120,7 +121,8 @@ export function SitesModule({
             });
             setEditing(null);
           }}
-          onDelete={() => { onRemove(editing.id); setEditing(null); }}
+          onArchive={() => { onRemove(editing.id, "archive"); setEditing(null); }}
+          onDelete={() => { onRemove(editing.id, "delete"); setEditing(null); }}
         />
       )}
     </Card>
@@ -136,6 +138,7 @@ function SiteDrawer({
   onClose,
   onSubmit,
   onStatusChange,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -146,6 +149,7 @@ function SiteDrawer({
   onClose: () => void;
   onSubmit: (input: SiteInput) => void;
   onStatusChange?: (status: ClientSite["status"]) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [domainName, setDomainName] = useState(initial?.domain_name ?? "");
@@ -233,11 +237,7 @@ function SiteDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ domainName, hostingProvider, customerId, projectId, domainRenewalDate, hostingRenewalDate, nextMaintenanceAt, monthlyPrice, notes })}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le site « ${initial?.domain_name || "sans nom"} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );

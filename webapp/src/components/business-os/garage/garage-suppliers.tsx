@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
+import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 // Contrôlé par GarageView (comme Pièces/Techniciens) : la liste des
 // fournisseurs doit être à jour pour le sélecteur de fournisseur de
@@ -22,7 +23,7 @@ export function SuppliersModule({
   rows: Supplier[];
   onCreate: (input: { name: string; phone: string; email: string; notes: string }) => void;
   onUpdate: (id: string, patch: Partial<Supplier>) => void;
-  onRemove: (id: string) => void;
+  onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
@@ -38,8 +39,8 @@ export function SuppliersModule({
     setEditing(null);
   }
 
-  function remove(id: string) {
-    onRemove(id);
+  function remove(id: string, mode: "archive" | "delete") {
+    onRemove(id, mode);
     setEditing(null);
   }
 
@@ -89,7 +90,8 @@ export function SuppliersModule({
           initial={editing}
           onClose={() => setEditing(null)}
           onSubmit={(input) => update(editing.id, { name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() })}
-          onDelete={() => remove(editing.id)}
+          onArchive={() => remove(editing.id, "archive")}
+          onDelete={() => remove(editing.id, "delete")}
         />
       )}
     </Card>
@@ -102,6 +104,7 @@ function SupplierDrawer({
   initial,
   onClose,
   onSubmit,
+  onArchive,
   onDelete,
 }: {
   open: boolean;
@@ -109,6 +112,7 @@ function SupplierDrawer({
   initial: Supplier | null;
   onClose: () => void;
   onSubmit: (input: { name: string; phone: string; email: string; notes: string }) => void;
+  onArchive?: () => void;
   onDelete?: () => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -140,11 +144,7 @@ function SupplierDrawer({
         <Button className="flex-1" onClick={() => onSubmit({ name, phone: phone ?? "", email: email ?? "", notes })} disabled={!name.trim()}>
           Enregistrer
         </Button>
-        {onDelete && (
-          <Button variant="outline" onClick={onDelete}>
-            Supprimer
-          </Button>
-        )}
+        {onDelete && <ConfirmDeleteButton itemLabel={`le fournisseur « ${initial?.name ?? ""} »`} onArchive={onArchive} onConfirm={onDelete} />}
       </div>
     </Drawer>
   );
