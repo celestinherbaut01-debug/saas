@@ -81,6 +81,8 @@ export interface Database {
           audience: "b2b" | "b2c" | "both";
           product_mode: "acquisition" | "business_os" | "both";
           own_category_id: string | null;
+          /** Rempli uniquement quand aucun métier catalogue ne correspond ("Je ne trouve pas mon métier") — jamais un blocage à l'onboarding. */
+          own_category_label: string | null;
           street: string;
           postal_code: string;
           city: string;
@@ -759,6 +761,7 @@ export interface Database {
           p_target_category_ids: string[];
           p_radius_km?: number | null;
           p_product_mode?: string;
+          p_own_category_label?: string | null;
         };
         Returns: string;
       };

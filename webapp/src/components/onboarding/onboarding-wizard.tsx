@@ -12,6 +12,7 @@ import { AddressField, type AddressValue } from "@/components/onboarding/address
 import { completeOnboarding } from "@/lib/actions/onboarding";
 import { recommendedSlugsFor, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { PRODUCT_MODE_OPTIONS, type ProductMode } from "@/lib/product-mode";
+import { getBusinessOsProfile } from "@/lib/business-os";
 import { cn } from "@/lib/utils";
 
 export function OnboardingWizard({ categories }: { categories: BusinessCategory[] }) {
@@ -26,6 +27,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
   const [audience, setAudience] = useState<"b2b" | "b2c" | "both">("both");
 
   const [ownCategoryId, setOwnCategoryId] = useState<string | null>(null);
+  const [ownCategoryLabel, setOwnCategoryLabel] = useState("");
   const [productMode, setProductMode] = useState<ProductMode>("both");
   const [targetIds, setTargetIds] = useState<string[]>([]);
 
@@ -40,8 +42,11 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
     : (["Entreprise", "Votre métier", "Votre objectif", "Localisation"] as const);
   const stepName = STEPS[step];
 
-  const ownSlug = categories.find((c) => c.id === ownCategoryId)?.slug ?? null;
+  const ownCategory = categories.find((c) => c.id === ownCategoryId) ?? null;
+  const ownSlug = ownCategory?.slug ?? null;
+  const ownParentSlug = ownCategory ? categories.find((c) => c.id === ownCategory.parent_id)?.slug ?? null : null;
   const recommendedSlugs = filterSlugsByAudience(recommendedSlugsFor(ownSlug), categories, audience);
+  const businessOsProfile = getBusinessOsProfile(ownParentSlug, ownSlug);
 
   const targetNames = useMemo(
     () => targetIds.map((id) => categories.find((c) => c.id === id)?.name).filter((n): n is string => Boolean(n)),
@@ -70,6 +75,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
         offerDescription: offer,
         audience,
         ownCategoryId,
+        ownCategoryLabel: ownCategoryId ? null : ownCategoryLabel.trim() || null,
         address: address
           ? { street: address.street, postalCode: address.postalCode, city: address.city, lat: address.lat, lng: address.lng }
           : null,
@@ -162,7 +168,13 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
             <p className="text-[13px] text-muted">
               Votre métier — distinct des métiers que vous allez démarcher à l&apos;étape suivante.
             </p>
-            <CategoryCombobox categories={categories} value={ownCategoryId} onChange={setOwnCategoryId} />
+            <CategoryCombobox
+              categories={categories}
+              value={ownCategoryId}
+              onChange={setOwnCategoryId}
+              customLabel={ownCategoryLabel}
+              onCustomLabelChange={setOwnCategoryLabel}
+            />
           </div>
         )}
 
@@ -215,14 +227,47 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
               </p>
             </div>
 
-            <div className="rounded-lg border border-line bg-soft px-3 py-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">
-                Récapitulatif — {companyName || "Entreprise sans nom"}
+            <div className="rounded-xl border border-accent/30 bg-gradient-to-br from-panel to-soft px-4 py-3.5">
+              <p className="text-[13px] font-bold text-ink">
+                ✨ ProspectFlow va adapter votre espace à votre activité
               </p>
-              <p className="mt-1 text-[11.5px] text-muted">
-                {categories.find((c) => c.id === ownCategoryId)?.name ?? "Métier non précisé"}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+
+              <div className="mt-3 flex flex-col gap-2 text-[12.5px]">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-faint">Métier détecté</span>
+                  <span className="text-right font-semibold text-ink">
+                    {ownCategory?.name ?? (ownCategoryLabel.trim() ? `« ${ownCategoryLabel.trim()} » (nouveau)` : "Non précisé — configuration générale")}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-faint">Espace</span>
+                  <span className="text-right font-semibold text-ink">
+                    {businessOsProfile.vertical === "generic" ? "Business OS (socle générique)" : businessOsProfile.osName}
+                  </span>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-faint">Mode</span>
+                  <span className="text-right font-semibold text-ink">
+                    {PRODUCT_MODE_OPTIONS.find((o) => o.value === productMode)?.label}
+                  </span>
+                </div>
+                {needsTargets && (
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="shrink-0 text-faint">Acquisition recommandée</span>
+                    <span className="text-right text-muted">
+                      {audience === "b2b" ? "Entreprises (B2B)" : audience === "b2c" ? "Particuliers (B2C)" : "B2B + B2C"}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-start justify-between gap-3">
+                  <span className="shrink-0 text-faint">Modules proposés</span>
+                  <span className="text-right text-muted">
+                    {[businessOsProfile.customersLabel, businessOsProfile.inventoryLabel, businessOsProfile.appointmentsLabel].join(" · ")}
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line pt-2.5">
                 {!needsTargets && <span className="text-[11.5px] text-faint">Prospection non activée pour l&apos;instant.</span>}
                 {visibleTargetNames.map((name) => (
                   <span

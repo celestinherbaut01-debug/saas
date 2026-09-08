@@ -9,6 +9,8 @@ export interface OnboardingPayload {
   offerDescription: string;
   audience: "b2b" | "b2c" | "both";
   ownCategoryId: string | null;
+  /** "Je ne trouve pas mon métier" — texte libre, utilisé UNIQUEMENT quand ownCategoryId est null. Jamais un blocage à l'onboarding. */
+  ownCategoryLabel: string | null;
   address: {
     street: string;
     postalCode: string;
@@ -89,6 +91,7 @@ export async function completeOnboarding(
     // Rayon volontairement absent : n'est plus choisi à l'onboarding, mais
     // sur la page Prospection (dépend du forfait) — voir 0014.
     p_product_mode: payload.productMode,
+    p_own_category_label: payload.ownCategoryId ? null : payload.ownCategoryLabel?.trim() || null,
   });
 
   if (error) {
