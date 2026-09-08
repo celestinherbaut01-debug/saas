@@ -128,6 +128,8 @@ export interface Database {
           icon: string | null;
           naf_codes: string[];
           keywords: string[];
+          /** Motifs qui rétrogradent un candidat (nom d'établissement) même s'il matche le NAF — voir _shared/relevance.ts. */
+          exclusion_keywords: string[];
           business_type: "b2b" | "b2c" | "both";
           sort_order: number;
         };

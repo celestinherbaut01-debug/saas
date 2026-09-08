@@ -23,6 +23,28 @@ export interface RelevanceResult {
 
 const SECONDARY_THRESHOLD = 45;
 
+const DIACRITICS = new RegExp("[\\u0300-\\u036f]", "g");
+function normalize(s: string): string {
+  return s.normalize("NFD").replace(DIACRITICS, "").toLowerCase();
+}
+
+/**
+ * "Je veux éviter les correspondances grossières" : un candidat qui matche
+ * le NAF d'une catégorie mais dont le nom contient un motif d'exclusion de
+ * cette catégorie (ex. "grossiste" pour Garages automobiles) n'est pas un
+ * faux négatif à cacher — c'est une correspondance de mauvaise qualité,
+ * rétrogradée en "secondary" avec la raison explicite, jamais supprimée
+ * silencieusement (le client doit pouvoir la voir et juger lui-même).
+ */
+function matchesExclusion(companyName: string, exclusionKeywords: string[]): string | null {
+  if (exclusionKeywords.length === 0) return null;
+  const name = normalize(companyName);
+  for (const kw of exclusionKeywords) {
+    if (kw.trim() && name.includes(normalize(kw))) return kw;
+  }
+  return null;
+}
+
 // Le champ business_type d'une catégorie répond à "qui SONT ses clients
 // habituels" (un restaurant sert des particuliers) — PAS à "qui peut la
 // démarcher". Pour une offre de présence digitale/marketing
@@ -45,9 +67,18 @@ export function computeRelevance(
   audience: "b2b" | "b2c" | "both" | null,
   nafBusinessType: Map<string, "b2b" | "b2c" | "both">,
   scoringProfile: ScoringProfile,
+  companyName?: string,
+  nafExclusionKeywords?: Map<string, string[]>,
 ): RelevanceResult {
   const reasons: string[] = [];
   let score = 70; // Base : le candidat correspond à une catégorie explicitement sélectionnée par le client.
+
+  const exclusionKeywords = candidateNafCode ? nafExclusionKeywords?.get(candidateNafCode) ?? [] : [];
+  const exclusionMatch = companyName ? matchesExclusion(companyName, exclusionKeywords) : null;
+  if (exclusionMatch) {
+    score -= 45;
+    reasons.push(`Correspondance imprécise probable (motif d'exclusion « ${exclusionMatch} » détecté dans le nom)`);
+  }
 
   const candidateType = candidateNafCode ? nafBusinessType.get(candidateNafCode) : undefined;
   const audienceMatchApplies = !PROFILES_IGNORING_AUDIENCE_MATCH.includes(scoringProfile);

@@ -146,13 +146,19 @@ Deno.serve(async (req) => {
         operationalOnly: filters.operationalOnly,
         maxEstablishmentsPerSiren: filters.maxEstablishmentsPerSiren,
       }),
-      admin.from("business_categories").select("naf_codes, business_type").order("sort_order"),
+      admin.from("business_categories").select("naf_codes, business_type, exclusion_keywords").order("sort_order"),
     ]);
 
     const nafToBusinessType = new Map<string, "b2b" | "b2c" | "both">();
+    const nafToExclusionKeywords = new Map<string, string[]>();
     for (const cat of categoryRows ?? []) {
       for (const code of cat.naf_codes as string[]) {
         if (!nafToBusinessType.has(code)) nafToBusinessType.set(code, cat.business_type as "b2b" | "b2c" | "both");
+        const exclusions = (cat.exclusion_keywords as string[] | null) ?? [];
+        if (exclusions.length > 0) {
+          const existing = nafToExclusionKeywords.get(code) ?? [];
+          nafToExclusionKeywords.set(code, [...existing, ...exclusions]);
+        }
       }
     }
 
@@ -355,7 +361,14 @@ Deno.serve(async (req) => {
       const { score, sources } = computeQualityScore(base, scoringProfile);
       if (fromCache) sources.cached = true;
 
-      const relevance = computeRelevance(c.nafCode, body.audience ?? null, nafToBusinessType, scoringProfile);
+      const relevance = computeRelevance(
+        c.nafCode,
+        body.audience ?? null,
+        nafToBusinessType,
+        scoringProfile,
+        c.companyName,
+        nafToExclusionKeywords,
+      );
 
       enriched.push({
         ...base,
