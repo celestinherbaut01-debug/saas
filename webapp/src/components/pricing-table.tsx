@@ -36,12 +36,13 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
       >
         {isPro && (
           <span className="absolute -top-3 left-1/2 w-fit -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-1 text-[10.5px] font-bold text-accent-ink shadow-sm">
-            Le plus populaire
+            Recommandé
           </span>
         )}
 
         <h3 className="font-display text-[17px] font-extrabold tracking-tight">{plan.label}</h3>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{plan.tagline}</p>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-faint">{plan.targetAudience}</p>
 
         <p className="mt-6 flex items-baseline gap-1">
           <span className="font-display text-[34px] font-extrabold tracking-tight">
@@ -84,6 +85,10 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
             </li>
           ))}
         </ul>
+
+        <p className="mt-5 rounded-lg border border-dashed border-line bg-soft px-3 py-2 text-[11.5px] leading-relaxed text-muted">
+          <span className="font-semibold text-ink">Limite à connaître —</span> {plan.notIncluded}
+        </p>
       </div>
     );
   }

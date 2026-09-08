@@ -62,6 +62,10 @@ export interface PlanEntitlements {
   id: Plan;
   label: string;
   tagline: string;
+  /** "Pour qui" en une phrase — pas un chiffre inventé (taille d'équipe, type d'activité réel visé par ce niveau). */
+  targetAudience: string;
+  /** La limite la plus susceptible de faire hésiter — affichée aussi visiblement que les avantages, jamais cachée en petit. */
+  notIncluded: string;
   priceMonthly: number; // en euros, 0 = gratuit
   seats: number; // utilisateurs inclus (1 = pas d'équipe)
   prospectMonthlyLimit: number;
@@ -88,6 +92,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "free",
     label: "Free",
     tagline: "Pour découvrir ProspectFlow.",
+    targetAudience: "Pour tester avant de vous engager — pas pour prospecter sérieusement.",
+    notIncluded: "15 prospects/mois seulement — bien trop limité pour une vraie campagne de prospection.",
     priceMonthly: 0,
     seats: 1,
     prospectMonthlyLimit: 15,
@@ -117,6 +123,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "acquisition_starter",
     label: "Acquisition Starter",
     tagline: "Pour lancer une vraie prospection.",
+    targetAudience: "Indépendants et petites équipes commerciales qui démarrent la prospection.",
+    notIncluded: "Pas de campagnes email automatiques ni de relances — envoi et suivi restent manuels.",
     priceMonthly: 59,
     seats: 1,
     prospectMonthlyLimit: 500,
@@ -147,6 +155,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "acquisition_pro",
     label: "Acquisition Pro",
     tagline: "Toute la puissance de prospection, sans Business OS.",
+    targetAudience: "Équipes commerciales actives qui veulent automatiser relances et suivi.",
+    notIncluded: "Pas de Business OS — gestion de l'activité (clients, planning, stock) non incluse.",
     priceMonthly: 129,
     seats: 1,
     prospectMonthlyLimit: 2000,
@@ -177,6 +187,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "business_os",
     label: "Business OS",
     tagline: "Le logiciel de gestion de votre métier — sans prospection.",
+    targetAudience: "TPE et indépendants qui gèrent déjà leurs clients, sans besoin de prospecter.",
+    notIncluded: "Pas de prospection — ajoutez le module Acquisition séparément si besoin.",
     priceMonthly: 89,
     seats: 1,
     prospectMonthlyLimit: 15,
@@ -204,6 +216,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "business_os_advanced",
     label: "Business OS Advanced",
     tagline: "Business OS complet, équipe incluse.",
+    targetAudience: "Entreprises avec une équipe (jusqu'à 5) qui veulent alertes et automatisations métier.",
+    notIncluded: "Pas de prospection — ajoutez le module Acquisition séparément si besoin.",
     priceMonthly: 139,
     seats: 5,
     prospectMonthlyLimit: 15,
@@ -231,6 +245,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "complete",
     label: "Complete",
     tagline: "Acquisition Pro + Business OS, au prix d'un bundle.",
+    targetAudience: "Entreprises qui prospectent ET gèrent leur activité au quotidien, seules (pas d'équipe).",
+    notIncluded: "1 seul utilisateur — passez à Complete Max pour ajouter une équipe.",
     priceMonthly: 179,
     seats: 1,
     prospectMonthlyLimit: 2000,
@@ -259,6 +275,8 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     id: "complete_max",
     label: "Complete Max",
     tagline: "Acquisition Pro + Business OS avancé + équipe, sans compromis.",
+    targetAudience: "Entreprises en croissance avec une équipe, qui veulent tout sans compromis.",
+    notIncluded: "Le forfait le plus cher — inutile si vous n'utilisez qu'un seul des deux modules.",
     priceMonthly: 249,
     seats: 5,
     prospectMonthlyLimit: 5000,
