@@ -11,6 +11,7 @@ import { Drawer } from "@/components/ui/drawer";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
+import { normalizeSearch } from "@/lib/utils";
 
 interface ControlledCustomers {
   rows: Customer[];
@@ -45,8 +46,12 @@ export function CustomersModule({
   const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [search, setSearch] = useState("");
 
   const rows = controlled ? controlled.rows : localRows;
+  const filteredRows = search.trim()
+    ? rows.filter((r) => normalizeSearch(`${r.name} ${r.phone ?? ""} ${r.email ?? ""}`).includes(normalizeSearch(search.trim())))
+    : rows;
 
   async function create(input: { name: string; phone: string; email: string; notes: string }) {
     if (!input.name.trim()) return;
@@ -104,7 +109,9 @@ export function CustomersModule({
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">{label}</h2>
+        <h2 className="font-display text-sm font-bold">
+          {label} <span className="font-normal text-faint">({rows.length})</span>
+        </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter
         </Button>
@@ -125,26 +132,38 @@ export function CustomersModule({
         </div>
       ) : (
         <div className="mt-4">
-          <TableWrap>
-            <Table>
-              <Thead>
-                <tr>
-                  <Th>Nom</Th>
-                  <Th>Téléphone</Th>
-                  <Th>Email</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {rows.map((r) => (
-                  <Tr key={r.id} onClick={() => setEditing(r)}>
-                    <Td className="font-semibold text-ink">{r.name}</Td>
-                    <Td className="text-muted">{r.phone ?? "—"}</Td>
-                    <Td className="text-muted">{r.email ?? "—"}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+          {rows.length > 5 && (
+            <Input
+              placeholder="Rechercher (nom, téléphone, email)…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="mb-2.5"
+            />
+          )}
+          {filteredRows.length === 0 ? (
+            <p className="py-6 text-center text-[12.5px] text-muted">Aucun résultat pour « {search} ».</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>Nom</Th>
+                    <Th>Téléphone</Th>
+                    <Th>Email</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {filteredRows.map((r) => (
+                    <Tr key={r.id} onClick={() => setEditing(r)}>
+                      <Td className="font-semibold text-ink">{r.name}</Td>
+                      <Td className="text-muted">{r.phone ?? "—"}</Td>
+                      <Td className="text-muted">{r.email ?? "—"}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </TableWrap>
+          )}
         </div>
       )}
 

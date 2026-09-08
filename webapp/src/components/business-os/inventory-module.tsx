@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
+import { cn, normalizeSearch } from "@/lib/utils";
 
 interface ItemInput {
   name: string;
@@ -51,12 +52,23 @@ export function InventoryModule({
   const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
 
   const rows = controlled ? controlled.rows : localRows;
 
   function supplierName(id: string | null) {
     return id ? suppliers.find((s) => s.id === id)?.name ?? "—" : "—";
   }
+
+  function isLow(r: InventoryItem) {
+    return r.low_stock_threshold != null && r.quantity <= r.low_stock_threshold;
+  }
+  const lowStockCount = rows.filter(isLow).length;
+
+  const filteredRows = rows
+    .filter((r) => !lowStockOnly || isLow(r))
+    .filter((r) => !search.trim() || normalizeSearch(`${r.name} ${supplierName(r.supplier_id)}`).includes(normalizeSearch(search.trim())));
 
   async function create(input: ItemInput) {
     if (!input.name.trim()) return;
@@ -122,7 +134,9 @@ export function InventoryModule({
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">{label}</h2>
+        <h2 className="font-display text-sm font-bold">
+          {label} <span className="font-normal text-faint">({rows.length})</span>
+        </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter
         </Button>
@@ -134,44 +148,70 @@ export function InventoryModule({
         </div>
       ) : (
         <div className="mt-4">
-          <TableWrap>
-            <Table>
-              <Thead>
-                <tr>
-                  <Th>Article</Th>
-                  {suppliers.length > 0 && <Th>Fournisseur</Th>}
-                  <Th className="text-right">Quantité</Th>
-                  <Th className="text-right">Ajuster</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {rows.map((r) => {
-                  const low = r.low_stock_threshold != null && r.quantity <= r.low_stock_threshold;
-                  return (
-                    <Tr key={r.id} onClick={() => setEditing(r)}>
-                      <Td className="font-semibold text-ink">
-                        {r.name} {low && <Badge tone="danger" className="ml-1.5">Stock bas</Badge>}
-                      </Td>
-                      {suppliers.length > 0 && <Td className="text-muted">{supplierName(r.supplier_id)}</Td>}
-                      <Td className="text-right font-display font-bold">
-                        {r.quantity} {r.unit}
-                      </Td>
-                      <Td className="text-right" onClick={(e) => e.stopPropagation()}>
-                        <span className="inline-flex items-center gap-1.5">
-                          <button onClick={() => adjust(r.id, -1)} className="h-6 w-6 rounded-md border border-line bg-panel">
-                            −
-                          </button>
-                          <button onClick={() => adjust(r.id, 1)} className="h-6 w-6 rounded-md border border-line bg-panel">
-                            +
-                          </button>
-                        </span>
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </TableWrap>
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            {rows.length > 5 && (
+              <Input
+                placeholder="Rechercher (article, fournisseur)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="min-w-[180px] flex-1"
+              />
+            )}
+            {lowStockCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setLowStockOnly((v) => !v)}
+                className={cn(
+                  "shrink-0 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold",
+                  lowStockOnly ? "border-red-fg bg-red-bg text-red-fg" : "border-line bg-panel text-muted hover:bg-soft",
+                )}
+              >
+                ⚠ Stock bas ({lowStockCount})
+              </button>
+            )}
+          </div>
+          {filteredRows.length === 0 ? (
+            <p className="py-6 text-center text-[12.5px] text-muted">Aucun résultat.</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>Article</Th>
+                    {suppliers.length > 0 && <Th>Fournisseur</Th>}
+                    <Th className="text-right">Quantité</Th>
+                    <Th className="text-right">Ajuster</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {filteredRows.map((r) => {
+                    const low = isLow(r);
+                    return (
+                      <Tr key={r.id} onClick={() => setEditing(r)}>
+                        <Td className="font-semibold text-ink">
+                          {r.name} {low && <Badge tone="danger" className="ml-1.5">Stock bas</Badge>}
+                        </Td>
+                        {suppliers.length > 0 && <Td className="text-muted">{supplierName(r.supplier_id)}</Td>}
+                        <Td className="text-right font-display font-bold">
+                          {r.quantity} {r.unit}
+                        </Td>
+                        <Td className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <span className="inline-flex items-center gap-1.5">
+                            <button onClick={() => adjust(r.id, -1)} className="h-6 w-6 rounded-md border border-line bg-panel">
+                              −
+                            </button>
+                            <button onClick={() => adjust(r.id, 1)} className="h-6 w-6 rounded-md border border-line bg-panel">
+                              +
+                            </button>
+                          </span>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </TableWrap>
+          )}
         </div>
       )}
 

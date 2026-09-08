@@ -13,6 +13,7 @@ import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { REPAIR_STATUS_LABEL } from "@/lib/garage";
+import { normalizeSearch } from "@/lib/utils";
 
 interface ControlledVehicles {
   rows: Vehicle[];
@@ -38,6 +39,7 @@ export function VehiclesModule({
   const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Vehicle | null>(null);
+  const [search, setSearch] = useState("");
 
   const rows = controlled ? controlled.rows : localRows;
 
@@ -47,6 +49,12 @@ export function VehiclesModule({
   function historyOf(vehicleId: string) {
     return repairOrders.filter((r) => r.vehicle_id === vehicleId).sort((a, b) => b.created_at.localeCompare(a.created_at));
   }
+
+  const filteredRows = search.trim()
+    ? rows.filter((r) =>
+        normalizeSearch(`${r.registration} ${r.make} ${r.model} ${customerName(r.customer_id)}`).includes(normalizeSearch(search.trim())),
+      )
+    : rows;
 
   async function create(input: { registration: string; make: string; model: string; year: string; mileage: string; customerId: string; notes: string }) {
     if (!input.registration.trim()) return;
@@ -107,7 +115,9 @@ export function VehiclesModule({
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">Véhicules</h2>
+        <h2 className="font-display text-sm font-bold">
+          Véhicules <span className="font-normal text-faint">({rows.length})</span>
+        </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter
         </Button>
@@ -128,32 +138,44 @@ export function VehiclesModule({
         </div>
       ) : (
         <div className="mt-4">
-          <TableWrap>
-            <Table>
-              <Thead>
-                <tr>
-                  <Th>Immatriculation</Th>
-                  <Th>Véhicule</Th>
-                  <Th>Propriétaire</Th>
-                  <Th>Kilométrage</Th>
-                  <Th className="text-right">Historique</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {rows.map((r) => (
-                  <Tr key={r.id} onClick={() => setEditing(r)}>
-                    <Td className="font-display font-bold text-ink">{r.registration}</Td>
-                    <Td className="text-muted">
-                      {r.make} {r.model} {r.year ? `(${r.year})` : ""}
-                    </Td>
-                    <Td className="text-muted">{customerName(r.customer_id)}</Td>
-                    <Td className="text-muted">{r.mileage != null ? `${r.mileage.toLocaleString("fr-FR")} km` : "—"}</Td>
-                    <Td className="text-right text-muted">{historyOf(r.id).length} ordre(s)</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </TableWrap>
+          {rows.length > 5 && (
+            <Input
+              placeholder="Rechercher (immatriculation, marque, modèle, propriétaire)…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="mb-2.5"
+            />
+          )}
+          {filteredRows.length === 0 ? (
+            <p className="py-6 text-center text-[12.5px] text-muted">Aucun résultat pour « {search} ».</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>Immatriculation</Th>
+                    <Th>Véhicule</Th>
+                    <Th>Propriétaire</Th>
+                    <Th>Kilométrage</Th>
+                    <Th className="text-right">Historique</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {filteredRows.map((r) => (
+                    <Tr key={r.id} onClick={() => setEditing(r)}>
+                      <Td className="font-display font-bold text-ink">{r.registration}</Td>
+                      <Td className="text-muted">
+                        {r.make} {r.model} {r.year ? `(${r.year})` : ""}
+                      </Td>
+                      <Td className="text-muted">{customerName(r.customer_id)}</Td>
+                      <Td className="text-muted">{r.mileage != null ? `${r.mileage.toLocaleString("fr-FR")} km` : "—"}</Td>
+                      <Td className="text-right text-muted">{historyOf(r.id).length} ordre(s)</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </Table>
+            </TableWrap>
+          )}
         </div>
       )}
 

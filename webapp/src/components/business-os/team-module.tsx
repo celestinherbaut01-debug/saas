@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
+import { cn } from "@/lib/utils";
 
 // Équipe générique (Employés/Équipe selon le libellé) — réutilisé par
 // Nettoyage, Agence, Restaurant. Le Garage a sa propre version
@@ -33,11 +34,16 @@ export function TeamModule({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
+  const [activeOnly, setActiveOnly] = useState(false);
+  const inactiveCount = rows.filter((t) => !t.active).length;
+  const filteredRows = activeOnly ? rows.filter((t) => t.active) : rows;
 
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">{label}</h2>
+        <h2 className="font-display text-sm font-bold">
+          {label} <span className="font-normal text-faint">({rows.length})</span>
+        </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter
         </Button>
@@ -49,6 +55,18 @@ export function TeamModule({
         </div>
       ) : (
         <div className="mt-4">
+          {inactiveCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setActiveOnly((v) => !v)}
+              className={cn(
+                "mb-2.5 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold",
+                activeOnly ? "border-ink bg-ink text-bg" : "border-line bg-panel text-muted hover:bg-soft",
+              )}
+            >
+              {activeOnly ? "Actifs uniquement" : `Voir tous (${inactiveCount} inactif${inactiveCount > 1 ? "s" : ""})`}
+            </button>
+          )}
           <TableWrap>
             <Table>
               <Thead>
@@ -60,7 +78,7 @@ export function TeamModule({
                 </tr>
               </Thead>
               <tbody>
-                {rows.map((t) => (
+                {filteredRows.map((t) => (
                   <Tr key={t.id} onClick={() => setEditing(t)}>
                     <Td className="font-semibold text-ink">{t.name}</Td>
                     <Td className="text-muted">{t.role || "—"}</Td>

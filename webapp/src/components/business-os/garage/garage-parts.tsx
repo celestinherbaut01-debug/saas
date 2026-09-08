@@ -12,6 +12,7 @@ import { Table, TableWrap, Thead, Th, Tr, Td } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 import { formatEUR } from "@/lib/garage";
+import { cn, normalizeSearch } from "@/lib/utils";
 
 interface PartInput {
   name: string;
@@ -38,15 +39,26 @@ export function PartsModule({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Part | null>(null);
+  const [search, setSearch] = useState("");
+  const [lowStockOnly, setLowStockOnly] = useState(false);
 
   function supplierName(id: string | null) {
     return id ? suppliers.find((s) => s.id === id)?.name ?? "—" : "—";
   }
+  function isLow(p: Part) {
+    return p.low_stock_threshold != null && p.quantity <= p.low_stock_threshold;
+  }
+  const lowStockCount = rows.filter(isLow).length;
+  const filteredRows = rows
+    .filter((p) => !lowStockOnly || isLow(p))
+    .filter((p) => !search.trim() || normalizeSearch(`${p.name} ${p.reference} ${supplierName(p.supplier_id)}`).includes(normalizeSearch(search.trim())));
 
   return (
     <Card>
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-display text-sm font-bold">Pièces</h2>
+        <h2 className="font-display text-sm font-bold">
+          Pièces <span className="font-normal text-faint">({rows.length})</span>
+        </h2>
         <Button size="sm" onClick={() => setCreateOpen(true)}>
           + Ajouter une pièce
         </Button>
@@ -58,40 +70,66 @@ export function PartsModule({
         </div>
       ) : (
         <div className="mt-4">
-          <TableWrap>
-            <Table>
-              <Thead>
-                <tr>
-                  <Th>Pièce</Th>
-                  <Th>Référence</Th>
-                  <Th>Fournisseur</Th>
-                  <Th className="text-right">Coût</Th>
-                  <Th className="text-right">Prix de vente</Th>
-                  <Th className="text-right">Stock</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {rows.map((p) => {
-                  const low = p.low_stock_threshold != null && p.quantity <= p.low_stock_threshold;
-                  return (
-                    <Tr key={p.id} onClick={() => setEditing(p)}>
-                      <Td className="font-semibold text-ink">{p.name}</Td>
-                      <Td className="text-muted">{p.reference || "—"}</Td>
-                      <Td className="text-muted">{supplierName(p.supplier_id)}</Td>
-                      <Td className="text-right text-muted">{formatEUR(p.unit_cost)}</Td>
-                      <Td className="text-right font-semibold">{formatEUR(p.unit_price)}</Td>
-                      <Td className="text-right">
-                        <span className="inline-flex items-center gap-1.5">
-                          {p.quantity} {p.unit}
-                          {low && <Badge tone="danger">Bas</Badge>}
-                        </span>
-                      </Td>
-                    </Tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          </TableWrap>
+          <div className="mb-2.5 flex flex-wrap items-center gap-2">
+            {rows.length > 5 && (
+              <Input
+                placeholder="Rechercher (nom, référence, fournisseur)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="min-w-[180px] flex-1"
+              />
+            )}
+            {lowStockCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setLowStockOnly((v) => !v)}
+                className={cn(
+                  "shrink-0 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold",
+                  lowStockOnly ? "border-red-fg bg-red-bg text-red-fg" : "border-line bg-panel text-muted hover:bg-soft",
+                )}
+              >
+                ⚠ Stock bas ({lowStockCount})
+              </button>
+            )}
+          </div>
+          {filteredRows.length === 0 ? (
+            <p className="py-6 text-center text-[12.5px] text-muted">Aucun résultat.</p>
+          ) : (
+            <TableWrap>
+              <Table>
+                <Thead>
+                  <tr>
+                    <Th>Pièce</Th>
+                    <Th>Référence</Th>
+                    <Th>Fournisseur</Th>
+                    <Th className="text-right">Coût</Th>
+                    <Th className="text-right">Prix de vente</Th>
+                    <Th className="text-right">Stock</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {filteredRows.map((p) => {
+                    const low = isLow(p);
+                    return (
+                      <Tr key={p.id} onClick={() => setEditing(p)}>
+                        <Td className="font-semibold text-ink">{p.name}</Td>
+                        <Td className="text-muted">{p.reference || "—"}</Td>
+                        <Td className="text-muted">{supplierName(p.supplier_id)}</Td>
+                        <Td className="text-right text-muted">{formatEUR(p.unit_cost)}</Td>
+                        <Td className="text-right font-semibold">{formatEUR(p.unit_price)}</Td>
+                        <Td className="text-right">
+                          <span className="inline-flex items-center gap-1.5">
+                            {p.quantity} {p.unit}
+                            {low && <Badge tone="danger">Bas</Badge>}
+                          </span>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </TableWrap>
+          )}
         </div>
       )}
 
