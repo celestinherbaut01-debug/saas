@@ -144,6 +144,20 @@ export async function runProspectSearch(
     return { ok: false, error: e instanceof Error ? e.message : "Quota atteint." };
   }
 
+  // Log temporaire de diagnostic (stage "requête envoyée") — uniquement en
+  // dev, jamais en production. À retirer une fois le pipeline confirmé
+  // stable en conditions réelles.
+  if (isDev()) {
+    console.log("[search-prospects][server-action] requête envoyée :", {
+      workspaceId,
+      plan,
+      radiusKm: params.radiusKm,
+      nafCodes: params.nafCodes,
+      audience: params.audience,
+      ownCategorySlug: params.ownCategorySlug,
+    });
+  }
+
   const { data, error } = await supabase.functions.invoke("search-prospects", { body: params });
 
   if (error) {
@@ -187,6 +201,21 @@ export async function runProspectSearch(
     return { ok: false, error: data.error };
   }
 
+  const normalized = normalizeSearchResponse(data);
+
+  // Log temporaire de diagnostic (stage "résultats après normalisation") —
+  // uniquement en dev. Montre exactement ce que l'UI va recevoir, y compris
+  // les éventuels avertissements de dégradation (voir lib/search-response.ts).
+  if (isDev()) {
+    console.log("[search-prospects][server-action] résultat normalisé :", {
+      registryFound: normalized.registryFound,
+      displayed: normalized.displayed,
+      googleVerified: normalized.googleVerified,
+      resultsCount: normalized.results.length,
+      warnings: normalized.warnings,
+    });
+  }
+
   await incrementUsage(workspaceId, "searches");
-  return { ok: true, data: normalizeSearchResponse(data) };
+  return { ok: true, data: normalized };
 }

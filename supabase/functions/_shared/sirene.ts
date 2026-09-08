@@ -100,6 +100,14 @@ export async function searchSirene(
     API_MAX_MATCHING_SIZE,
   );
 
+  // Log temporaire de diagnostic — visible uniquement dans les logs Supabase
+  // Edge Functions (jamais renvoyé au client). À retirer une fois le pipeline
+  // de recherche confirmé stable en conditions réelles.
+  console.log(
+    `[sirene] requête : lat=${query.lat} lng=${query.lng} radius=${effectiveRadius}km ` +
+      `nafCodes=${query.nafCodes.length > 0 ? query.nafCodes.join(",") : "(tous)"}`,
+  );
+
   for (let page = 1; page <= MAX_PAGES; page++) {
     const params = new URLSearchParams({
       lat: String(query.lat),
@@ -121,17 +129,31 @@ export async function searchSirene(
       params.set("etat_administratif", "A");
     }
 
-    const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-      headers: { Accept: "application/json" },
-    });
-    if (!res.ok) {
-      throw new Error(
-        `Registre entreprises indisponible (${res.status}) : ${await res
-          .text()
-          .catch(() => "")}`,
-      );
+    let data: RawResponse;
+    try {
+      const res = await fetch(`${BASE_URL}?${params.toString()}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        throw new Error(
+          `Registre entreprises indisponible (${res.status}) : ${await res
+            .text()
+            .catch(() => "")}`,
+        );
+      }
+      data = (await res.json()) as RawResponse;
+    } catch (err) {
+      console.error(`[sirene] page ${page} en échec`, err);
+      // Une recherche multi-codes/multi-pages ne doit pas s'effondrer
+      // entièrement à cause d'un incident sur UNE page : si des résultats
+      // ont déjà été obtenus (pages précédentes), on les garde et on arrête
+      // la pagination proprement (dégradation, pas d'erreur globale). Si
+      // c'est la toute première page qui échoue, on n'a réellement aucune
+      // donnée à montrer : le registre est injoignable, il faut le dire.
+      if (results.length > 0) break;
+      throw err instanceof Error ? err : new Error("Registre entreprises indisponible");
     }
-    const data = (await res.json()) as RawResponse;
+
     const pageResults = data.results ?? [];
 
     for (const company of pageResults) {
@@ -147,9 +169,15 @@ export async function searchSirene(
       }
     }
 
+    console.log(
+      `[sirene] page ${page}/${data.total_pages ?? 1} : ${pageResults.length} entreprises reçues, ` +
+        `${results.length} établissements cumulés`,
+    );
+
     const totalPages = data.total_pages ?? 1;
     if (page >= totalPages || pageResults.length === 0) break;
   }
 
+  console.log(`[sirene] total établissements retenus : ${results.length}`);
   return results;
 }

@@ -25,9 +25,32 @@ import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_sh
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
 const HARD_MAX_PLACES_LOOKUPS = 60;
 const CACHE_TTL_DAYS = 30;
+/** Vérifications Google Places en direct traitées en parallèle par lot. */
+const GOOGLE_LOOKUP_CONCURRENCY = 6;
 
 function badRequest(message: string) {
   return jsonResponse({ error: message }, 400);
+}
+
+/**
+ * Exécute `fn` sur chaque item de `items`, avec au plus `limit` exécutions en
+ * parallèle. Remplace une boucle séquentielle : jusqu'à 25 candidats × 2
+ * appels externes (Google Places + analyse du site, 8s/6s de timeout chacun)
+ * traités un par un pouvaient prendre 30s+ de temps d'exécution total et
+ * risquer le timeout de la fonction — cause la plus probable des recherches
+ * qui échouent sans erreur claire. Chaque `fn` reste responsable d'isoler ses
+ * propres erreurs : un échec sur un item ne doit jamais interrompre les
+ * autres.
+ */
+async function runWithConcurrency<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let cursor = 0;
+  async function worker() {
+    while (cursor < items.length) {
+      const item = items[cursor++];
+      await fn(item);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 /**
@@ -96,6 +119,16 @@ Deno.serve(async (req) => {
   );
   const scoringProfile = resolveScoringProfile(body.ownCategorySlug ?? null, body.audience ?? null);
 
+  // Log temporaire de diagnostic (stage 1/8 : requête reçue) — visible
+  // uniquement dans les logs Supabase Edge Functions, jamais renvoyé au
+  // client. À retirer une fois le pipeline confirmé stable en réel.
+  console.log(
+    `[search-prospects] requête : lat=${lat} lng=${lng} radius=${radiusKm}km ` +
+      `nafCodes=[${nafCodes.join(",")}] audience=${body.audience ?? "?"} ownCategorySlug=${
+        body.ownCategorySlug ?? "?"
+      } maxPlacesLookups=${maxPlacesLookups} scoringProfile=${scoringProfile}`,
+  );
+
   // Service role : nécessaire pour lire/écrire le cache de vérification
   // mutualisé (verification_cache n'autorise pas l'écriture depuis le client).
   const admin = createClient(supabaseUrl, serviceRoleKey);
@@ -158,6 +191,13 @@ Deno.serve(async (req) => {
     candidates.sort((a, b) => a.distanceKm - b.distanceKm);
     const totalMatched = candidates.length;
 
+    // Stage 2/8 + 3/8 : résultats registre bruts puis après normalisation
+    // (distance exacte + filtres indépendance).
+    console.log(
+      `[search-prospects] registre : ${raw.length} établissements bruts reçus → ${totalMatched} après ` +
+        `filtre distance/indépendance`,
+    );
+
     // 5. Vérification Google Places (avec cache par SIRET) + qualité du site.
     //
     // RÈGLE PRODUIT : le registre suffit à afficher un prospect. Google
@@ -176,15 +216,8 @@ Deno.serve(async (req) => {
       .in("siret", candidates.map((c) => c.siret));
     const cacheBySiret = new Map((cachedRows ?? []).map((r) => [r.siret, r]));
 
-    const enriched: EnrichedProspect[] = [];
-    let liveGoogleCallsUsed = 0;
-
-    for (const c of candidates) {
-      const isChain = isKnownChain(c.companyName);
-      const isAssociation = isAssociationOrPublic(c.natureJuridique);
-      const isLarge = isLargeGroup(c.effectifTranche);
-
-      let placesResult: {
+    type VerificationOutcome = {
+      placesResult: {
         placeId: string | null;
         businessStatus: EnrichedProspect["businessStatus"];
         websiteUri: string | null;
@@ -192,35 +225,73 @@ Deno.serve(async (req) => {
         rating: number | null;
         ratingCount: number | null;
       };
-      let websiteQuality: EnrichedProspect["websiteQuality"] = "unknown";
-      let checkedAt: string | null = null;
-      let fromCache = false;
-      let googleConsulted = false;
+      websiteQuality: EnrichedProspect["websiteQuality"];
+      checkedAt: string | null;
+      fromCache: boolean;
+      googleConsulted: boolean;
+    };
 
+    // Pas de clé Google configurée, plafond de vérifications payantes
+    // atteint, ou vérification live qui a échoué : on ne fabrique aucune
+    // donnée, le prospect reste explicitement "à vérifier" — mais reste
+    // affiché (le registre suffit, Google ne fait qu'enrichir).
+    const noDataOutcome = (): VerificationOutcome => ({
+      placesResult: { placeId: null, businessStatus: "unverified", websiteUri: null, phone: null, rating: null, ratingCount: null },
+      websiteQuality: "unknown",
+      checkedAt: null,
+      fromCache: false,
+      googleConsulted: false,
+    });
+
+    // Phase 1 (synchrone) : décider, dans l'ordre de distance, qui vient du
+    // cache et qui a besoin d'un appel Google en direct — le budget
+    // `maxPlacesLookups` est consommé exactement dans cet ordre, comme avant.
+    const outcomes: VerificationOutcome[] = new Array(candidates.length);
+    const liveLookupIndexes: number[] = [];
+    let liveBudgetLeft = maxPlacesLookups;
+
+    candidates.forEach((c, i) => {
       const cached = cacheBySiret.get(c.siret);
-
       if (cached && Date.now() - new Date(cached.checked_at).getTime() < cacheTtlMs) {
-        placesResult = {
-          placeId: cached.place_id,
-          businessStatus: cached.business_status ?? "unverified",
-          websiteUri: cached.website_uri,
-          phone: cached.phone,
-          rating: cached.google_rating,
-          ratingCount: cached.google_rating_count,
+        outcomes[i] = {
+          placesResult: {
+            placeId: cached.place_id,
+            businessStatus: cached.business_status ?? "unverified",
+            websiteUri: cached.website_uri,
+            phone: cached.phone,
+            rating: cached.google_rating,
+            ratingCount: cached.google_rating_count,
+          },
+          websiteQuality: cached.website_quality ?? "unknown",
+          checkedAt: cached.checked_at,
+          fromCache: true,
+          googleConsulted: true,
         };
-        websiteQuality = cached.website_quality ?? "unknown";
-        checkedAt = cached.checked_at;
-        fromCache = true;
-        googleConsulted = true;
-      } else if (googleApiKey && liveGoogleCallsUsed < maxPlacesLookups) {
-        liveGoogleCallsUsed++;
-        const address = [c.street, c.postalCode, c.city].filter(Boolean).join(", ");
-        placesResult = await verifyWithGooglePlaces(c.companyName, address, googleApiKey);
-        websiteQuality = await analyseWebsiteQuality(placesResult.websiteUri);
-        checkedAt = new Date().toISOString();
-        googleConsulted = true;
+      } else if (googleApiKey && liveBudgetLeft > 0) {
+        liveBudgetLeft--;
+        liveLookupIndexes.push(i);
+        outcomes[i] = noDataOutcome(); // provisoire, remplacé après la vérification live (phase 2)
+      } else {
+        outcomes[i] = noDataOutcome();
+      }
+    });
 
-        await admin.from("verification_cache").upsert({
+    // Phase 2 : vérifications Google en direct exécutées en parallèle par
+    // lots bornés (voir runWithConcurrency) au lieu d'une par une. Chaque
+    // échec reste isolé à SON candidat — verifyWithGooglePlaces et
+    // analyseWebsiteQuality ne lèvent déjà jamais (voir _shared/placesApi.ts
+    // et _shared/websiteQuality.ts), le try/catch ici est un filet de
+    // sécurité supplémentaire — jamais une erreur globale sur la recherche.
+    await runWithConcurrency(liveLookupIndexes, GOOGLE_LOOKUP_CONCURRENCY, async (i) => {
+      const c = candidates[i];
+      try {
+        const address = [c.street, c.postalCode, c.city].filter(Boolean).join(", ");
+        const placesResult = await verifyWithGooglePlaces(c.companyName, address, googleApiKey!);
+        const websiteQuality = await analyseWebsiteQuality(placesResult.websiteUri);
+        const checkedAt = new Date().toISOString();
+        outcomes[i] = { placesResult, websiteQuality, checkedAt, fromCache: false, googleConsulted: true };
+
+        const { error: upsertError } = await admin.from("verification_cache").upsert({
           siret: c.siret,
           place_id: placesResult.placeId,
           business_status: placesResult.businessStatus,
@@ -231,20 +302,28 @@ Deno.serve(async (req) => {
           website_quality: websiteQuality,
           checked_at: checkedAt,
         });
-      } else {
-        // Pas de clé Google configurée, ou plafond de vérifications payantes
-        // atteint pour cette recherche : on ne fabrique aucune donnée, le
-        // prospect reste explicitement "à vérifier" — mais reste affiché.
-        placesResult = {
-          placeId: null,
-          businessStatus: "unverified",
-          websiteUri: null,
-          phone: null,
-          rating: null,
-          ratingCount: null,
-        };
-        websiteQuality = "unknown";
+        if (upsertError) console.error("[search-prospects] échec écriture cache verification_cache", c.siret, upsertError);
+      } catch (err) {
+        console.error("[search-prospects] vérification Google en échec pour un candidat — affiché sans enrichissement", c.siret, err);
+        outcomes[i] = noDataOutcome();
       }
+    });
+
+    // Stage 4/8 + 5/8 : résultats registre retenus / résultats Google reçus.
+    console.log(
+      `[search-prospects] vérification Google : ${liveLookupIndexes.length} appels live, ` +
+        `${outcomes.filter((o) => o.fromCache).length} depuis le cache, ` +
+        `${outcomes.filter((o) => !o.googleConsulted).length} non vérifiés (pas de clé ou plafond atteint)`,
+    );
+
+    const enriched: EnrichedProspect[] = [];
+
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const { placesResult, websiteQuality, checkedAt, fromCache, googleConsulted } = outcomes[i];
+      const isChain = isKnownChain(c.companyName);
+      const isAssociation = isAssociationOrPublic(c.natureJuridique);
+      const isLarge = isLargeGroup(c.effectifTranche);
 
       // Filtres qui dépendent de la vérification Places — uniquement
       // appliqués si Google a réellement été consulté (sinon on ne sait
@@ -288,6 +367,9 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Stage 6/8 : résultats après normalisation/scoring (avant filtre web).
+    console.log(`[search-prospects] après scoring/pertinence : ${enriched.length} prospects enrichis`);
+
     // 6. Filtre "besoin digital" — optionnel, "all" par défaut côté client :
     // ne doit jamais, à lui seul, faire disparaître un prospect du registre.
     let results = enriched;
@@ -300,6 +382,7 @@ Deno.serve(async (req) => {
       };
       const allowed = wanted[filters.webFilter];
       if (allowed) results = results.filter((r) => allowed.includes(r.websiteQuality));
+      console.log(`[search-prospects] après filtre web (${filters.webFilter}) : ${results.length} résultats`);
     }
 
     // 7. Tri : la pertinence (primary avant secondary) prime toujours sur le
@@ -317,6 +400,12 @@ Deno.serve(async (req) => {
     }
 
     const primaryCount = results.filter((r) => r.relevanceTier === "primary").length;
+
+    // Stage 8/8 : résultats réellement affichés au client.
+    console.log(
+      `[search-prospects] affichés : ${results.length} (primary=${primaryCount}, ` +
+        `secondary=${results.length - primaryCount})`,
+    );
 
     return jsonResponse({
       totalMatchedInRegistry: totalMatched,

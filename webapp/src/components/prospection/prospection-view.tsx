@@ -211,11 +211,27 @@ export function ProspectionView({
     setStatus({ kind: "info", text: "Recherche en cours — registre officiel, Google Places, analyse des sites…" });
     setChecked(new Set());
 
+    const nafCodes = nafCodesForSelection();
+
+    // Log temporaire de diagnostic (stage "recherche lancée depuis l'UI") —
+    // uniquement en dev (visible dans la console du navigateur). À retirer
+    // une fois le pipeline confirmé stable en conditions réelles.
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[prospection][ui] recherche lancée :", {
+        address: `${address.lat},${address.lng}`,
+        radiusKm,
+        targetIds,
+        nafCodesCount: nafCodes.length,
+        nafCodes,
+        audience,
+      });
+    }
+
     const result = await runProspectSearch(workspaceId, {
       lat: address.lat,
       lng: address.lng,
       radiusKm,
-      nafCodes: nafCodesForSelection(),
+      nafCodes,
       filters: {
         operationalOnly,
         excludeTempClosed,
@@ -250,6 +266,18 @@ export function ProspectionView({
       results: [],
       warnings: [],
     };
+
+    // Log temporaire de diagnostic (stage "résultats affichés dans l'UI") —
+    // uniquement en dev.
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[prospection][ui] résultats reçus :", {
+        registryFound: data.registryFound,
+        displayed: data.displayed,
+        googleVerified: data.googleVerified,
+        resultsCount: data.results.length,
+        warnings: data.warnings,
+      });
+    }
 
     setResults(data.results);
     setScoringProfileLabel(data.scoringProfileLabel);
