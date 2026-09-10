@@ -11,9 +11,11 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { getWorkspacePlan, PLAN_LABEL } from "@/lib/plan";
-import { businessOsAtLeast } from "@/lib/entitlements";
+import { businessOsAtLeast, getEntitlements } from "@/lib/entitlements";
 import { buildAppointmentInsights, buildLowStockInsight, buildRenewalInsight, type ProactiveInsight } from "@/lib/automation-insights";
 import { ProactiveInsights } from "@/components/business-os/proactive-insights";
+import { getOpportunities } from "@/lib/actions/nova-opportunities";
+import { NovaOpportunities } from "@/components/nova-opportunities";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
@@ -52,12 +54,20 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings] = await Promise.all([
+  const [businessProfile, profile, automationSettings, opportunitiesResult] = await Promise.all([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
+    getOpportunities(workspaceId),
   ]);
   const vertical = profile.vertical;
+  const opportunitiesBlock = opportunitiesResult.opportunities.length > 0 && (
+    <NovaOpportunities
+      workspaceId={workspaceId}
+      opportunities={opportunitiesResult.opportunities}
+      actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
+    />
+  );
 
   const header = (
     <div className="flex items-center justify-between gap-3">
@@ -120,6 +130,7 @@ export default async function BusinessOsPage() {
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          {opportunitiesBlock}
           <ProactiveInsights insights={insights} />
           <GarageView
             workspaceId={workspaceId}
@@ -171,6 +182,7 @@ export default async function BusinessOsPage() {
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          {opportunitiesBlock}
           <ProactiveInsights insights={insights} />
           <CleaningView
             workspaceId={workspaceId}
@@ -223,6 +235,7 @@ export default async function BusinessOsPage() {
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          {opportunitiesBlock}
           <ProactiveInsights insights={insights} />
           <AgencyView
             workspaceId={workspaceId}
@@ -277,6 +290,7 @@ export default async function BusinessOsPage() {
       <AppShell>
         <div className="flex flex-col gap-5">
           {header}
+          {opportunitiesBlock}
           <ProactiveInsights insights={insights} />
           <RestaurantView
             workspaceId={workspaceId}
@@ -325,6 +339,7 @@ export default async function BusinessOsPage() {
     <AppShell>
       <div className="flex flex-col gap-5">
         {header}
+        {opportunitiesBlock}
         <ProactiveInsights insights={insights} />
 
         <BusinessOsView

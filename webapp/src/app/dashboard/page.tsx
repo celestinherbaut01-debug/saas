@@ -10,11 +10,13 @@ import { getXpSummary, xpActionLabel } from "@/lib/xp";
 import { getUserAppState } from "@/lib/app-state";
 import { getUsage } from "@/lib/quota";
 import { isNovaConfigured } from "@/lib/actions/nova";
-import { novaContexts } from "@/lib/entitlements";
+import { novaContexts, getEntitlements } from "@/lib/entitlements";
 import { ACTIVITY_LABEL } from "@/lib/activity-labels";
 import type { ProspectStatus } from "@/lib/crm-status";
 import { PlanIntentBanner } from "@/components/plan-intent";
 import { OnboardingBanner } from "@/components/onboarding-banner";
+import { getOpportunities } from "@/lib/actions/nova-opportunities";
+import { NovaOpportunities } from "@/components/nova-opportunities";
 
 const CONTACTED_OR_LATER: ProspectStatus[] = [
   "contacted",
@@ -57,6 +59,7 @@ export default async function DashboardPage() {
     usageNova,
     usageProspects,
     usageSearches,
+    opportunitiesResult,
   ] = workspaceId
     ? await Promise.all([
         supabase
@@ -80,8 +83,20 @@ export default async function DashboardPage() {
         getUsage(workspaceId, "nova_requests", plan),
         getUsage(workspaceId, "prospects_added", plan),
         getUsage(workspaceId, "searches", plan),
+        getOpportunities(workspaceId),
       ])
-    : [{ count: 0 }, { data: [] }, { data: [] }, { data: [] }, null, false, null, null, null];
+    : [
+        { count: 0 },
+        { data: [] },
+        { data: [] },
+        { data: [] },
+        null,
+        false,
+        null,
+        null,
+        null,
+        { opportunities: [], canSeeAcquisition: false, canSeeBusinessOs: false },
+      ];
 
   const configured = businessProfileExists;
   const statuses = statusRows ?? [];
@@ -109,6 +124,14 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-6">
         {!configured && <OnboardingBanner />}
         <PlanIntentBanner currentPlan={plan} />
+
+        {workspaceId && opportunitiesResult.opportunities.length > 0 && (
+          <NovaOpportunities
+            workspaceId={workspaceId}
+            opportunities={opportunitiesResult.opportunities}
+            actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
+          />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

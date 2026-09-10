@@ -85,6 +85,18 @@ export interface PlanEntitlements {
   /** Prix additionné des deux modules pris séparément — pour afficher l'économie d'un bundle. Absent si non pertinent. */
   bundleOf?: { acquisition: Plan; businessOs: Plan };
   features: string[]; // libellés affichés tels quels sur /tarifs
+
+  // --- NOVA Growth Autopilot (détection d'opportunités + centre d'actions) ---
+  // Deux axes indépendants, cohérents avec acquisitionLevel/businessOsLevel :
+  // le feed d'opportunités Acquisition (prospects prioritaires, séquences
+  // préparées) suit l'accès Acquisition Pro+ ; le feed Business OS (devis
+  // sans réponse, factures en retard, clients inactifs, stock, sous-
+  // réservation) suit Business OS Advanced+. Le CENTRE d'actions complet
+  // (page dédiée, historique, règles d'automatisation) reste exclusif à
+  // Complete Max — c'est la raison d'être concrète de ce plan.
+  canSeeAcquisitionOpportunities: boolean;
+  canSeeBusinessOsOpportunities: boolean;
+  canUseActionCenter: boolean;
 }
 
 export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
@@ -109,6 +121,9 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     businessOsLevel: "none",
     canUseTeam: false,
     teamMemberLimit: 1,
+    canSeeAcquisitionOpportunities: false,
+    canSeeBusinessOsOpportunities: false,
+    canUseActionCenter: false,
     features: [
       "Rayon de prospection jusqu'à 10 km",
       "1 utilisateur",
@@ -125,12 +140,12 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     tagline: "Pour lancer une vraie prospection.",
     targetAudience: "Indépendants et petites équipes commerciales qui démarrent la prospection.",
     notIncluded: "Pas de campagnes email automatiques ni de relances — envoi et suivi restent manuels.",
-    priceMonthly: 59,
+    priceMonthly: 29,
     seats: 1,
-    prospectMonthlyLimit: 500,
-    searchMonthlyLimit: 60,
+    prospectMonthlyLimit: 300,
+    searchMonthlyLimit: 40,
     maxRadiusKm: 50,
-    novaMonthlyLimit: 100,
+    novaMonthlyLimit: 80,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
@@ -140,13 +155,16 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     businessOsLevel: "none",
     canUseTeam: false,
     teamMemberLimit: 1,
+    canSeeAcquisitionOpportunities: false,
+    canSeeBusinessOsOpportunities: false,
+    canUseActionCenter: false,
     features: [
       "Rayon de prospection jusqu'à 50 km",
       "1 utilisateur",
-      "500 prospects vérifiés / mois",
+      "300 prospects vérifiés / mois",
       "Recherche avancée (zones, rayon, métiers)",
       "CRM complet + score d'opportunité",
-      "100 requêtes NOVA commercial / mois",
+      "80 requêtes NOVA commercial / mois",
       "Génération d'emails (validation manuelle obligatoire)",
       "Analytics simples",
     ],
@@ -157,12 +175,12 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     tagline: "Toute la puissance de prospection, sans Business OS.",
     targetAudience: "Équipes commerciales actives qui veulent automatiser relances et suivi.",
     notIncluded: "Pas de Business OS — gestion de l'activité (clients, planning, stock) non incluse.",
-    priceMonthly: 129,
+    priceMonthly: 59,
     seats: 1,
-    prospectMonthlyLimit: 2000,
-    searchMonthlyLimit: 200,
-    maxRadiusKm: 150,
-    novaMonthlyLimit: 500,
+    prospectMonthlyLimit: 1000,
+    searchMonthlyLimit: 120,
+    maxRadiusKm: 100,
+    novaMonthlyLimit: 300,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
@@ -173,14 +191,18 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canUseTeam: false,
     teamMemberLimit: 1,
     highlighted: true,
+    canSeeAcquisitionOpportunities: true,
+    canSeeBusinessOsOpportunities: false,
+    canUseActionCenter: false,
     features: [
-      "Rayon de prospection jusqu'à 150 km",
+      "Rayon de prospection jusqu'à 100 km",
       "Tout Acquisition Starter",
-      "2 000 prospects vérifiés / mois",
-      "500 requêtes NOVA commercial / mois",
+      "1 000 prospects vérifiés / mois",
+      "300 requêtes NOVA commercial / mois",
+      "Recherche avancée + scoring de pertinence",
+      "NOVA Growth Autopilot : prospects prioritaires détectés + séquences préparées",
       "Campagnes email Gmail + relances automatiques",
       "Classification automatique des réponses",
-      "Calendrier + analytics avancées",
     ],
   },
   business_os: {
@@ -189,12 +211,12 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     tagline: "Le logiciel de gestion de votre métier — sans prospection.",
     targetAudience: "TPE et indépendants qui gèrent déjà leurs clients, sans besoin de prospecter.",
     notIncluded: "Pas de prospection — ajoutez le module Acquisition séparément si besoin.",
-    priceMonthly: 89,
+    priceMonthly: 39,
     seats: 1,
     prospectMonthlyLimit: 15,
     searchMonthlyLimit: 3,
     maxRadiusKm: 10,
-    novaMonthlyLimit: 300,
+    novaMonthlyLimit: 200,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: false,
@@ -204,11 +226,15 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     businessOsLevel: "standard",
     canUseTeam: false,
     teamMemberLimit: 1,
+    canSeeAcquisitionOpportunities: false,
+    canSeeBusinessOsOpportunities: false,
+    canUseActionCenter: false,
     features: [
       "Business OS STANDARD adapté à votre métier",
       "Clients, planning, stock, devis, factures",
       "1 utilisateur",
-      "300 requêtes NOVA métier / mois",
+      "200 requêtes NOVA métier / mois",
+      "Alertes simples (stock bas, rendez-vous, renouvellements)",
       "Prospection non incluse (option Acquisition disponible séparément)",
     ],
   },
@@ -218,12 +244,12 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     tagline: "Business OS complet, équipe incluse.",
     targetAudience: "Entreprises avec une équipe (jusqu'à 5) qui veulent alertes et automatisations métier.",
     notIncluded: "Pas de prospection — ajoutez le module Acquisition séparément si besoin.",
-    priceMonthly: 139,
+    priceMonthly: 69,
     seats: 5,
     prospectMonthlyLimit: 15,
     searchMonthlyLimit: 3,
     maxRadiusKm: 10,
-    novaMonthlyLimit: 800,
+    novaMonthlyLimit: 500,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: false,
@@ -233,10 +259,14 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     businessOsLevel: "advanced",
     canUseTeam: true,
     teamMemberLimit: 5,
+    canSeeAcquisitionOpportunities: false,
+    canSeeBusinessOsOpportunities: true,
+    canUseActionCenter: false,
     features: [
-      "Business OS AVANCÉ : alertes, historique complet, automatisations",
+      "Business OS AVANCÉ : historique complet, automatisations",
       "Jusqu'à 5 utilisateurs (équipe)",
-      "800 requêtes NOVA métier / mois",
+      "500 requêtes NOVA métier / mois",
+      "NOVA Growth Autopilot : devis sans réponse, factures en retard, clients inactifs, sous-réservation détectés",
       "NOVA connectée aux données Business OS",
       "Prospection non incluse (option Acquisition disponible séparément)",
     ],
@@ -244,45 +274,50 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   complete: {
     id: "complete",
     label: "Complete",
-    tagline: "Acquisition Pro + Business OS, au prix d'un bundle.",
+    tagline: "Acquisition Pro + Business OS Advanced, au prix d'un bundle.",
     targetAudience: "Entreprises qui prospectent ET gèrent leur activité au quotidien, seules (pas d'équipe).",
     notIncluded: "1 seul utilisateur — passez à Complete Max pour ajouter une équipe.",
-    priceMonthly: 179,
+    priceMonthly: 89,
     seats: 1,
-    prospectMonthlyLimit: 2000,
-    searchMonthlyLimit: 200,
-    maxRadiusKm: 150,
-    novaMonthlyLimit: 800,
+    prospectMonthlyLimit: 1500,
+    searchMonthlyLimit: 150,
+    maxRadiusKm: 120,
+    novaMonthlyLimit: 700,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
     canUseCampaigns: true,
     canUseAutoFollowup: true,
     acquisitionLevel: "pro",
-    businessOsLevel: "standard",
+    businessOsLevel: "advanced",
     canUseTeam: false,
     teamMemberLimit: 1,
     highlighted: true,
-    bundleOf: { acquisition: "acquisition_pro", businessOs: "business_os" },
+    canSeeAcquisitionOpportunities: true,
+    canSeeBusinessOsOpportunities: true,
+    canUseActionCenter: false,
+    bundleOf: { acquisition: "acquisition_pro", businessOs: "business_os_advanced" },
     features: [
       "Tout Acquisition Pro",
-      "Tout Business OS (standard)",
+      "Tout Business OS Advanced",
       "NOVA commercial ET NOVA métier",
-      "800 requêtes NOVA / mois",
+      "NOVA Growth Autopilot complet (Acquisition + Business OS) : toutes les opportunités détectées",
+      "Campagnes IA (contenu préparé, publication manuelle)",
+      "700 requêtes NOVA / mois",
     ],
   },
   complete_max: {
     id: "complete_max",
     label: "Complete Max",
-    tagline: "Acquisition Pro + Business OS avancé + équipe, sans compromis.",
+    tagline: "Tout Complete + le centre d'actions NOVA, pour une équipe.",
     targetAudience: "Entreprises en croissance avec une équipe, qui veulent tout sans compromis.",
     notIncluded: "Le forfait le plus cher — inutile si vous n'utilisez qu'un seul des deux modules.",
-    priceMonthly: 249,
+    priceMonthly: 129,
     seats: 5,
-    prospectMonthlyLimit: 5000,
-    searchMonthlyLimit: 1000,
-    maxRadiusKm: 250,
-    novaMonthlyLimit: 1500,
+    prospectMonthlyLimit: 3000,
+    searchMonthlyLimit: 300,
+    maxRadiusKm: 200,
+    novaMonthlyLimit: 1200,
     novaDailyLimit: null,
     canUseNova: true,
     canDraftEmails: true,
@@ -292,14 +327,15 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     businessOsLevel: "advanced",
     canUseTeam: true,
     teamMemberLimit: 5,
-    bundleOf: { acquisition: "acquisition_pro", businessOs: "business_os_advanced" },
+    canSeeAcquisitionOpportunities: true,
+    canSeeBusinessOsOpportunities: true,
+    canUseActionCenter: true,
     features: [
-      "Tout Acquisition Pro",
-      "Tout Business OS Advanced",
-      "5 000+ prospects vérifiés / mois",
-      "1 500 requêtes NOVA / mois",
+      "Tout Complete",
+      "Centre d'actions NOVA (/nova/actions) : à faire maintenant, historique, automatisations",
+      "Règles d'automatisation ('quand X arrive → NOVA prépare Y')",
       "Jusqu'à 5 utilisateurs (équipe)",
-      "NOVA commercial ET NOVA métier",
+      "3 000 prospects vérifiés / mois, 1 200 requêtes NOVA / mois",
       "Support prioritaire",
     ],
   },
@@ -459,6 +495,11 @@ export function upgradeOptions(current: Plan): Plan[] {
   const currentEnt = ENTITLEMENTS[current];
   if (currentEnt.priceMonthly === 0) return PLAN_ORDER.filter((id) => id !== "free");
 
+  // Complete -> Complete Max n'augmente ni acquisitionLevel ni businessOsLevel
+  // (les deux sont déjà "pro"/"advanced" sur Complete) : la différence est le
+  // nombre de sièges et le centre d'actions NOVA exclusif — ces deux axes
+  // comptent donc aussi comme un "vrai" plus, sans jamais accepter une
+  // combinaison qui ferait perdre un acquis (d'où les *Ok en garde-fou).
   const acqRank: Record<AcquisitionLevel, number> = { none: 0, starter: 1, pro: 2 };
   const bosRank: Record<BusinessOsLevel, number> = { none: 0, standard: 1, advanced: 2 };
   return PLAN_ORDER.filter((id) => {
@@ -466,9 +507,13 @@ export function upgradeOptions(current: Plan): Plan[] {
     const candidate = ENTITLEMENTS[id];
     const acqOk = acqRank[candidate.acquisitionLevel] >= acqRank[currentEnt.acquisitionLevel];
     const bosOk = bosRank[candidate.businessOsLevel] >= bosRank[currentEnt.businessOsLevel];
+    const seatsOk = candidate.seats >= currentEnt.seats;
+    const actionCenterOk = candidate.canUseActionCenter || !currentEnt.canUseActionCenter;
     const strictlyMore =
       acqRank[candidate.acquisitionLevel] > acqRank[currentEnt.acquisitionLevel] ||
-      bosRank[candidate.businessOsLevel] > bosRank[currentEnt.businessOsLevel];
-    return acqOk && bosOk && strictlyMore;
+      bosRank[candidate.businessOsLevel] > bosRank[currentEnt.businessOsLevel] ||
+      candidate.seats > currentEnt.seats ||
+      (candidate.canUseActionCenter && !currentEnt.canUseActionCenter);
+    return acqOk && bosOk && seatsOk && actionCenterOk && strictlyMore;
   });
 }

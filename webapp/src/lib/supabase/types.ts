@@ -724,6 +724,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["xp_events"]["Row"]>;
         Relationships: [];
       };
+      nova_action_log: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          opportunity_key: string;
+          status: "done" | "dismissed";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["nova_action_log"]["Row"]> & {
+          workspace_id: string;
+          opportunity_key: string;
+          status: "done" | "dismissed";
+        };
+        Update: Partial<Database["public"]["Tables"]["nova_action_log"]["Row"]>;
+        Relationships: [];
+      };
       usage_counters: {
         Row: {
           workspace_id: string;

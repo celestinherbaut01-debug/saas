@@ -120,6 +120,21 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
+  // Centre d'actions NOVA : exclusif à Complete Max (voir canUseActionCenter
+  // dans lib/entitlements.ts) — masqué plutôt qu'affiché avec un badge pour
+  // les autres plans, l'upsell se fait déjà depuis le bloc Opportunités et
+  // la page Abonnement.
+  if (entitlements.canUseActionCenter) {
+    navSections.push({
+      label: "",
+      items: (
+        <NavLink href="/nova/actions" icon="🎯">
+          Centre d&apos;actions NOVA
+        </NavLink>
+      ),
+    });
+  }
+
   navSections.push({ label: "Compte", items: accountLinks });
 
   const navLinks = (

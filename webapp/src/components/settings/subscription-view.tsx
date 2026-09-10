@@ -20,6 +20,12 @@ function describeUpgrade(current: Plan, candidate: Plan): string {
   if (cand.businessOsLevel !== cur.businessOsLevel) {
     gains.push(cur.businessOsLevel === "none" ? "ajoute le module Business OS" : "passe Business OS au niveau avancé");
   }
+  if (cand.seats > cur.seats) {
+    gains.push(`passe à ${cand.seats} utilisateurs`);
+  }
+  if (cand.canUseActionCenter && !cur.canUseActionCenter) {
+    gains.push("ajoute le centre d'actions NOVA");
+  }
   return gains.join(" et ") || "change de forfait";
 }
 
