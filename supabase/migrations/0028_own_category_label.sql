@@ -139,5 +139,36 @@ begin
 end;
 $$;
 
-revoke all on function public.complete_onboarding from public;
-grant execute on function public.complete_onboarding to authenticated;
+revoke all on function public.complete_onboarding(
+  text,
+  text,
+  text,
+  text,
+  uuid,
+  text,
+  text,
+  text,
+  double precision,
+  double precision,
+  uuid[],
+  numeric,
+  text,
+  text
+) from public;
+
+grant execute on function public.complete_onboarding(
+  text,
+  text,
+  text,
+  text,
+  uuid,
+  text,
+  text,
+  text,
+  double precision,
+  double precision,
+  uuid[],
+  numeric,
+  text,
+  text
+) to authenticated;
