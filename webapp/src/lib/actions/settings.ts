@@ -79,6 +79,7 @@ export async function setDevPlan(workspaceId: string, plan: string): Promise<Set
   revalidatePath("/prospection");
   revalidatePath("/business-os");
   revalidatePath("/analytics");
+  revalidatePath("/tarifs");
   revalidatePath("/", "layout");
   return { error: null, ok: true };
 }

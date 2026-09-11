@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ENTITLEMENTS, bundleSavingsMonthly, yearlyPrice, type Plan } from "@/lib/entitlements";
+import { setDevPlan } from "@/lib/actions/settings";
 
 // Architecture modulaire : deux modules indépendants (Acquisition /
 // Business OS), chacun activable seul, plus deux bundles qui coûtent
@@ -14,8 +15,41 @@ const ACQUISITION_PLANS: Plan[] = ["acquisition_starter", "acquisition_pro"];
 const BUSINESS_OS_PLANS: Plan[] = ["business_os", "business_os_advanced"];
 const BUNDLE_PLANS: Plan[] = ["complete", "complete_max"];
 
-export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
+export function PricingTable({
+  loggedIn = false,
+  workspaceId,
+  currentPlan,
+  isDev = false,
+}: {
+  loggedIn?: boolean;
+  /** Présent seulement pour un utilisateur connecté avec un workspace — permet le changement de plan direct sur cette page. */
+  workspaceId?: string;
+  currentPlan?: Plan;
+  isDev?: boolean;
+}) {
   const [yearly, setYearly] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [pendingPlan, setPendingPlan] = useState<Plan | null>(null);
+  const [feedback, setFeedback] = useState<{ plan: Plan; kind: "ok" | "err"; text: string } | null>(null);
+
+  // Même mécanisme que SubscriptionView (voir components/settings/subscription-view.tsx) :
+  // pas de Stripe branché, donc en dev ça change réellement subscriptions.plan,
+  // et en production setDevPlan renvoie une erreur explicite plutôt qu'un faux
+  // succès silencieux (jamais un bouton qui ne fait rien sans le dire).
+  function choosePlan(planId: Plan) {
+    if (!workspaceId || planId === currentPlan || pending) return;
+    setPendingPlan(planId);
+    setFeedback(null);
+    startTransition(async () => {
+      const result = await setDevPlan(workspaceId, planId);
+      setPendingPlan(null);
+      if (result.error) {
+        setFeedback({ plan: planId, kind: "err", text: result.error });
+      } else {
+        setFeedback({ plan: planId, kind: "ok", text: `Vous êtes maintenant sur ${ENTITLEMENTS[planId].label}.` });
+      }
+    });
+  }
 
   function renderCard(planId: Plan) {
     const plan = ENTITLEMENTS[planId];
@@ -23,6 +57,8 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
     const savings = bundleSavingsMonthly(planId);
     const savingsDisplay = yearly ? savings * 10 : savings;
     const isPro = plan.highlighted;
+    const isCurrent = loggedIn && workspaceId != null && currentPlan === planId;
+    const isBusy = pending && pendingPlan === planId;
 
     return (
       <div
@@ -34,9 +70,14 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
             : "border-line bg-panel hover:shadow-md",
         )}
       >
-        {isPro && (
+        {isPro && !isCurrent && (
           <span className="absolute -top-3 left-1/2 w-fit -translate-x-1/2 whitespace-nowrap rounded-full bg-accent px-3 py-1 text-[10.5px] font-bold text-accent-ink shadow-sm">
             Recommandé
+          </span>
+        )}
+        {isCurrent && (
+          <span className="absolute -top-3 left-1/2 w-fit -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-3 py-1 text-[10.5px] font-bold text-bg shadow-sm">
+            Votre plan actuel
           </span>
         )}
 
@@ -56,19 +97,42 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
           </p>
         )}
 
-        <Link
-          href={loggedIn ? "/abonnement" : plan.priceMonthly === 0 ? "/signup" : `/signup?plan=${plan.id}`}
-          className={cn(
-            "mt-6 rounded-xl px-4 py-2.5 text-center text-[13px] font-semibold transition-opacity hover:opacity-90",
-            isPro ? "bg-accent text-accent-ink" : "border border-line bg-bg text-ink",
-          )}
-        >
-          {loggedIn
-            ? "Gérer dans Abonnements"
-            : plan.priceMonthly === 0
-              ? "Démarrer gratuitement"
-              : `Choisir ${plan.label}`}
-        </Link>
+        {loggedIn && workspaceId ? (
+          isCurrent ? (
+            <span className="mt-6 rounded-xl border border-line bg-soft px-4 py-2.5 text-center text-[13px] font-semibold text-faint">
+              Plan actuel
+            </span>
+          ) : (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => choosePlan(planId)}
+              className={cn(
+                "mt-6 flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-center text-[13px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-60",
+                isPro ? "bg-accent text-accent-ink" : "border border-line bg-bg text-ink",
+              )}
+            >
+              {isBusy && <span className="h-3 w-3 animate-spin rounded-full border-2 border-current/30 border-t-current" />}
+              {plan.priceMonthly === 0 ? `Repasser à ${plan.label}` : `Passer à ${plan.label}`}
+            </button>
+          )
+        ) : (
+          <Link
+            href={plan.priceMonthly === 0 ? "/signup" : `/signup?plan=${plan.id}`}
+            className={cn(
+              "mt-6 rounded-xl px-4 py-2.5 text-center text-[13px] font-semibold transition-opacity hover:opacity-90",
+              isPro ? "bg-accent text-accent-ink" : "border border-line bg-bg text-ink",
+            )}
+          >
+            {plan.priceMonthly === 0 ? "Démarrer gratuitement" : `Choisir ${plan.label}`}
+          </Link>
+        )}
+
+        {feedback && feedback.plan === planId && (
+          <p className={cn("mt-2 text-[11.5px] font-medium", feedback.kind === "ok" ? "text-green-fg" : "text-red-fg")}>
+            {feedback.text}
+          </p>
+        )}
 
         <ul className="mt-7 flex flex-col gap-3 text-[12.5px] leading-relaxed text-muted">
           {plan.features.map((f) => (
@@ -160,8 +224,10 @@ export function PricingTable({ loggedIn = false }: { loggedIn?: boolean }) {
       </div>
 
       <p className="text-center text-[11.5px] text-faint">
-        {loggedIn
-          ? "Les paiements en ligne (Stripe) ne sont pas encore branchés — gérez votre forfait actuel depuis Abonnements."
+        {loggedIn && workspaceId
+          ? isDev
+            ? "Les paiements en ligne (Stripe) ne sont pas encore branchés — en développement, le changement de plan ci-dessus modifie réellement votre abonnement, sans paiement."
+            : "Les paiements en ligne (Stripe) ne sont pas encore branchés en production — le changement de plan ci-dessus est temporairement indisponible."
           : "Les paiements en ligne (Stripe) ne sont pas encore branchés — inscription gratuite disponible dès maintenant, changement de forfait payant à venir."}
       </p>
     </div>

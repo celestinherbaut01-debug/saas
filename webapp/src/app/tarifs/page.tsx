@@ -1,14 +1,18 @@
-import { createClient } from "@/lib/supabase/server";
+import { getCachedUser, getCachedMembership } from "@/lib/session";
+import { getWorkspacePlan } from "@/lib/plan";
 import { PublicNav } from "@/components/public-nav";
 import { PricingTable } from "@/components/pricing-table";
 import { PricingTrust } from "@/components/pricing-trust";
 import { PricingBusinessOs } from "@/components/pricing-business-os";
 
 export default async function TarifsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Connecté ou non, /tarifs reste accessible (page publique) — mais un
+  // utilisateur connecté peut changer de forfait directement ici, sans
+  // passer par /abonnement (voir PricingTable : mêmes actions serveur que
+  // la page Abonnement, juste exposées directement sur chaque carte).
+  const user = await getCachedUser();
+  const membership = user ? await getCachedMembership(user.id) : null;
+  const currentPlan = membership ? await getWorkspacePlan(membership.workspace_id) : null;
 
   return (
     <div className="flex flex-1 flex-col">
@@ -24,7 +28,12 @@ export default async function TarifsPage() {
           </p>
         </div>
 
-        <PricingTable loggedIn={Boolean(user)} />
+        <PricingTable
+          loggedIn={Boolean(user)}
+          workspaceId={membership?.workspace_id}
+          currentPlan={currentPlan ?? undefined}
+          isDev={process.env.NODE_ENV !== "production"}
+        />
         <PricingTrust />
         <PricingBusinessOs />
       </main>
