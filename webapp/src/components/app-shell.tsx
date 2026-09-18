@@ -120,6 +120,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
+  // Missions (Business Twin) : visible sur tous les plans, y compris Free
+  // (simulation d'essai sans mission persistante — voir GoalPicker) —
+  // jamais caché dans un sous-menu, c'est le cœur du produit.
+  navSections.push({
+    label: "",
+    items: (
+      <NavLink href="/missions" icon="🧭">
+        Missions
+      </NavLink>
+    ),
+  });
+
   // Centre d'actions NOVA : exclusif à Complete Max (voir canUseActionCenter
   // dans lib/entitlements.ts) — masqué plutôt qu'affiché avec un badge pour
   // les autres plans, l'upsell se fait déjà depuis le bloc Opportunités et

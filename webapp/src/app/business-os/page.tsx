@@ -16,6 +16,9 @@ import { buildAppointmentInsights, buildLowStockInsight, buildRenewalInsight, ty
 import { ProactiveInsights } from "@/components/business-os/proactive-insights";
 import { getOpportunities } from "@/lib/actions/nova-opportunities";
 import { NovaOpportunities } from "@/components/nova-opportunities";
+import { getBusinessTwinStatus, listMissions } from "@/lib/actions/business-twin";
+import { GoalPicker } from "@/components/business-twin/goal-picker";
+import { MissionsPreview } from "@/components/business-twin/missions-preview";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
@@ -54,19 +57,27 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings, opportunitiesResult] = await Promise.all([
+  const [businessProfile, profile, automationSettings, opportunitiesResult, businessTwinStatus, missions] = await Promise.all([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
     getOpportunities(workspaceId),
+    getBusinessTwinStatus(workspaceId),
+    listMissions(workspaceId),
   ]);
   const vertical = profile.vertical;
-  const opportunitiesBlock = opportunitiesResult.opportunities.length > 0 && (
-    <NovaOpportunities
-      workspaceId={workspaceId}
-      opportunities={opportunitiesResult.opportunities}
-      actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
-    />
+  const opportunitiesBlock = (
+    <>
+      <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />
+      {missions.length > 0 && <MissionsPreview missions={missions} />}
+      {opportunitiesResult.opportunities.length > 0 && (
+        <NovaOpportunities
+          workspaceId={workspaceId}
+          opportunities={opportunitiesResult.opportunities}
+          actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
+        />
+      )}
+    </>
   );
 
   const header = (

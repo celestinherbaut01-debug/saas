@@ -6,6 +6,17 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { businessOsAtLeast, novaContexts, type Plan } from "@/lib/entitlements";
 import { assertNovaQuota, getUsage, incrementNovaUsage } from "@/lib/quota";
 import { isValidProspectStatus } from "@/lib/crm-status";
+import {
+  loadCustomers,
+  loadInventoryItems,
+  loadAppointments,
+  loadDocuments,
+  loadContracts,
+  loadClientSites,
+  loadPurchaseOrders,
+  loadRepairOrders,
+  loadInterventions,
+} from "@/lib/business-os-data";
 
 export interface NovaMessage {
   role: "user" | "assistant";
@@ -140,31 +151,28 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
     const osModule = input.module;
 
     if (osModule === "customers") {
-      const { data } = await supabase
-        .from("customers")
-        .select("name, phone, email, notes, created_at")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const customers = await loadCustomers(supabase, workspaceId);
+      const results = customers.slice(0, limit).map((c) => ({ name: c.name, phone: c.phone, email: c.email, notes: c.notes, created_at: c.created_at }));
+      return { count: results.length, results };
     }
     if (osModule === "inventory") {
-      const { data } = await supabase
-        .from("inventory_items")
-        .select("name, quantity, unit, low_stock_threshold")
-        .eq("workspace_id", workspaceId)
-        .order("name")
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const inventory = await loadInventoryItems(supabase, workspaceId);
+      const results = inventory
+        .slice(0, limit)
+        .map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit, low_stock_threshold: i.low_stock_threshold }));
+      return { count: results.length, results };
     }
     if (osModule === "appointments") {
-      const { data } = await supabase
-        .from("appointments")
-        .select("title, starts_at, ends_at, notes, customer_id, prospect_id")
-        .eq("workspace_id", workspaceId)
-        .order("starts_at")
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const appointments = await loadAppointments(supabase, workspaceId);
+      const results = appointments.slice(0, limit).map((a) => ({
+        title: a.title,
+        starts_at: a.starts_at,
+        ends_at: a.ends_at,
+        notes: a.notes,
+        customer_id: a.customer_id,
+        prospect_id: a.prospect_id,
+      }));
+      return { count: results.length, results };
     }
     if (osModule === "vehicles") {
       const { data } = await supabase
@@ -176,14 +184,10 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "repair_orders") {
-      const { data } = await supabase
-        .from("repair_orders")
-        .select("title, status, scheduled_at, completed_at, delivered_at, labor_cost, parts_cost, notes, vehicle_id, technician_id")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      const vehicleIds = [...new Set((data ?? []).map((r) => r.vehicle_id).filter((id): id is string => Boolean(id)))];
-      const technicianIds = [...new Set((data ?? []).map((r) => r.technician_id).filter((id): id is string => Boolean(id)))];
+      const allOrders = await loadRepairOrders(supabase, workspaceId);
+      const data = allOrders.slice(0, limit);
+      const vehicleIds = [...new Set(data.map((r) => r.vehicle_id).filter((id): id is string => Boolean(id)))];
+      const technicianIds = [...new Set(data.map((r) => r.technician_id).filter((id): id is string => Boolean(id)))];
       const [{ data: vehicles }, { data: techs }] = await Promise.all([
         vehicleIds.length > 0
           ? supabase.from("vehicles").select("id, registration, make, model").in("id", vehicleIds)
@@ -194,10 +198,17 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       ]);
       const vehicleById = new Map((vehicles ?? []).map((v) => [v.id, v]));
       const techById = new Map((techs ?? []).map((t) => [t.id, t]));
-      const results = (data ?? []).map(({ vehicle_id, technician_id, ...rest }) => ({
-        ...rest,
-        vehicle: vehicle_id ? vehicleById.get(vehicle_id) ?? null : null,
-        technician: technician_id ? techById.get(technician_id) ?? null : null,
+      const results = data.map((r) => ({
+        title: r.title,
+        status: r.status,
+        scheduled_at: r.scheduled_at,
+        completed_at: r.completed_at,
+        delivered_at: r.delivered_at,
+        labor_cost: r.labor_cost,
+        parts_cost: r.parts_cost,
+        notes: r.notes,
+        vehicle: r.vehicle_id ? vehicleById.get(r.vehicle_id) ?? null : null,
+        technician: r.technician_id ? techById.get(r.technician_id) ?? null : null,
       }));
       return { count: results.length, results };
     }
@@ -230,13 +241,11 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: results.length, results };
     }
     if (osModule === "documents") {
-      const { data } = await supabase
-        .from("documents")
-        .select("doc_type, status, number, total_ttc, issued_at, due_at, repair_order_id")
-        .eq("workspace_id", workspaceId)
-        .order("issued_at", { ascending: false })
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const documents = await loadDocuments(supabase, workspaceId);
+      const results = documents
+        .slice(0, limit)
+        .map((d) => ({ doc_type: d.doc_type, status: d.status, number: d.number, total_ttc: d.total_ttc, issued_at: d.issued_at, due_at: d.due_at, repair_order_id: d.repair_order_id }));
+      return { count: results.length, results };
     }
     if (osModule === "sites") {
       const { data } = await supabase
@@ -248,24 +257,24 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "interventions") {
-      const { data } = await supabase
-        .from("interventions")
-        .select("scheduled_at, completed_at, status, quality_rating, notes, site_id, team_member_id")
-        .eq("workspace_id", workspaceId)
-        .order("scheduled_at", { ascending: false })
-        .limit(limit);
-      const siteIds = [...new Set((data ?? []).map((i) => i.site_id).filter((id): id is string => Boolean(id)))];
-      const teamIds = [...new Set((data ?? []).map((i) => i.team_member_id).filter((id): id is string => Boolean(id)))];
+      const allInterventions = await loadInterventions(supabase, workspaceId);
+      const data = allInterventions.slice(0, limit);
+      const siteIds = [...new Set(data.map((i) => i.site_id).filter((id): id is string => Boolean(id)))];
+      const teamIds = [...new Set(data.map((i) => i.team_member_id).filter((id): id is string => Boolean(id)))];
       const [{ data: sites }, { data: team }] = await Promise.all([
         siteIds.length > 0 ? supabase.from("sites").select("id, name").in("id", siteIds) : Promise.resolve({ data: [] }),
         teamIds.length > 0 ? supabase.from("team_members").select("id, name").in("id", teamIds) : Promise.resolve({ data: [] }),
       ]);
       const siteById = new Map((sites ?? []).map((s) => [s.id, s.name]));
       const teamById = new Map((team ?? []).map((t) => [t.id, t.name]));
-      const results = (data ?? []).map(({ site_id, team_member_id, ...rest }) => ({
-        ...rest,
-        site: site_id ? siteById.get(site_id) ?? null : null,
-        team_member: team_member_id ? teamById.get(team_member_id) ?? null : null,
+      const results = data.map((i) => ({
+        scheduled_at: i.scheduled_at,
+        completed_at: i.completed_at,
+        status: i.status,
+        quality_rating: i.quality_rating,
+        notes: i.notes,
+        site: i.site_id ? siteById.get(i.site_id) ?? null : null,
+        team_member: i.team_member_id ? teamById.get(i.team_member_id) ?? null : null,
       }));
       return { count: results.length, results };
     }
@@ -279,13 +288,11 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "contracts") {
-      const { data } = await supabase
-        .from("contracts")
-        .select("site_name, frequency, monthly_price, renewal_date, status, notes")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const contracts = await loadContracts(supabase, workspaceId);
+      const results = contracts
+        .slice(0, limit)
+        .map((c) => ({ site_name: c.site_name, frequency: c.frequency, monthly_price: c.monthly_price, renewal_date: c.renewal_date, status: c.status, notes: c.notes }));
+      return { count: results.length, results };
     }
     if (osModule === "projects") {
       const { data } = await supabase
@@ -297,13 +304,22 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "client_sites") {
-      const { data } = await supabase
-        .from("client_sites")
-        .select("domain_name, hosting_provider, domain_renewal_date, hosting_renewal_date, next_maintenance_at, monthly_price, status")
-        .eq("workspace_id", workspaceId)
-        .order("domain_renewal_date")
-        .limit(limit);
-      return { count: data?.length ?? 0, results: data ?? [] };
+      const sites = await loadClientSites(supabase, workspaceId);
+      // Le loader partagé ne trie pas par date de renouvellement (ordre par
+      // défaut non pertinent pour les autres consommateurs) — NOVA a besoin
+      // des renouvellements les plus proches en premier, donc le tri se fait
+      // ici, propre à ce besoin de présentation.
+      const sorted = [...sites].sort((a, b) => (a.domain_renewal_date ?? "9999").localeCompare(b.domain_renewal_date ?? "9999"));
+      const results = sorted.slice(0, limit).map((s) => ({
+        domain_name: s.domain_name,
+        hosting_provider: s.hosting_provider,
+        domain_renewal_date: s.domain_renewal_date,
+        hosting_renewal_date: s.hosting_renewal_date,
+        next_maintenance_at: s.next_maintenance_at,
+        monthly_price: s.monthly_price,
+        status: s.status,
+      }));
+      return { count: results.length, results };
     }
     if (osModule === "tickets") {
       const { data } = await supabase
@@ -324,17 +340,20 @@ async function runTool(workspaceId: string, plan: Plan, name: string, input: Rec
       return { count: data?.length ?? 0, results: data ?? [] };
     }
     if (osModule === "purchase_orders") {
-      const { data } = await supabase
-        .from("purchase_orders")
-        .select("status, total_cost, ordered_at, received_at, notes, supplier_id")
-        .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(limit);
-      const supplierIds = [...new Set((data ?? []).map((p) => p.supplier_id).filter((id): id is string => Boolean(id)))];
+      const allOrders = await loadPurchaseOrders(supabase, workspaceId);
+      const data = allOrders.slice(0, limit);
+      const supplierIds = [...new Set(data.map((p) => p.supplier_id).filter((id): id is string => Boolean(id)))];
       const { data: suppliers } =
         supplierIds.length > 0 ? await supabase.from("suppliers").select("id, name").in("id", supplierIds) : { data: [] };
       const supplierById = new Map((suppliers ?? []).map((s) => [s.id, s.name]));
-      const results = (data ?? []).map(({ supplier_id, ...rest }) => ({ ...rest, supplier: supplier_id ? supplierById.get(supplier_id) ?? null : null }));
+      const results = data.map((p) => ({
+        status: p.status,
+        total_cost: p.total_cost,
+        ordered_at: p.ordered_at,
+        received_at: p.received_at,
+        notes: p.notes,
+        supplier: p.supplier_id ? supplierById.get(p.supplier_id) ?? null : null,
+      }));
       return { count: results.length, results };
     }
     if (osModule === "recipes") {

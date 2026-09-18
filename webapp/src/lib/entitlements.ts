@@ -97,6 +97,22 @@ export interface PlanEntitlements {
   canSeeAcquisitionOpportunities: boolean;
   canSeeBusinessOsOpportunities: boolean;
   canUseActionCenter: boolean;
+
+  // --- Business Twin (OBJECTIF -> SITUATION -> SIMULATION -> PLAN -> ACTIONS) ---
+  // `businessTwinMaxActiveMissions: 0` sur Free : une simulation reste
+  // possible (voir businessTwinScenarioRunsMonthlyLimit — l'essai promis par
+  // le point 1 de la refonte), mais aucune mission n'est jamais persistée
+  // (server action refuse la création) — Free comprend la valeur sans
+  // remplacer un plan payant. `businessTwinAdvancedScenarios` limite le
+  // nombre de scénarios générés (A+B seulement si false, A+B+C si true) ;
+  // `businessTwinPreparedActions` contrôle si le contenu réellement rédigé
+  // (campagne/email) est conservé dans le plan ou seulement la liste de
+  // tâches (voir lib/actions/business-twin.ts).
+  businessTwinMaxActiveMissions: number;
+  businessTwinScenarioRunsMonthlyLimit: number;
+  businessTwinFullHistory: boolean;
+  businessTwinAdvancedScenarios: boolean;
+  businessTwinPreparedActions: boolean;
 }
 
 export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
@@ -124,6 +140,11 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: false,
     canSeeBusinessOsOpportunities: false,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 0,
+    businessTwinScenarioRunsMonthlyLimit: 1,
+    businessTwinFullHistory: false,
+    businessTwinAdvancedScenarios: false,
+    businessTwinPreparedActions: false,
     features: [
       "Rayon de prospection jusqu'à 10 km",
       "1 utilisateur",
@@ -131,6 +152,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "3 recherches / mois",
       "CRM très limité",
       "2 requêtes NOVA / jour",
+      "Business Twin : 1 simulation d'essai / mois (aucune mission enregistrée)",
       "Aucune automatisation, aucun Business OS",
     ],
   },
@@ -158,6 +180,11 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: false,
     canSeeBusinessOsOpportunities: false,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 1,
+    businessTwinScenarioRunsMonthlyLimit: 10,
+    businessTwinFullHistory: false,
+    businessTwinAdvancedScenarios: false,
+    businessTwinPreparedActions: false,
     features: [
       "Rayon de prospection jusqu'à 50 km",
       "1 utilisateur",
@@ -166,6 +193,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "CRM complet + score d'opportunité",
       "80 requêtes NOVA commercial / mois",
       "Génération d'emails (validation manuelle obligatoire)",
+      "Business Twin : 1 mission active, scénarios simples",
       "Analytics simples",
     ],
   },
@@ -194,6 +222,11 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: true,
     canSeeBusinessOsOpportunities: false,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 5,
+    businessTwinScenarioRunsMonthlyLimit: 40,
+    businessTwinFullHistory: true,
+    businessTwinAdvancedScenarios: true,
+    businessTwinPreparedActions: true,
     features: [
       "Rayon de prospection jusqu'à 100 km",
       "Tout Acquisition Starter",
@@ -201,6 +234,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
       "300 requêtes NOVA commercial / mois",
       "Recherche avancée + scoring de pertinence",
       "NOVA Growth Autopilot : prospects prioritaires détectés + séquences préparées",
+      "Business Twin : 5 missions actives, scénarios avancés, actions préparées",
       "Campagnes email Gmail + relances automatiques",
       "Classification automatique des réponses",
     ],
@@ -229,12 +263,18 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: false,
     canSeeBusinessOsOpportunities: false,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 1,
+    businessTwinScenarioRunsMonthlyLimit: 10,
+    businessTwinFullHistory: false,
+    businessTwinAdvancedScenarios: false,
+    businessTwinPreparedActions: false,
     features: [
       "Business OS STANDARD adapté à votre métier",
       "Clients, planning, stock, devis, factures",
       "1 utilisateur",
       "200 requêtes NOVA métier / mois",
       "Alertes simples (stock bas, rendez-vous, renouvellements)",
+      "Business Twin : 1 mission active, scénarios simples",
       "Prospection non incluse (option Acquisition disponible séparément)",
     ],
   },
@@ -262,11 +302,17 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: false,
     canSeeBusinessOsOpportunities: true,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 5,
+    businessTwinScenarioRunsMonthlyLimit: 40,
+    businessTwinFullHistory: true,
+    businessTwinAdvancedScenarios: true,
+    businessTwinPreparedActions: true,
     features: [
       "Business OS AVANCÉ : historique complet, automatisations",
       "Jusqu'à 5 utilisateurs (équipe)",
       "500 requêtes NOVA métier / mois",
       "NOVA Growth Autopilot : devis sans réponse, factures en retard, clients inactifs, sous-réservation détectés",
+      "Business Twin : 5 missions actives, scénarios avancés, actions préparées",
       "NOVA connectée aux données Business OS",
       "Prospection non incluse (option Acquisition disponible séparément)",
     ],
@@ -296,12 +342,18 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: true,
     canSeeBusinessOsOpportunities: true,
     canUseActionCenter: false,
+    businessTwinMaxActiveMissions: 8,
+    businessTwinScenarioRunsMonthlyLimit: 80,
+    businessTwinFullHistory: true,
+    businessTwinAdvancedScenarios: true,
+    businessTwinPreparedActions: true,
     bundleOf: { acquisition: "acquisition_pro", businessOs: "business_os_advanced" },
     features: [
       "Tout Acquisition Pro",
       "Tout Business OS Advanced",
       "NOVA commercial ET NOVA métier",
       "NOVA Growth Autopilot complet (Acquisition + Business OS) : toutes les opportunités détectées",
+      "Business Twin complet : 8 missions actives, Acquisition + Business OS combinés dans les scénarios",
       "Campagnes IA (contenu préparé, publication manuelle)",
       "700 requêtes NOVA / mois",
     ],
@@ -330,9 +382,15 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
     canSeeAcquisitionOpportunities: true,
     canSeeBusinessOsOpportunities: true,
     canUseActionCenter: true,
+    businessTwinMaxActiveMissions: 20,
+    businessTwinScenarioRunsMonthlyLimit: 200,
+    businessTwinFullHistory: true,
+    businessTwinAdvancedScenarios: true,
+    businessTwinPreparedActions: true,
     features: [
       "Tout Complete",
       "Centre d'actions NOVA (/nova/actions) : à faire maintenant, historique, automatisations",
+      "Business Twin : missions illimitées (jusqu'à 20 actives), priorisation avancée",
       "Règles d'automatisation ('quand X arrive → NOVA prépare Y')",
       "Jusqu'à 5 utilisateurs (équipe)",
       "3 000 prospects vérifiés / mois, 1 200 requêtes NOVA / mois",

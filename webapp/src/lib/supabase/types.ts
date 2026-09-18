@@ -745,17 +745,211 @@ export interface Database {
         Row: {
           workspace_id: string;
           period_key: string;
-          metric: "nova_requests" | "prospects_added" | "searches";
+          metric: "nova_requests" | "prospects_added" | "searches" | "scenario_runs";
           count: number;
           updated_at: string;
         };
         Insert: {
           workspace_id: string;
           period_key: string;
-          metric: "nova_requests" | "prospects_added" | "searches";
+          metric: "nova_requests" | "prospects_added" | "searches" | "scenario_runs";
           count?: number;
         };
         Update: Partial<Database["public"]["Tables"]["usage_counters"]["Row"]>;
+        Relationships: [];
+      };
+      business_twin_snapshots: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "generic";
+          captured_at: string;
+          metrics: Record<string, unknown>;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["business_twin_snapshots"]["Row"]> & {
+          workspace_id: string;
+          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "generic";
+        };
+        Update: Partial<Database["public"]["Tables"]["business_twin_snapshots"]["Row"]>;
+        Relationships: [];
+      };
+      missions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          goal_type:
+            | "revenue_growth"
+            | "new_customers"
+            | "fill_capacity"
+            | "b2b_contracts"
+            | "reactivate_customers"
+            | "overdue_payments"
+            | "margin_improvement"
+            | "stock_reduction"
+            | "retention"
+            | "custom";
+          goal_label: string;
+          goal_target_value: number | null;
+          goal_target_unit: string | null;
+          deadline: string | null;
+          status: "active" | "at_risk" | "succeeded" | "failed" | "abandoned";
+          snapshot_id: string | null;
+          chosen_scenario_result_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["missions"]["Row"]> & {
+          workspace_id: string;
+          goal_type: Database["public"]["Tables"]["missions"]["Row"]["goal_type"];
+          goal_label: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["missions"]["Row"]>;
+        Relationships: [];
+      };
+      scenario_runs: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          mission_id: string | null;
+          snapshot_id: string | null;
+          goal_type: Database["public"]["Tables"]["missions"]["Row"]["goal_type"];
+          prompt: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["scenario_runs"]["Row"]> & {
+          workspace_id: string;
+          goal_type: Database["public"]["Tables"]["scenario_runs"]["Row"]["goal_type"];
+          prompt: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["scenario_runs"]["Row"]>;
+        Relationships: [];
+      };
+      scenario_results: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          scenario_run_id: string;
+          key: "do_nothing" | "primary" | "alternative";
+          label: string;
+          description: string;
+          effort: "faible" | "moyen" | "eleve";
+          confidence: "faible" | "moyenne" | "elevee";
+          confidence_explanation: string;
+          qualitative_impact: string;
+          is_recommended: boolean;
+          plan_preview: { label: string; count: number | null }[];
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["scenario_results"]["Row"]> & {
+          workspace_id: string;
+          scenario_run_id: string;
+          key: Database["public"]["Tables"]["scenario_results"]["Row"]["key"];
+          label: string;
+          effort: Database["public"]["Tables"]["scenario_results"]["Row"]["effort"];
+          confidence: Database["public"]["Tables"]["scenario_results"]["Row"]["confidence"];
+        };
+        Update: Partial<Database["public"]["Tables"]["scenario_results"]["Row"]>;
+        Relationships: [];
+      };
+      scenario_assumptions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          scenario_result_id: string;
+          kind: "real" | "estimated" | "hypothesis" | "missing";
+          label: string;
+          explanation: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["scenario_assumptions"]["Row"]> & {
+          workspace_id: string;
+          scenario_result_id: string;
+          kind: Database["public"]["Tables"]["scenario_assumptions"]["Row"]["kind"];
+          label: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["scenario_assumptions"]["Row"]>;
+        Relationships: [];
+      };
+      mission_actions: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          mission_id: string;
+          step_order: number;
+          action_type:
+            | "relance_devis"
+            | "contact_prospect"
+            | "upsell"
+            | "campagne"
+            | "appel"
+            | "tache_crm"
+            | "relance_facture"
+            | "reactivation_client"
+            | "autre";
+          title: string;
+          reason: string;
+          status: "proposed" | "ready" | "done" | "skipped";
+          target_ref: Record<string, unknown> | null;
+          prepared_content: Record<string, unknown> | null;
+          due_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["mission_actions"]["Row"]> & {
+          workspace_id: string;
+          mission_id: string;
+          action_type: Database["public"]["Tables"]["mission_actions"]["Row"]["action_type"];
+          title: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["mission_actions"]["Row"]>;
+        Relationships: [];
+      };
+      mission_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          mission_id: string;
+          event_type:
+            | "created"
+            | "scenario_chosen"
+            | "plan_applied"
+            | "action_done"
+            | "action_skipped"
+            | "progress_update"
+            | "recommendation"
+            | "blocker"
+            | "status_changed";
+          detail: string;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["mission_events"]["Row"]> & {
+          workspace_id: string;
+          mission_id: string;
+          event_type: Database["public"]["Tables"]["mission_events"]["Row"]["event_type"];
+        };
+        Update: Partial<Database["public"]["Tables"]["mission_events"]["Row"]>;
+        Relationships: [];
+      };
+      action_outcomes: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          mission_action_id: string;
+          proposed_at: string;
+          accepted: boolean | null;
+          accepted_at: string | null;
+          result: "converted" | "no_response" | "declined" | "in_progress" | null;
+          amount_eur: number | null;
+          time_to_outcome_hours: number | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["action_outcomes"]["Row"]> & {
+          workspace_id: string;
+          mission_action_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["action_outcomes"]["Row"]>;
         Relationships: [];
       };
     };

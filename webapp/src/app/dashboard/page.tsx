@@ -17,6 +17,9 @@ import { PlanIntentBanner } from "@/components/plan-intent";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { getOpportunities } from "@/lib/actions/nova-opportunities";
 import { NovaOpportunities } from "@/components/nova-opportunities";
+import { getBusinessTwinStatus, listMissions } from "@/lib/actions/business-twin";
+import { GoalPicker } from "@/components/business-twin/goal-picker";
+import { MissionsPreview } from "@/components/business-twin/missions-preview";
 
 const CONTACTED_OR_LATER: ProspectStatus[] = [
   "contacted",
@@ -60,6 +63,8 @@ export default async function DashboardPage() {
     usageProspects,
     usageSearches,
     opportunitiesResult,
+    businessTwinStatus,
+    missions,
   ] = workspaceId
     ? await Promise.all([
         supabase
@@ -84,6 +89,8 @@ export default async function DashboardPage() {
         getUsage(workspaceId, "prospects_added", plan),
         getUsage(workspaceId, "searches", plan),
         getOpportunities(workspaceId),
+        getBusinessTwinStatus(workspaceId),
+        listMissions(workspaceId),
       ])
     : [
         { count: 0 },
@@ -96,6 +103,8 @@ export default async function DashboardPage() {
         null,
         null,
         { opportunities: [], canSeeAcquisition: false, canSeeBusinessOs: false },
+        null,
+        [],
       ];
 
   const configured = businessProfileExists;
@@ -124,6 +133,9 @@ export default async function DashboardPage() {
       <div className="flex flex-col gap-6">
         {!configured && <OnboardingBanner />}
         <PlanIntentBanner currentPlan={plan} />
+
+        {workspaceId && businessTwinStatus && <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />}
+        {workspaceId && missions && missions.length > 0 && <MissionsPreview missions={missions} />}
 
         {workspaceId && opportunitiesResult.opportunities.length > 0 && (
           <NovaOpportunities

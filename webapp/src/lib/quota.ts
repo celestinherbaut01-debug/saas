@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolvePlanEntitlements, type Plan } from "@/lib/entitlements";
 
-export type QuotaMetric = "nova_requests" | "prospects_added" | "searches";
+export type QuotaMetric = "nova_requests" | "prospects_added" | "searches" | "scenario_runs";
 
 function currentMonthKey(): string {
   const now = new Date();
@@ -13,16 +13,18 @@ function currentDayKey(): string {
   return `${currentMonthKey()}-${String(now.getUTCDate()).padStart(2, "0")}`;
 }
 
-const LIMIT_FIELD: Record<QuotaMetric, "novaMonthlyLimit" | "prospectMonthlyLimit" | "searchMonthlyLimit"> = {
+const LIMIT_FIELD: Record<QuotaMetric, "novaMonthlyLimit" | "prospectMonthlyLimit" | "searchMonthlyLimit" | "businessTwinScenarioRunsMonthlyLimit"> = {
   nova_requests: "novaMonthlyLimit",
   prospects_added: "prospectMonthlyLimit",
   searches: "searchMonthlyLimit",
+  scenario_runs: "businessTwinScenarioRunsMonthlyLimit",
 };
 
 const METRIC_LABEL: Record<QuotaMetric, string> = {
   nova_requests: "requêtes NOVA",
   prospects_added: "prospects ajoutés",
   searches: "recherches",
+  scenario_runs: "simulations Business Twin",
 };
 
 export interface QuotaStatus {

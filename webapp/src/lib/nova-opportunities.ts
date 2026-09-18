@@ -172,17 +172,20 @@ export function detectRenewalsUpcoming(renewals: { label: string; date: string }
 }
 
 /**
- * Clients sans devis/facture depuis longtemps. Approximation assumée : il
- * n'existe aucune date "dernier contact" par client dans le schéma — on
- * dérive donc l'activité de la dernière date de devis/facture, pas d'un
- * historique de contact complet. Un client jamais facturé (last=null) n'est
- * PAS compté "inactif" — on ne sait juste rien de lui, on ne l'affirme pas.
+ * Ids des clients sans devis/facture depuis longtemps. Approximation
+ * assumée : il n'existe aucune date "dernier contact" par client dans le
+ * schéma — on dérive donc l'activité de la dernière date de devis/facture,
+ * pas d'un historique de contact complet. Un client jamais facturé
+ * (last=null) n'est PAS compté "inactif" — on ne sait juste rien de lui, on
+ * ne l'affirme pas. Extrait de detectInactiveCustomers pour être réutilisé
+ * tel quel par le plan-builder de Business Twin (lib/business-twin/plan-
+ * builder.ts), qui a besoin de la liste elle-même, pas juste d'un compte.
  */
-export function detectInactiveCustomers(
+export function listInactiveCustomerIds(
   customers: { id: string }[],
   documents: { customer_id: string | null; issued_at: string }[],
   inactiveDays = 180,
-): Opportunity | null {
+): string[] {
   const now = Date.now();
   const lastDocByCustomer = new Map<string, number>();
   for (const d of documents) {
@@ -192,10 +195,20 @@ export function detectInactiveCustomers(
     if (cur == null || t > cur) lastDocByCustomer.set(d.customer_id, t);
   }
 
-  const inactive = customers.filter((c) => {
-    const last = lastDocByCustomer.get(c.id);
-    return last != null && now - last > inactiveDays * 24 * 60 * 60 * 1000;
-  });
+  return customers
+    .filter((c) => {
+      const last = lastDocByCustomer.get(c.id);
+      return last != null && now - last > inactiveDays * 24 * 60 * 60 * 1000;
+    })
+    .map((c) => c.id);
+}
+
+export function detectInactiveCustomers(
+  customers: { id: string }[],
+  documents: { customer_id: string | null; issued_at: string }[],
+  inactiveDays = 180,
+): Opportunity | null {
+  const inactive = listInactiveCustomerIds(customers, documents, inactiveDays);
   if (inactive.length === 0) return null;
 
   const months = Math.round(inactiveDays / 30);
