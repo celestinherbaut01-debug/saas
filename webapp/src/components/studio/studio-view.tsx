@@ -374,7 +374,7 @@ export function StudioView({
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((c) => (
-            <Card key={c.id} className="flex cursor-pointer flex-col gap-2" onClick={() => openPreview(c.id)}>
+            <Card key={c.id} interactive className="flex animate-fade-up flex-col gap-2" onClick={() => openPreview(c.id)}>
               <div className="flex items-start justify-between gap-2">
                 <p className="font-display text-[14px] font-extrabold leading-tight">{c.title}</p>
                 <Badge tone={STATUS_BADGE[c.status as StudioStatus].tone}>{STATUS_BADGE[c.status as StudioStatus].text}</Badge>

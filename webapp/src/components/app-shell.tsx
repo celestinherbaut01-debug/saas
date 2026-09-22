@@ -4,8 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership, getCachedBusinessProfile } from "@/lib/session";
 import { getWorkspacePlan } from "@/lib/plan";
 import { NavLink } from "@/components/nav-link";
-import { Button } from "@/components/ui/button";
-import { signOut } from "@/lib/actions/auth";
+import { NavSection } from "@/components/nav-section";
+import { ProfileMenu } from "@/components/profile-menu";
 import { ENTITLEMENTS, upgradeOptions, businessOsAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
@@ -43,141 +43,71 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   // comme avant cette évolution — aucun compte ne perd d'accès.
   const mode = businessProfile?.product_mode ?? "both";
   const hasBusinessOsPlan = businessOsAtLeast(plan, "standard");
+  const dashboardHref = mode === "business_os" ? "/business-os" : "/dashboard";
 
-  const accountLinks = (
-    <>
-      <NavLink href="/abonnement" icon="◆">
-        Abonnement
-      </NavLink>
-      <NavLink href="/integrations" icon="◎">
-        Intégrations
-      </NavLink>
-      <NavLink href="/parametres" icon="⚙">
-        Paramètres
-      </NavLink>
-    </>
-  );
+  // Cinq entrées principales repliables (Accueil/Développer/Gérer/NOVA/
+  // Analyser) au lieu de 13 liens en permanence visibles — chaque lien
+  // reste soumis à EXACTEMENT les mêmes conditions qu'avant (mode
+  // acquisition/business_os/both, plan Business OS, Centre d'actions NOVA),
+  // seule la présentation change (voir NavSection : replié par défaut, sauf
+  // la section de la page courante).
+  const showDeveloperLinks = mode !== "business_os";
+  const showManageSection = mode === "business_os" || mode === "both";
+  const showAnalytics = mode !== "business_os";
 
-  // Cinq blocs nommés (ACCUEIL/DÉVELOPPER/GÉRER/ANALYSER/COMPTE) plutôt que
-  // des sections sans titre — chaque lien reste soumis à EXACTEMENT les
-  // mêmes conditions qu'avant (mode acquisition/business_os/both, plan
-  // Business OS, Centre d'actions NOVA) : seul le REGROUPEMENT change, un
-  // logiciel professionnel organise sa navigation par intention ("je veux
-  // développer" / "je veux gérer" / "je veux analyser"), pas par accident
-  // d'implémentation.
-  const navSections: Array<{ label: string; items: React.ReactNode }> = [];
+  const navLinks = (
+    <div className="flex flex-col gap-1">
+      <NavLink href={dashboardHref} icon="⌂" badge={mode === "business_os" && !hasBusinessOsPlan ? "PRO" : undefined}>
+        Accueil
+      </NavLink>
 
-  // ACCUEIL : le tableau de bord pertinent selon le mode + Missions (Business
-  // Twin), toujours visible y compris sur Free (simulation d'essai — voir
-  // GoalPicker), jamais caché dans un sous-menu.
-  navSections.push({
-    label: "Accueil",
-    items: (
-      <>
-        {mode === "business_os" ? (
-          <NavLink href="/business-os" icon="⌂" badge={hasBusinessOsPlan ? undefined : "PRO"}>
-            Dashboard
-          </NavLink>
-        ) : (
-          <NavLink href="/dashboard" icon="⌂">
-            Dashboard
-          </NavLink>
+      <NavSection label="Développer" icon="⌕" hrefs={showDeveloperLinks ? ["/prospection", "/crm", "/studio"] : ["/studio"]}>
+        {showDeveloperLinks && (
+          <>
+            <NavLink href="/prospection" icon="⌕">
+              Prospection
+            </NavLink>
+            <NavLink href="/crm" icon="▦">
+              CRM
+            </NavLink>
+          </>
         )}
-        <NavLink href="/missions" icon="🧭">
-          Missions
-        </NavLink>
-      </>
-    ),
-  });
-
-  // DÉVELOPPER : trouver des clients et créer du contenu — Prospection/CRM
-  // n'apparaissent qu'en mode acquisition/both (voir le lien secondaire
-  // discret plus bas pour le mode business_os, décision produit inchangée) ;
-  // Studio IA et NOVA restent utiles à tout le monde.
-  const developerItems =
-    mode === "business_os" ? (
-      <NavLink href="/studio" icon="🎨">
-        Studio IA
-      </NavLink>
-    ) : (
-      <>
-        <NavLink href="/prospection" icon="⌕">
-          Prospection
-        </NavLink>
-        <NavLink href="/crm" icon="▦">
-          CRM
-        </NavLink>
-        <NavLink href="/agent" icon="✦">
-          NOVA
-        </NavLink>
         <NavLink href="/studio" icon="🎨">
           Studio IA
         </NavLink>
-      </>
-    );
-  navSections.push({ label: "Développer", items: developerItems });
+      </NavSection>
 
-  // GÉRER : Business OS + Automatisations, uniquement pertinent en mode
-  // business_os/both. NOVA y apparaît aussi en mode business_os pur (où
-  // c'est l'assistant opérationnel, groupé avec Automatisations comme avant
-  // cette réorganisation).
-  if (mode === "business_os" || mode === "both") {
-    navSections.push({
-      label: "Gérer",
-      items: (
-        <>
+      {showManageSection && (
+        <NavSection label="Gérer" icon="▣" hrefs={["/business-os", "/automatisations"]}>
           <NavLink href="/business-os" icon="▣" badge={hasBusinessOsPlan ? undefined : "PRO"}>
             Business OS
           </NavLink>
-          {mode === "business_os" && (
-            <NavLink href="/agent" icon="✦">
-              NOVA
-            </NavLink>
-          )}
           <NavLink href="/automatisations" icon="⚡">
             Automatisations
           </NavLink>
-        </>
-      ),
-    });
-  }
+        </NavSection>
+      )}
 
-  // ANALYSER : Analytics (acquisition/both) + Centre d'actions NOVA (plan
-  // Complete Max uniquement, voir canUseActionCenter) — bloc omis s'il
-  // serait vide plutôt qu'affiché sans contenu.
-  const analyserItems = (
-    <>
-      {mode !== "business_os" && (
+      <NavSection label="NOVA" icon="✦" hrefs={["/agent", "/missions", "/nova/actions"]}>
+        <NavLink href="/agent" icon="✦">
+          Assistant
+        </NavLink>
+        <NavLink href="/missions" icon="🧭">
+          Missions
+        </NavLink>
+        {entitlements.canUseActionCenter && (
+          <NavLink href="/nova/actions" icon="🎯">
+            Centre d&apos;actions
+          </NavLink>
+        )}
+      </NavSection>
+
+      {showAnalytics && (
         <NavLink href="/analytics" icon="◫">
-          Analytics
+          Analyser
         </NavLink>
       )}
-      {entitlements.canUseActionCenter && (
-        <NavLink href="/nova/actions" icon="🎯">
-          Centre d&apos;actions NOVA
-        </NavLink>
-      )}
-    </>
-  );
-  if (mode !== "business_os" || entitlements.canUseActionCenter) {
-    navSections.push({ label: "Analyser", items: analyserItems });
-  }
-
-  navSections.push({ label: "Compte", items: accountLinks });
-
-  const navLinks = (
-    <>
-      {navSections.map((section, i) => (
-        <div key={section.label || `section-${i}`} className="flex flex-col gap-1">
-          {section.label && (
-            <p className="px-3 pb-1 pt-3 text-[9.5px] font-bold uppercase tracking-wider text-sidebar-ink-dim/70 first:pt-0">
-              {section.label}
-            </p>
-          )}
-          {section.items}
-        </div>
-      ))}
-    </>
+    </div>
   );
 
   // Lien secondaire discret vers l'autre module — jamais un vrai lien de
@@ -203,7 +133,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       {cheapestUpgrade && (
         <Link
           href="/abonnement"
-          className="mt-2.5 block rounded-lg bg-gradient-to-br from-accent to-[#8fb0ff] px-3 py-1.5 text-center text-[11.5px] font-bold text-white shadow-sm transition-transform hover:-translate-y-px"
+          className="mt-2.5 block rounded-lg bg-gradient-to-br from-accent to-accent-2 px-3 py-1.5 text-center text-[11.5px] font-bold text-white shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-px"
         >
           Passer à {ENTITLEMENTS[cheapestUpgrade].label}
         </Link>
@@ -213,7 +143,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   const logo = (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-[#8fb0ff] font-display text-[12px] font-extrabold text-white">
+      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 font-display text-[12px] font-extrabold text-white shadow-[var(--shadow-sm)]">
         PF
       </div>
       <div>
@@ -234,31 +164,23 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         <div className="mt-auto flex flex-col gap-3 border-t border-sidebar-line pt-3.5">
           {crossModuleLink}
           {planBadge}
-          <form action={signOut}>
-            <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
-              Se déconnecter
-            </Button>
-          </form>
+          <ProfileMenu email={user.email ?? ""} />
         </div>
       </aside>
 
-      {/* Mobile : bandeau + menu <details> natif, sans JS ni hydratation client. */}
+      {/* Mobile : bandeau + menu <details> natif, sans JS ni hydratation client pour l'ouverture/fermeture globale. */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-sidebar-line bg-sidebar px-3.5 py-2.5 text-sidebar-ink md:hidden">
         {logo}
         <details className="relative">
           <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-lg border border-sidebar-line text-lg">
             ☰
           </summary>
-          <div className="absolute right-0 top-11 flex max-h-[80vh] w-64 flex-col gap-1 overflow-y-auto rounded-xl border border-sidebar-line bg-sidebar p-2.5 shadow-lg">
+          <div className="absolute right-0 top-11 flex max-h-[80vh] w-64 flex-col gap-1 overflow-y-auto rounded-xl border border-sidebar-line bg-sidebar p-2.5 shadow-[var(--shadow-lg)]">
             {navLinks}
             <div className="mt-1 flex flex-col gap-3 border-t border-sidebar-line pt-2">
               {crossModuleLink}
               {planBadge}
-              <form action={signOut}>
-                <Button type="submit" variant="outline" size="sm" className="w-full bg-transparent text-sidebar-ink">
-                  Se déconnecter
-                </Button>
-              </form>
+              <ProfileMenu email={user.email ?? ""} />
             </div>
           </div>
         </details>
