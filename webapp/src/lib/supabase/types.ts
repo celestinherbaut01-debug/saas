@@ -880,6 +880,43 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["recommendation_fingerprints"]["Row"]>;
         Relationships: [];
       };
+      brand_kits: {
+        Row: {
+          workspace_id: string;
+          tone: "professionnel" | "chaleureux" | "dynamique" | "premium";
+          primary_color: string;
+          accent_color: string;
+          tagline: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["brand_kits"]["Row"]> & { workspace_id: string };
+        Update: Partial<Database["public"]["Tables"]["brand_kits"]["Row"]>;
+        Relationships: [];
+      };
+      studio_creations: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          vertical: string;
+          offer_type: "produit" | "service" | "bien" | "realisation" | "evenement" | "promotion";
+          title: string;
+          input_data: Record<string, unknown>;
+          generated_content: Record<string, unknown>;
+          status: "draft" | "ready" | "published" | "archived";
+          source_mission_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["studio_creations"]["Row"]> & {
+          workspace_id: string;
+          vertical: string;
+          offer_type: Database["public"]["Tables"]["studio_creations"]["Row"]["offer_type"];
+          title: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["studio_creations"]["Row"]>;
+        Relationships: [];
+      };
       scenario_assumptions: {
         Row: {
           id: string;

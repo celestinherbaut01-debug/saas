@@ -1,10 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { setMissionActionStatus } from "@/lib/actions/business-twin";
 import type { MissionActionView } from "@/lib/actions/business-twin";
+
+/** Construit le lien de préremplissage Studio IA à partir du contenu déjà préparé par le plan (voir generateCampaignTemplate) — jamais de nouveau texte inventé ici. */
+function studioPrefillHref(missionId: string, action: MissionActionView): string {
+  const content = action.preparedContent ?? {};
+  const title = typeof content.headline === "string" ? content.headline : action.title;
+  const description = typeof content.offerPrompt === "string" ? content.offerPrompt : "";
+  const params = new URLSearchParams({ new: "1", offerType: "promotion", title, description, sourceMissionId: missionId });
+  return `/studio?${params.toString()}`;
+}
 
 const STATUS_LABEL: Record<string, { text: string; tone: BadgeTone }> = {
   proposed: { text: "Proposée", tone: "neutral" },
@@ -29,7 +39,7 @@ function PreparedContent({ content }: { content: Record<string, unknown> }) {
   );
 }
 
-export function MissionActionItem({ workspaceId, action }: { workspaceId: string; action: MissionActionView }) {
+export function MissionActionItem({ workspaceId, missionId, action }: { workspaceId: string; missionId: string; action: MissionActionView }) {
   const [status, setStatus] = useState(action.status);
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState(false);
@@ -58,6 +68,12 @@ export function MissionActionItem({ workspaceId, action }: { workspaceId: string
           </button>
           {expanded && <PreparedContent content={action.preparedContent} />}
         </>
+      )}
+
+      {action.actionType === "campagne" && (
+        <Link href={studioPrefillHref(missionId, action)} className="mt-2 inline-block text-[11.5px] font-semibold text-accent">
+          🎨 Créer cette campagne dans Studio IA →
+        </Link>
       )}
 
       {status !== "done" && status !== "skipped" && (

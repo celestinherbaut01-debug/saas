@@ -104,7 +104,7 @@ export default async function MissionDetailPage({ params }: PageProps<"/missions
           ) : (
             <ul className="mt-3 flex flex-col gap-2">
               {detail.actions.map((a) => (
-                <MissionActionItem key={a.id} workspaceId={workspaceId} action={a} />
+                <MissionActionItem key={a.id} workspaceId={workspaceId} missionId={detail.id} action={a} />
               ))}
             </ul>
           )}

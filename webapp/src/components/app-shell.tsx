@@ -132,6 +132,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     ),
   });
 
+  // Studio IA : utile quel que soit le mode (acquisition ou business_os,
+  // un garagiste comme une agence ont besoin de créer du contenu) —
+  // jamais caché derrière une sous-navigation.
+  navSections.push({
+    label: "",
+    items: (
+      <NavLink href="/studio" icon="🎨">
+        Studio IA
+      </NavLink>
+    ),
+  });
+
   // Centre d'actions NOVA : exclusif à Complete Max (voir canUseActionCenter
   // dans lib/entitlements.ts) — masqué plutôt qu'affiché avec un badge pour
   // les autres plans, l'upsell se fait déjà depuis le bloc Opportunités et

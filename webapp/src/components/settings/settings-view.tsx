@@ -10,13 +10,17 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { updateBusinessProfile, updateProductMode, type SettingsActionState } from "@/lib/actions/settings";
 import { PRODUCT_MODE_OPTIONS } from "@/lib/product-mode";
+import { BrandKitCard } from "@/components/settings/brand-kit-card";
+import type { BrandKit } from "@/lib/studio/types";
 
 export function SettingsView({
   workspaceId,
   businessProfile,
+  brandKit,
 }: {
   workspaceId: string;
   businessProfile: BusinessProfile | null;
+  brandKit: BrandKit;
 }) {
   const boundAction = updateBusinessProfile.bind(null, workspaceId);
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(boundAction, {
@@ -94,6 +98,8 @@ export function SettingsView({
           </Button>
         </form>
       </Card>
+
+      <BrandKitCard workspaceId={workspaceId} initialBrandKit={brandKit} />
 
       <Card className="flex flex-wrap items-center justify-between gap-3">
         <div>
