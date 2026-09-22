@@ -5,6 +5,7 @@ import { getCachedUser, getCachedBusinessProfile } from "@/lib/session";
 import { Card } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
 import { UsageBar } from "@/components/ui/usage-bar";
+import { SectionLabel } from "@/components/ui/section-label";
 import { AppShell } from "@/components/app-shell";
 import { getXpSummary, xpActionLabel } from "@/lib/xp";
 import { getUserAppState } from "@/lib/app-state";
@@ -128,59 +129,103 @@ export default async function DashboardPage() {
       : { data: [] };
   const prospectNameById = new Map((activityProspects ?? []).map((p) => [p.id, p.company_name]));
 
+  const toContactCount = statuses.filter((s) => s.status === "to_contact").length;
+  const hasPriorityActions = toContactCount > 0 || upcoming.length > 0;
+
   return (
     <AppShell>
       <div className="flex flex-col gap-6">
         {!configured && <OnboardingBanner />}
         <PlanIntentBanner currentPlan={plan} />
 
-        {workspaceId && businessTwinStatus && <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />}
-        {workspaceId && missions && missions.length > 0 && <MissionsPreview missions={missions} />}
-
-        {workspaceId && opportunitiesResult.opportunities.length > 0 && (
-          <NovaOpportunities
-            workspaceId={workspaceId}
-            opportunities={opportunitiesResult.opportunities}
-            actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
-          />
-        )}
-
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="font-display text-2xl font-extrabold">
               Bonjour {user.user_metadata?.full_name || user.email}
             </h1>
-            <p className="mt-1 text-[13px] text-muted">Voici où en est votre prospection.</p>
+            <p className="mt-1 text-[13px] text-muted">Voici ce qui mérite votre attention aujourd&apos;hui.</p>
           </div>
           <Link href="/prospection" className="shrink-0 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg">
             Lancer une recherche →
           </Link>
         </div>
 
-        {total === 0 ? (
-          <Card className="flex flex-col items-center gap-3 py-12 text-center">
-            <span className="text-3xl">⌕</span>
-            <h2 className="font-display text-[17px] font-extrabold">Aucun prospect pour l&apos;instant</h2>
-            <p className="max-w-sm text-[13px] leading-relaxed text-muted">
-              Lancez votre première recherche pour trouver de vraies entreprises (registre officiel + Google
-              Places) dans votre zone, puis ajoutez les meilleures au CRM.
-            </p>
-            <Link href="/prospection" className="mt-1 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg">
-              Trouver mes premiers prospects
-            </Link>
-          </Card>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <StatTile label="Prospects trouvés" value={String(total)} />
-              <StatTile label="Contactés" value={String(contactedCount)} />
-              <StatTile label="Réponses" value={String(respondedCount)} />
-              <StatTile label="Rendez-vous à venir" value={String(upcoming.length)} />
-              <StatTile label="Clients gagnés" value={String(wonCount)} />
-              <StatTile label="Taux de conversion" value={conversionRate !== null ? `${conversionRate}%` : "—"} />
-            </div>
+        {workspaceId && businessTwinStatus && (
+          <div className="flex flex-col gap-2.5">
+            <SectionLabel>Objectif Business Twin</SectionLabel>
+            <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />
+          </div>
+        )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
+        {workspaceId && missions && missions.length > 0 && (
+          <div className="flex flex-col gap-2.5">
+            <SectionLabel>Missions</SectionLabel>
+            <MissionsPreview missions={missions} />
+          </div>
+        )}
+
+        {workspaceId && opportunitiesResult.opportunities.length > 0 && (
+          <div className="flex flex-col gap-2.5">
+            <SectionLabel>Opportunités NOVA</SectionLabel>
+            <NovaOpportunities
+              workspaceId={workspaceId}
+              opportunities={opportunitiesResult.opportunities}
+              actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
+            />
+          </div>
+        )}
+
+        {hasPriorityActions && (
+          <div className="flex flex-col gap-2.5">
+            <SectionLabel>Actions prioritaires</SectionLabel>
+            <Card>
+              <ul className="flex flex-col gap-2.5 text-[12.5px]">
+                {toContactCount > 0 && (
+                  <li>
+                    <Link href="/crm" className="font-semibold text-accent">
+                      {toContactCount} prospect(s)
+                    </Link>{" "}
+                    <span className="text-muted">en attente de premier contact</span>
+                  </li>
+                )}
+                {upcoming.slice(0, 3).map((a) => (
+                  <li key={a.id}>
+                    <span className="font-semibold">{a.title}</span>{" "}
+                    <span className="text-muted">
+                      — {new Date(a.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2.5">
+          <SectionLabel>KPI réels</SectionLabel>
+          {total === 0 ? (
+            <Card className="flex flex-col items-center gap-3 py-12 text-center">
+              <span className="text-3xl">⌕</span>
+              <h2 className="font-display text-[17px] font-extrabold">Aucun prospect pour l&apos;instant</h2>
+              <p className="max-w-sm text-[13px] leading-relaxed text-muted">
+                Lancez votre première recherche pour trouver de vraies entreprises (registre officiel + Google
+                Places) dans votre zone, puis ajoutez les meilleures au CRM.
+              </p>
+              <Link href="/prospection" className="mt-1 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg">
+                Trouver mes premiers prospects
+              </Link>
+            </Card>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <StatTile label="Prospects trouvés" value={String(total)} />
+                <StatTile label="Contactés" value={String(contactedCount)} />
+                <StatTile label="Réponses" value={String(respondedCount)} />
+                <StatTile label="Rendez-vous à venir" value={String(upcoming.length)} />
+                <StatTile label="Clients gagnés" value={String(wonCount)} />
+                <StatTile label="Taux de conversion" value={conversionRate !== null ? `${conversionRate}%` : "—"} />
+              </div>
+
               <Card>
                 <h2 className="font-display text-sm font-bold">Activité récente</h2>
                 {(recentActivities ?? []).length === 0 ? (
@@ -201,34 +246,9 @@ export default async function DashboardPage() {
                   </ul>
                 )}
               </Card>
-
-              <Card>
-                <h2 className="font-display text-sm font-bold">Prochaines actions</h2>
-                <ul className="mt-3 flex flex-col gap-2.5 text-[12.5px]">
-                  {statuses.filter((s) => s.status === "to_contact").length > 0 && (
-                    <li>
-                      <Link href="/crm" className="font-semibold text-accent">
-                        {statuses.filter((s) => s.status === "to_contact").length} prospect(s)
-                      </Link>{" "}
-                      <span className="text-muted">en attente de premier contact</span>
-                    </li>
-                  )}
-                  {upcoming.slice(0, 3).map((a) => (
-                    <li key={a.id}>
-                      <span className="font-semibold">{a.title}</span>{" "}
-                      <span className="text-muted">
-                        — {new Date(a.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
-                      </span>
-                    </li>
-                  ))}
-                  {statuses.filter((s) => s.status === "to_contact").length === 0 && upcoming.length === 0 && (
-                    <li className="text-muted">Rien en attente pour l&apos;instant.</li>
-                  )}
-                </ul>
-              </Card>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
 
         <Card>
           <h2 className="font-display text-sm font-bold">NOVA</h2>

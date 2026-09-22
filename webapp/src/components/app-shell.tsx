@@ -44,26 +44,6 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   const mode = businessProfile?.product_mode ?? "both";
   const hasBusinessOsPlan = businessOsAtLeast(plan, "standard");
 
-  const acquisitionLinks = (
-    <>
-      <NavLink href="/dashboard" icon="⌂">
-        Dashboard
-      </NavLink>
-      <NavLink href="/prospection" icon="⌕">
-        Prospection
-      </NavLink>
-      <NavLink href="/crm" icon="▦">
-        CRM
-      </NavLink>
-      <NavLink href="/agent" icon="✦">
-        NOVA
-      </NavLink>
-      <NavLink href="/analytics" icon="◫">
-        Analytics
-      </NavLink>
-    </>
-  );
-
   const accountLinks = (
     <>
       <NavLink href="/abonnement" icon="◆">
@@ -78,40 +58,82 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 
+  // Cinq blocs nommés (ACCUEIL/DÉVELOPPER/GÉRER/ANALYSER/COMPTE) plutôt que
+  // des sections sans titre — chaque lien reste soumis à EXACTEMENT les
+  // mêmes conditions qu'avant (mode acquisition/business_os/both, plan
+  // Business OS, Centre d'actions NOVA) : seul le REGROUPEMENT change, un
+  // logiciel professionnel organise sa navigation par intention ("je veux
+  // développer" / "je veux gérer" / "je veux analyser"), pas par accident
+  // d'implémentation.
   const navSections: Array<{ label: string; items: React.ReactNode }> = [];
 
-  if (mode === "business_os") {
-    // Business OS au premier plan : la Prospection n'est volontairement pas
-    // dans la navigation principale (voir le lien secondaire discret
-    // ci-dessous, sous la sidebar) — un garagiste qui a choisi "gérer mon
-    // entreprise" n'a pas besoin d'un menu de prospection en évidence.
-    navSections.push({
-      label: "",
-      items: (
-        <>
+  // ACCUEIL : le tableau de bord pertinent selon le mode + Missions (Business
+  // Twin), toujours visible y compris sur Free (simulation d'essai — voir
+  // GoalPicker), jamais caché dans un sous-menu.
+  navSections.push({
+    label: "Accueil",
+    items: (
+      <>
+        {mode === "business_os" ? (
           <NavLink href="/business-os" icon="⌂" badge={hasBusinessOsPlan ? undefined : "PRO"}>
             Dashboard
           </NavLink>
-          <NavLink href="/agent" icon="✦">
-            NOVA
+        ) : (
+          <NavLink href="/dashboard" icon="⌂">
+            Dashboard
           </NavLink>
-          <NavLink href="/automatisations" icon="⚡">
-            Automatisations
-          </NavLink>
-        </>
-      ),
-    });
-  } else if (mode === "acquisition") {
-    navSections.push({ label: "", items: acquisitionLinks });
-  } else {
-    navSections.push({ label: "Acquisition", items: acquisitionLinks });
+        )}
+        <NavLink href="/missions" icon="🧭">
+          Missions
+        </NavLink>
+      </>
+    ),
+  });
+
+  // DÉVELOPPER : trouver des clients et créer du contenu — Prospection/CRM
+  // n'apparaissent qu'en mode acquisition/both (voir le lien secondaire
+  // discret plus bas pour le mode business_os, décision produit inchangée) ;
+  // Studio IA et NOVA restent utiles à tout le monde.
+  const developerItems =
+    mode === "business_os" ? (
+      <NavLink href="/studio" icon="🎨">
+        Studio IA
+      </NavLink>
+    ) : (
+      <>
+        <NavLink href="/prospection" icon="⌕">
+          Prospection
+        </NavLink>
+        <NavLink href="/crm" icon="▦">
+          CRM
+        </NavLink>
+        <NavLink href="/agent" icon="✦">
+          NOVA
+        </NavLink>
+        <NavLink href="/studio" icon="🎨">
+          Studio IA
+        </NavLink>
+      </>
+    );
+  navSections.push({ label: "Développer", items: developerItems });
+
+  // GÉRER : Business OS + Automatisations, uniquement pertinent en mode
+  // business_os/both. NOVA y apparaît aussi en mode business_os pur (où
+  // c'est l'assistant opérationnel, groupé avec Automatisations comme avant
+  // cette réorganisation).
+  if (mode === "business_os" || mode === "both") {
     navSections.push({
-      label: "Gestion",
+      label: "Gérer",
       items: (
         <>
           <NavLink href="/business-os" icon="▣" badge={hasBusinessOsPlan ? undefined : "PRO"}>
             Business OS
           </NavLink>
+          {mode === "business_os" && (
+            <NavLink href="/agent" icon="✦">
+              NOVA
+            </NavLink>
+          )}
           <NavLink href="/automatisations" icon="⚡">
             Automatisations
           </NavLink>
@@ -120,43 +142,25 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     });
   }
 
-  // Missions (Business Twin) : visible sur tous les plans, y compris Free
-  // (simulation d'essai sans mission persistante — voir GoalPicker) —
-  // jamais caché dans un sous-menu, c'est le cœur du produit.
-  navSections.push({
-    label: "",
-    items: (
-      <NavLink href="/missions" icon="🧭">
-        Missions
-      </NavLink>
-    ),
-  });
-
-  // Studio IA : utile quel que soit le mode (acquisition ou business_os,
-  // un garagiste comme une agence ont besoin de créer du contenu) —
-  // jamais caché derrière une sous-navigation.
-  navSections.push({
-    label: "",
-    items: (
-      <NavLink href="/studio" icon="🎨">
-        Studio IA
-      </NavLink>
-    ),
-  });
-
-  // Centre d'actions NOVA : exclusif à Complete Max (voir canUseActionCenter
-  // dans lib/entitlements.ts) — masqué plutôt qu'affiché avec un badge pour
-  // les autres plans, l'upsell se fait déjà depuis le bloc Opportunités et
-  // la page Abonnement.
-  if (entitlements.canUseActionCenter) {
-    navSections.push({
-      label: "",
-      items: (
+  // ANALYSER : Analytics (acquisition/both) + Centre d'actions NOVA (plan
+  // Complete Max uniquement, voir canUseActionCenter) — bloc omis s'il
+  // serait vide plutôt qu'affiché sans contenu.
+  const analyserItems = (
+    <>
+      {mode !== "business_os" && (
+        <NavLink href="/analytics" icon="◫">
+          Analytics
+        </NavLink>
+      )}
+      {entitlements.canUseActionCenter && (
         <NavLink href="/nova/actions" icon="🎯">
           Centre d&apos;actions NOVA
         </NavLink>
-      ),
-    });
+      )}
+    </>
+  );
+  if (mode !== "business_os" || entitlements.canUseActionCenter) {
+    navSections.push({ label: "Analyser", items: analyserItems });
   }
 
   navSections.push({ label: "Compte", items: accountLinks });
