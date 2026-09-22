@@ -26,6 +26,7 @@ import { generateScenarios } from "@/lib/business-twin/scenarios";
 import { buildPlan, type PlanBuilderContext } from "@/lib/business-twin/plan-builder";
 import { assessMissionRisk, computeBlockers } from "@/lib/business-twin/mission-risk";
 import { GOAL_CATALOG, goalTemplate } from "@/lib/business-twin/goals";
+import { computeFingerprint } from "@/lib/business-twin/fingerprint";
 import type { GoalType, ScenarioKey, ScenarioResult, TypedProspect, DataField } from "@/lib/business-twin/types";
 
 // PROSPECTFLOW BUSINESS TWIN — server actions. Toute la logique de calcul
@@ -190,7 +191,52 @@ export async function getBusinessTwinStatus(workspaceId: string): Promise<Busine
 export interface SimulationResult {
   scenarioRunId: string;
   snapshotId: string;
-  scenarios: (ScenarioResult & { id: string })[];
+  scenarios: (ScenarioResult & { id: string; isRepeat: boolean; firstSeenAt: string | null })[];
+}
+
+/**
+ * ANTI-RÉPÉTITION — vérifie si ce fingerprint a déjà été vu pour ce
+ * workspace (voir 0032_business_twin_anti_repetition.sql) et met à jour le
+ * registre. Ne bloque JAMAIS l'enregistrement du scénario lui-même (il
+ * reste consultable dans son scenario_run) — seule sa présentation change
+ * côté UI ("reste valable" au lieu de "nouveau").
+ */
+async function registerFingerprint(
+  supabase: SupabaseServerClient,
+  workspaceId: string,
+  fingerprint: string,
+  goalType: GoalType,
+  lever: string,
+  label: string,
+): Promise<{ isRepeat: boolean; firstSeenAt: string }> {
+  const { data: existing } = await supabase
+    .from("recommendation_fingerprints")
+    .select("first_seen_at, times_seen")
+    .eq("workspace_id", workspaceId)
+    .eq("fingerprint", fingerprint)
+    .maybeSingle();
+
+  const now = new Date().toISOString();
+  if (existing) {
+    await supabase
+      .from("recommendation_fingerprints")
+      .update({ last_seen_at: now, times_seen: existing.times_seen + 1 })
+      .eq("workspace_id", workspaceId)
+      .eq("fingerprint", fingerprint);
+    return { isRepeat: true, firstSeenAt: existing.first_seen_at };
+  }
+
+  await supabase.from("recommendation_fingerprints").insert({
+    workspace_id: workspaceId,
+    fingerprint,
+    goal_type: goalType,
+    lever,
+    label,
+    first_seen_at: now,
+    last_seen_at: now,
+    times_seen: 1,
+  });
+  return { isRepeat: false, firstSeenAt: now };
 }
 
 /**
@@ -212,7 +258,15 @@ async function computeAndPersistScenarios(
   const snapshotInputs: SnapshotInputs = {
     vertical: raw.vertical,
     prospects: raw.prospects,
-    documents: raw.documents.map((d) => ({ doc_type: d.doc_type, status: d.status, issued_at: d.issued_at, due_at: d.due_at, paid_at: d.paid_at ?? null, total_ttc: d.total_ttc })),
+    documents: raw.documents.map((d) => ({
+      doc_type: d.doc_type,
+      status: d.status,
+      issued_at: d.issued_at,
+      due_at: d.due_at,
+      paid_at: d.paid_at ?? null,
+      total_ttc: d.total_ttc,
+      customer_id: d.customer_id,
+    })),
     customers: raw.customers,
     lowStockItems: raw.lowStockItems,
     scheduledDates: raw.scheduledDates,
@@ -239,8 +293,14 @@ async function computeAndPersistScenarios(
     .single();
   if (runError || !runRow) return { error: `Échec de l'enregistrement de la simulation : ${runError?.message}` };
 
-  const scenariosWithIds: (ScenarioResult & { id: string })[] = [];
+  const scenariosWithIds: (ScenarioResult & { id: string; isRepeat: boolean; firstSeenAt: string | null })[] = [];
   for (const scenario of scenarios) {
+    // "do_nothing" n'est pas une recommandation au sens du point 3 — pas de
+    // fingerprint à suivre pour "ne rien faire", qui n'est jamais "répété"
+    // au sens où l'utilisateur l'entend.
+    const fingerprint = scenario.lever === "do_nothing" ? null : computeFingerprint(workspaceId, input.goalType, scenario.fingerprintSeed);
+    const repeatInfo = fingerprint ? await registerFingerprint(supabase, workspaceId, fingerprint, input.goalType, scenario.lever, scenario.label) : null;
+
     const { data: resultRow, error: resultError } = await supabase
       .from("scenario_results")
       .insert({
@@ -255,6 +315,11 @@ async function computeAndPersistScenarios(
         qualitative_impact: scenario.qualitativeImpact,
         is_recommended: scenario.isRecommended,
         plan_preview: scenario.planPreview,
+        lever: scenario.lever,
+        signal_category: scenario.signalCategory,
+        fingerprint,
+        is_repeat: repeatInfo?.isRepeat ?? false,
+        first_seen_at: repeatInfo?.firstSeenAt ?? null,
       })
       .select("id")
       .single();
@@ -272,7 +337,7 @@ async function computeAndPersistScenarios(
       );
     }
 
-    scenariosWithIds.push({ ...scenario, id: resultRow.id });
+    scenariosWithIds.push({ ...scenario, id: resultRow.id, isRepeat: repeatInfo?.isRepeat ?? false, firstSeenAt: repeatInfo?.firstSeenAt ?? null });
   }
 
   await incrementUsage(workspaceId, "scenario_runs");
@@ -351,6 +416,8 @@ export async function createMissionFromScenario(
     scenarioRunId: string;
     scenarioResultId: string;
     scenarioKey: ScenarioKey;
+    /** Levier réel choisi (ScenarioResult.lever) — pilote QUELLES actions le plan-builder génère, voir lib/business-twin/plan-builder.ts. */
+    lever: string;
     goalType: GoalType;
     goalLabel: string;
     goalTargetValue?: number | null;
@@ -397,7 +464,7 @@ export async function createMissionFromScenario(
   const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
   const planContext: PlanBuilderContext = {
     goalType: params.goalType,
-    scenarioKey: params.scenarioKey,
+    lever: params.lever,
     companyName: raw.companyName,
     vertical: raw.vertical,
     city: raw.city,
@@ -428,7 +495,7 @@ export async function createMissionFromScenario(
 
   await supabase.from("mission_events").insert([
     { workspace_id: workspaceId, mission_id: missionRow.id, event_type: "created", detail: params.goalLabel },
-    { workspace_id: workspaceId, mission_id: missionRow.id, event_type: "scenario_chosen", detail: `Scénario choisi : ${params.scenarioKey}` },
+    { workspace_id: workspaceId, mission_id: missionRow.id, event_type: "scenario_chosen", detail: `Levier choisi : ${params.lever}` },
     { workspace_id: workspaceId, mission_id: missionRow.id, event_type: "plan_applied", detail: `${drafts.length} action(s) préparée(s).` },
   ]);
 
@@ -445,7 +512,7 @@ export async function createMissionFromScenario(
  */
 export async function addScenarioToMission(
   workspaceId: string,
-  params: { missionId: string; scenarioRunId: string; scenarioResultId: string; scenarioKey: ScenarioKey },
+  params: { missionId: string; scenarioRunId: string; scenarioResultId: string; scenarioKey: ScenarioKey; lever: string },
 ): Promise<{ ok: true } | { error: string }> {
   const supabase = await createClient();
   const memberError = await assertMember(supabase, workspaceId);
@@ -471,7 +538,7 @@ export async function addScenarioToMission(
   const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
   const planContext: PlanBuilderContext = {
     goalType: mission.goal_type,
-    scenarioKey: params.scenarioKey,
+    lever: params.lever,
     companyName: raw.companyName,
     vertical: raw.vertical,
     city: raw.city,
@@ -501,7 +568,7 @@ export async function addScenarioToMission(
     supabase.from("missions").update({ snapshot_id: runRow.snapshot_id, chosen_scenario_result_id: params.scenarioResultId }).eq("id", params.missionId),
     supabase.from("scenario_runs").update({ applied: true }).eq("id", params.scenarioRunId),
     supabase.from("mission_events").insert([
-      { workspace_id: workspaceId, mission_id: params.missionId, event_type: "scenario_chosen", detail: `Ajustement — scénario choisi : ${params.scenarioKey}` },
+      { workspace_id: workspaceId, mission_id: params.missionId, event_type: "scenario_chosen", detail: `Ajustement — levier choisi : ${params.lever}` },
       { workspace_id: workspaceId, mission_id: params.missionId, event_type: "plan_applied", detail: `${drafts.length} nouvelle(s) action(s) ajoutée(s) au plan.` },
     ]),
   ]);

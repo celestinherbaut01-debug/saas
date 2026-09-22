@@ -64,8 +64,21 @@ export interface PlanPreviewItem {
 
 export type ScenarioKey = "do_nothing" | "primary" | "alternative";
 
+/**
+ * Catégorie du SIGNAL qui motive un scénario — pas le type d'objectif
+ * (goal_type), mais le LEVIER réel actionné. Deux scénarios de catégories
+ * différentes pour le même objectif sont garantis de reposer sur des
+ * données et des actions différentes (voir lib/business-twin/scenarios.ts,
+ * buildScenarioFromLever) — c'est ce qui empêche A/B/C de n'être que des
+ * variantes de texte/quantité du même levier.
+ */
+export type SignalCategory = "sales" | "capacity" | "finance" | "inventory" | "customers" | "acquisition" | "marketing";
+
 export interface ScenarioResult {
   key: ScenarioKey;
+  /** Identifiant machine du LEVIER réel (ex. "sales_followup", "marketing_campaign") — pilote le plan-builder ET le fingerprint anti-répétition. Distinct de `key`, qui ne dit que la position A/B/C. */
+  lever: string;
+  signalCategory: SignalCategory;
   label: string;
   description: string;
   effort: Effort;
@@ -76,6 +89,8 @@ export interface ScenarioResult {
   isRecommended: boolean;
   assumptions: ScenarioAssumption[];
   planPreview: PlanPreviewItem[];
+  /** Valeurs importantes bucketées (ex. "sales_followup:unanswered=3-5") — base du fingerprint anti-répétition calculé côté serveur, jamais recalculé côté client. */
+  fingerprintSeed: string;
 }
 
 export type MissionActionType =

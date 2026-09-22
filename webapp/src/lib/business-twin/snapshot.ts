@@ -1,5 +1,5 @@
 import type { BusinessOsVertical } from "@/lib/business-os";
-import { compareToTrailingAverage } from "@/lib/nova-opportunities";
+import { compareToTrailingAverage, listInactiveCustomerIds } from "@/lib/nova-opportunities";
 import { type DataField, realField, insufficientField } from "./types";
 
 // SITUATION — construit le snapshot à partir de données DÉJÀ chargées par
@@ -18,6 +18,7 @@ export interface SnapshotInputs {
     due_at: string | null;
     paid_at: string | null;
     total_ttc: number;
+    customer_id: string | null;
   }[];
   customers: { id: string }[];
   lowStockItems: { quantity: number; low_stock_threshold: number | null }[];
@@ -57,6 +58,26 @@ export function buildSnapshotMetrics(inputs: SnapshotInputs): Record<string, Dat
 
   // --- Clients ---
   metrics.customersCount = realField(inputs.customers.length, "Table clients du Business OS.");
+
+  // --- Clients inactifs (VRAIE donnée, distincte de customersCount — voir
+  // audit : reactivateCustomersScenarios dérivait auparavant sa confiance
+  // du nombre TOTAL de clients au lieu du nombre réellement inactif, alors
+  // que l'action générée (plan-builder) ciblait déjà les bons clients. Le
+  // signal affiché correspond maintenant à l'action réelle. ---
+  if (inputs.customers.length === 0) {
+    metrics.inactiveCustomersCount = insufficientField("Aucun client enregistré.", "Ajoutez vos clients dans Business OS pour suivre leur activité.");
+  } else if (inputs.documents.length === 0) {
+    metrics.inactiveCustomersCount = insufficientField(
+      "Aucun devis ni facture pour déterminer l'activité des clients.",
+      "Le calcul se base sur la date du dernier devis/de la dernière facture par client.",
+    );
+  } else {
+    const inactiveIds = listInactiveCustomerIds(inputs.customers, inputs.documents, 180);
+    metrics.inactiveCustomersCount = realField(
+      inactiveIds.length,
+      `${inputs.customers.length} client(s) au total, sans devis ni facture depuis plus de 6 mois.`,
+    );
+  }
 
   // --- Devis/factures ---
   const unanswered = inputs.documents.filter((d) => d.doc_type === "quote" && d.status === "sent");

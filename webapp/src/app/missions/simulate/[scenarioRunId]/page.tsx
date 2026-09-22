@@ -28,6 +28,16 @@ const ASSUMPTION_LABEL: Record<string, { text: string; tone: BadgeTone }> = {
   missing: { text: "Donnée manquante", tone: "neutral" },
 };
 
+const SIGNAL_CATEGORY_LABEL: Record<string, string> = {
+  sales: "Ventes",
+  capacity: "Capacité",
+  finance: "Finance",
+  inventory: "Stock",
+  customers: "Clients",
+  acquisition: "Acquisition",
+  marketing: "Marketing",
+};
+
 export default async function SimulatePage({ params }: PageProps<"/missions/simulate/[scenarioRunId]">) {
   const { scenarioRunId } = await params;
   const user = await getCachedUser();
@@ -92,7 +102,15 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
                 </div>
                 <p className="mt-1.5 text-[12.5px] text-muted">{r.description}</p>
 
+                {r.is_repeat && r.first_seen_at && (
+                  <p className="mt-2 rounded-lg bg-soft px-2.5 py-1.5 text-[11px] font-medium text-muted">
+                    ↻ Cette recommandation reste valable depuis le {new Date(r.first_seen_at).toLocaleDateString("fr-FR")} — rien n&apos;a
+                    changé dans vos données depuis.
+                  </p>
+                )}
+
                 <div className="mt-3 flex flex-wrap gap-1.5">
+                  {r.signal_category && <Badge tone="dark">{SIGNAL_CATEGORY_LABEL[r.signal_category] ?? r.signal_category}</Badge>}
                   <Badge tone={CONFIDENCE_LABEL[r.confidence].tone}>{CONFIDENCE_LABEL[r.confidence].text}</Badge>
                   <Badge tone="neutral">{EFFORT_LABEL[r.effort]}</Badge>
                 </div>
@@ -134,6 +152,7 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
                       scenarioRunId={run.id}
                       scenarioResultId={r.id}
                       scenarioKey={r.key}
+                      lever={r.lever ?? "do_nothing"}
                       goalType={run.goal_type}
                       goalLabel={run.prompt}
                       targetUnit={template.targetUnit}

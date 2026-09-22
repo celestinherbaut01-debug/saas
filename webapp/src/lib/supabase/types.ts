@@ -840,6 +840,11 @@ export interface Database {
           qualitative_impact: string;
           is_recommended: boolean;
           plan_preview: { label: string; count: number | null }[];
+          lever: string | null;
+          signal_category: string | null;
+          fingerprint: string | null;
+          is_repeat: boolean;
+          first_seen_at: string | null;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["scenario_results"]["Row"]> & {
@@ -851,6 +856,28 @@ export interface Database {
           confidence: Database["public"]["Tables"]["scenario_results"]["Row"]["confidence"];
         };
         Update: Partial<Database["public"]["Tables"]["scenario_results"]["Row"]>;
+        Relationships: [];
+      };
+      recommendation_fingerprints: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          fingerprint: string;
+          goal_type: string;
+          lever: string;
+          label: string;
+          first_seen_at: string;
+          last_seen_at: string;
+          times_seen: number;
+        };
+        Insert: Partial<Database["public"]["Tables"]["recommendation_fingerprints"]["Row"]> & {
+          workspace_id: string;
+          fingerprint: string;
+          goal_type: string;
+          lever: string;
+          label: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["recommendation_fingerprints"]["Row"]>;
         Relationships: [];
       };
       scenario_assumptions: {

@@ -1,7 +1,7 @@
 import type { BusinessOsVertical } from "@/lib/business-os";
 import { generateCampaignTemplate } from "@/lib/nova-campaign";
 import { listInactiveCustomerIds } from "@/lib/nova-opportunities";
-import type { GoalType, ScenarioKey, MissionActionDraft, TypedProspect } from "./types";
+import type { GoalType, MissionActionDraft, TypedProspect } from "./types";
 
 // PLAN — transforme un scénario CHOISI en actions concrètes, à partir de
 // données FRAÎCHES (chargées au moment du clic sur "Appliquer le plan", pas
@@ -9,6 +9,13 @@ import type { GoalType, ScenarioKey, MissionActionDraft, TypedProspect } from ".
 // devis peut avoir été payé, un prospect contacté — on ne fige jamais une
 // liste d'IDs obsolète dans le scénario lui-même (voir ScenarioResult.
 // planPreview, qui ne contient que des libellés/compteurs, jamais d'IDs).
+//
+// SUITE À L'AUDIT : le dispatch se fait maintenant sur `lever` (le levier
+// RÉEL choisi par scenarios.ts, ex. "reactivation_direct" vs
+// "reactivation_bulk_campaign"), pas sur `scenarioKey` (qui ne dit que la
+// position A/B/C). Deux leviers différents produisent maintenant des
+// actions structurellement différentes (une action de campagne unique vs N
+// actions individuelles), pas la même liste redécorée.
 
 export interface PlanBuilderDocument {
   id: string;
@@ -30,7 +37,8 @@ export interface PlanBuilderCustomer {
 
 export interface PlanBuilderContext {
   goalType: GoalType;
-  scenarioKey: ScenarioKey;
+  /** Levier réel choisi (voir ScenarioResult.lever dans lib/business-twin/scenarios.ts) — pilote QUELLES actions sont générées. */
+  lever: string;
   companyName: string;
   vertical: BusinessOsVertical;
   city: string;
@@ -42,23 +50,54 @@ export interface PlanBuilderContext {
 const MAX_ITEMS = 12;
 
 export function buildPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  if (ctx.scenarioKey === "do_nothing") return [];
-
-  switch (ctx.goalType) {
-    case "revenue_growth":
-      return revenueGrowthPlan(ctx);
-    case "new_customers":
-    case "b2b_contracts":
-      return newCustomersPlan(ctx);
-    case "fill_capacity":
-      return fillCapacityPlan(ctx);
-    case "reactivate_customers":
-      return reactivateCustomersPlan(ctx);
-    case "overdue_payments":
-      return overduePaymentsPlan(ctx);
+  switch (ctx.lever) {
+    case "do_nothing":
+    case "capacity_wait_for_data":
+      return [];
+    case "sales_followup":
+      return draftsFromQuotes(unansweredQuotes(ctx));
+    case "acquisition_direct":
+      return draftsFromProspects(priorityProspects(ctx));
+    case "acquisition_launch_search":
+      return [{ actionType: "tache_crm", title: "Lancer une nouvelle recherche de prospects", reason: "Élargir le pipeline — aucun prospect prioritaire identifié actuellement." }];
+    case "marketing_campaign":
+      return [campaignDraft(ctx, campaignContextLabel(ctx.goalType))];
+    case "reactivation_direct":
+      return draftsFromInactiveCustomers(inactiveCustomerIds(ctx), customersById(ctx));
+    case "reactivation_bulk_campaign":
+      return [campaignDraft(ctx, "Réactivation clients")];
+    case "finance_batch":
+      return draftsFromInvoices(overdueInvoices(ctx));
+    case "finance_triage": {
+      const invoices = overdueInvoicesSortedByUrgency(ctx).slice(0, 5);
+      return draftsFromInvoices(invoices);
+    }
+    case "manual_review_nova":
     default:
-      return genericPlan();
+      return [
+        {
+          actionType: "autre",
+          title: "Discuter de cet objectif avec NOVA",
+          reason: "Pas de règle déterministe prédéfinie pour ce levier — NOVA peut explorer vos données au cas par cas.",
+        },
+      ];
   }
+}
+
+function campaignContextLabel(goalType: GoalType): string {
+  const labels: Record<GoalType, string> = {
+    revenue_growth: "Croissance du chiffre d'affaires",
+    new_customers: "Nouveaux clients",
+    b2b_contracts: "Nouveaux contrats B2B",
+    fill_capacity: "Remplissage du planning",
+    reactivate_customers: "Réactivation clients",
+    overdue_payments: "Impayés",
+    margin_improvement: "Marge",
+    stock_reduction: "Déstockage",
+    retention: "Fidélisation",
+    custom: "Objectif personnalisé",
+  };
+  return labels[goalType];
 }
 
 function priorityProspects(ctx: PlanBuilderContext): TypedProspect[] {
@@ -75,6 +114,27 @@ function overdueInvoices(ctx: PlanBuilderContext): PlanBuilderDocument[] {
   return ctx.documents
     .filter((d) => d.doc_type === "invoice" && d.status !== "paid" && d.status !== "canceled" && d.due_at && new Date(d.due_at).getTime() < now)
     .slice(0, MAX_ITEMS);
+}
+
+/** Les plus anciennes/montants les plus élevés d'abord — voir le levier "finance_triage". */
+function overdueInvoicesSortedByUrgency(ctx: PlanBuilderContext): PlanBuilderDocument[] {
+  const now = Date.now();
+  return ctx.documents
+    .filter((d) => d.doc_type === "invoice" && d.status !== "paid" && d.status !== "canceled" && d.due_at && new Date(d.due_at).getTime() < now)
+    .sort((a, b) => {
+      const daysLateA = now - new Date(a.due_at as string).getTime();
+      const daysLateB = now - new Date(b.due_at as string).getTime();
+      if (daysLateA !== daysLateB) return daysLateB - daysLateA;
+      return b.total_ttc - a.total_ttc;
+    });
+}
+
+function inactiveCustomerIds(ctx: PlanBuilderContext): string[] {
+  return listInactiveCustomerIds(ctx.customers, ctx.documents, 180);
+}
+
+function customersById(ctx: PlanBuilderContext): Map<string, string> {
+  return new Map(ctx.customers.map((c) => [c.id, c.name]));
 }
 
 function draftsFromQuotes(quotes: PlanBuilderDocument[]): MissionActionDraft[] {
@@ -104,10 +164,10 @@ function draftsFromProspects(prospects: TypedProspect[]): MissionActionDraft[] {
   }));
 }
 
-function draftsFromInactiveCustomers(ids: string[], customersById: Map<string, string>): MissionActionDraft[] {
+function draftsFromInactiveCustomers(ids: string[], customersMap: Map<string, string>): MissionActionDraft[] {
   return ids.slice(0, MAX_ITEMS).map((id) => ({
     actionType: "reactivation_client",
-    title: `Réactiver ${customersById.get(id) ?? "un client"}`,
+    title: `Réactiver ${customersMap.get(id) ?? "un client"}`,
     reason: "Aucun devis ni facture depuis plus de 6 mois.",
     targetRef: { table: "customers", id },
   }));
@@ -127,48 +187,4 @@ function campaignDraft(ctx: PlanBuilderContext, context: string): MissionActionD
     reason: "Contenu prêt à relire et adapter (aucun envoi automatique).",
     preparedContent: template as unknown as Record<string, unknown>,
   };
-}
-
-function revenueGrowthPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  const drafts = [...draftsFromQuotes(unansweredQuotes(ctx)), ...draftsFromProspects(priorityProspects(ctx))];
-  if (ctx.scenarioKey === "alternative") drafts.push(campaignDraft(ctx, "Croissance du chiffre d'affaires"));
-  return drafts;
-}
-
-function newCustomersPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  const drafts = draftsFromProspects(priorityProspects(ctx));
-  if (ctx.scenarioKey === "alternative") {
-    drafts.push({
-      actionType: "tache_crm",
-      title: "Lancer une nouvelle recherche de prospects",
-      reason: "Élargir le pipeline au-delà des prospects déjà identifiés.",
-    });
-  }
-  return drafts;
-}
-
-function fillCapacityPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  const customersById = new Map(ctx.customers.map((c) => [c.id, c.name]));
-  const inactiveIds = listInactiveCustomerIds(ctx.customers, ctx.documents, 180);
-  return [campaignDraft(ctx, "Remplissage du planning"), ...draftsFromInactiveCustomers(inactiveIds, customersById)];
-}
-
-function reactivateCustomersPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  const customersById = new Map(ctx.customers.map((c) => [c.id, c.name]));
-  const inactiveIds = listInactiveCustomerIds(ctx.customers, ctx.documents, 180);
-  return draftsFromInactiveCustomers(inactiveIds, customersById);
-}
-
-function overduePaymentsPlan(ctx: PlanBuilderContext): MissionActionDraft[] {
-  return draftsFromInvoices(overdueInvoices(ctx));
-}
-
-function genericPlan(): MissionActionDraft[] {
-  return [
-    {
-      actionType: "autre",
-      title: "Discuter de cet objectif avec NOVA",
-      reason: "Pas de règle déterministe prédéfinie pour ce type d'objectif — NOVA peut explorer vos données au cas par cas.",
-    },
-  ];
 }

@@ -25,6 +25,7 @@ export function ChooseScenarioForm({
   scenarioRunId,
   scenarioResultId,
   scenarioKey,
+  lever,
   goalType,
   goalLabel,
   targetUnit,
@@ -34,6 +35,8 @@ export function ChooseScenarioForm({
   scenarioRunId: string;
   scenarioResultId: string;
   scenarioKey: ScenarioKey;
+  /** Levier réel de ce scénario (ScenarioResult.lever) — détermine quelles actions seront générées. */
+  lever: string;
   goalType: GoalType;
   goalLabel: string;
   targetUnit: string | null;
@@ -53,7 +56,7 @@ export function ChooseScenarioForm({
     setError(null);
     startTransition(async () => {
       if (missionId) {
-        const result = await addScenarioToMission(workspaceId, { missionId, scenarioRunId, scenarioResultId, scenarioKey });
+        const result = await addScenarioToMission(workspaceId, { missionId, scenarioRunId, scenarioResultId, scenarioKey, lever });
         if ("error" in result) {
           setError(result.error);
           return;
@@ -66,6 +69,7 @@ export function ChooseScenarioForm({
         scenarioRunId,
         scenarioResultId,
         scenarioKey,
+        lever,
         goalType,
         goalLabel,
         goalTargetValue: targetValue.trim() ? Number(targetValue) : null,
