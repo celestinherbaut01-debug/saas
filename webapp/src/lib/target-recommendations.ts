@@ -132,15 +132,24 @@ export interface OfferRecommendation {
   basedOnOffer: boolean; // false = repli sur le métier (aucun mot-clé d'offre reconnu)
 }
 
+/**
+ * Règles d'intention dont le texte de l'offre matche réellement — extrait
+ * de recommendedSlugsForOffer pour être réutilisé par channel-strategy.ts
+ * (décider si le registre SIRENE est le bon canal), sans dupliquer la
+ * logique de correspondance par mots-clés.
+ */
+export function matchedOfferIntentRules(offerDescription: string): OfferIntentRule[] {
+  const normalized = normalize(offerDescription || "");
+  if (!normalized.trim()) return [];
+  return OFFER_INTENT_RULES.filter((rule) => rule.keywords.some((kw) => normalized.includes(normalize(kw))));
+}
+
 export function recommendedSlugsForOffer(
   offerDescription: string,
   ownSlug: string | null,
   categories: { id: string; slug: string; parent_id: string | null }[],
 ): OfferRecommendation {
-  const normalized = normalize(offerDescription || "");
-  const matched = normalized.trim()
-    ? OFFER_INTENT_RULES.filter((rule) => rule.keywords.some((kw) => normalized.includes(normalize(kw))))
-    : [];
+  const matched = matchedOfferIntentRules(offerDescription);
 
   if (matched.length > 0) {
     const slugs = new Set<string>();

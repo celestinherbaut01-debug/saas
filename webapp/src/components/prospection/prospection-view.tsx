@@ -16,6 +16,8 @@ import { type ProspectionFilters } from "@/lib/prospecting-config";
 import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { getProspectingFilterProfile } from "@/lib/prospecting-filter-profile";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
+import { resolveChannelStrategy } from "@/lib/prospecting/channel-strategy";
+import { ChannelStrategyBanner } from "@/components/prospection/channel-strategy-banner";
 
 type SearchResult = ProspectionResult;
 
@@ -182,6 +184,18 @@ export function ProspectionView({
     [offerDescription, ownSlug, categories],
   );
   const recommendedSlugs = filterSlugsByAudience(offerRecommendation.slugs, categories, audience);
+
+  // Le registre SIRENE est un registre D'ENTREPRISES — pour une offre dont
+  // les vrais clients sont des particuliers, ce n'est structurellement pas
+  // le bon canal (voir lib/prospecting/channel-strategy.ts, CAS C/F du
+  // cahier des charges produit). "b2c_not_registry" replie le reste du
+  // parcours de recherche par défaut, sans jamais le supprimer.
+  const channelStrategy = useMemo(
+    () => resolveChannelStrategy(ownSlug, audience, offerDescription),
+    [ownSlug, audience, offerDescription],
+  );
+  const [showAdvancedB2bSearch, setShowAdvancedB2bSearch] = useState(false);
+  const searchFlowVisible = channelStrategy.channel !== "b2c_not_registry" || showAdvancedB2bSearch;
 
   const displayedResults = useMemo(
     () =>
@@ -431,6 +445,20 @@ export function ProspectionView({
         </div>
       </Card>
 
+      <ChannelStrategyBanner strategy={channelStrategy} />
+
+      {channelStrategy.channel === "b2c_not_registry" && !showAdvancedB2bSearch && (
+        <button
+          type="button"
+          onClick={() => setShowAdvancedB2bSearch(true)}
+          className="self-start text-[12px] font-semibold text-muted underline decoration-dotted hover:text-ink"
+        >
+          Cas particulier : utiliser quand même la recherche dans le registre d&apos;entreprises →
+        </button>
+      )}
+
+      {searchFlowVisible && (
+      <>
       <Card>
         <h2 className="font-display text-sm font-bold">2. Qui voulez-vous démarcher ?</h2>
         {recommendedSlugs && recommendedSlugs.length > 0 && (
@@ -573,6 +601,8 @@ export function ProspectionView({
           </div>
         )}
       </Card>
+      </>
+      )}
 
       <Card>
         <div className="flex items-center justify-between">
