@@ -194,29 +194,19 @@ export interface SimulationResult {
 }
 
 /**
- * SIMULATION — calcule le snapshot + les scénarios pour un objectif, et les
- * persiste (scenario_runs/scenario_results/scenario_assumptions +
- * business_twin_snapshots) SANS créer de mission : explorer un objectif ne
- * doit jamais engager automatiquement une mission (voir createMissionFrom
- * Scenario, une étape explicite séparée).
+ * Cœur commun de SITUATION + SIMULATION : recalcule un snapshot à partir des
+ * données ACTUELLES et génère/persiste les scénarios. Utilisé aussi bien
+ * pour une première simulation (missionId=null) que pour un AJUSTEMENT
+ * (missionId renseigné — voir runAdjustmentSimulation) : dans les deux cas,
+ * rien n'est réutilisé de l'ancien snapshot, tout est recalculé "en direct".
  */
-export async function runSimulation(
+async function computeAndPersistScenarios(
+  supabase: SupabaseServerClient,
   workspaceId: string,
+  ent: ReturnType<typeof getEntitlements>,
   input: { goalType: GoalType; goalLabel: string },
+  missionId: string | null,
 ): Promise<{ result: SimulationResult } | { error: string }> {
-  const supabase = await createClient();
-  const memberError = await assertMember(supabase, workspaceId);
-  if (memberError) return memberError;
-
-  const plan = await getWorkspacePlan(workspaceId);
-  const ent = getEntitlements(plan);
-
-  try {
-    await assertQuota(workspaceId, "scenario_runs", plan);
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Quota de simulations atteint." };
-  }
-
   const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
 
   const snapshotInputs: SnapshotInputs = {
@@ -244,7 +234,7 @@ export async function runSimulation(
 
   const { data: runRow, error: runError } = await supabase
     .from("scenario_runs")
-    .insert({ workspace_id: workspaceId, snapshot_id: snapshotRow.id, goal_type: input.goalType, prompt: input.goalLabel })
+    .insert({ workspace_id: workspaceId, mission_id: missionId, snapshot_id: snapshotRow.id, goal_type: input.goalType, prompt: input.goalLabel })
     .select("id")
     .single();
   if (runError || !runRow) return { error: `Échec de l'enregistrement de la simulation : ${runError?.message}` };
@@ -288,6 +278,65 @@ export async function runSimulation(
   await incrementUsage(workspaceId, "scenario_runs");
 
   return { result: { scenarioRunId: runRow.id, snapshotId: snapshotRow.id, scenarios: scenariosWithIds } };
+}
+
+/**
+ * SIMULATION — calcule le snapshot + les scénarios pour un objectif, et les
+ * persiste SANS créer de mission : explorer un objectif ne doit jamais
+ * engager automatiquement une mission (voir createMissionFromScenario, une
+ * étape explicite séparée).
+ */
+export async function runSimulation(
+  workspaceId: string,
+  input: { goalType: GoalType; goalLabel: string },
+): Promise<{ result: SimulationResult } | { error: string }> {
+  const supabase = await createClient();
+  const memberError = await assertMember(supabase, workspaceId);
+  if (memberError) return memberError;
+
+  const plan = await getWorkspacePlan(workspaceId);
+  const ent = getEntitlements(plan);
+
+  try {
+    await assertQuota(workspaceId, "scenario_runs", plan);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Quota de simulations atteint." };
+  }
+
+  return computeAndPersistScenarios(supabase, workspaceId, ent, input, null);
+}
+
+/**
+ * AJUSTEMENT — recalcule un nouveau snapshot + de nouveaux scénarios pour
+ * une mission EXISTANTE, à partir des données actuelles (pas de celles
+ * utilisées à la création). Ne modifie rien tant que l'utilisateur n'a pas
+ * explicitement choisi un scénario (voir addScenarioToMission) : ajuster
+ * n'écrase jamais silencieusement le plan en cours.
+ */
+export async function runAdjustmentSimulation(workspaceId: string, missionId: string): Promise<{ result: SimulationResult } | { error: string }> {
+  const supabase = await createClient();
+  const memberError = await assertMember(supabase, workspaceId);
+  if (memberError) return memberError;
+
+  const { data: mission } = await supabase.from("missions").select("goal_type, goal_label").eq("id", missionId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!mission) return { error: "Mission introuvable." };
+
+  const plan = await getWorkspacePlan(workspaceId);
+  const ent = getEntitlements(plan);
+
+  try {
+    await assertQuota(workspaceId, "scenario_runs", plan);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Quota de simulations atteint." };
+  }
+
+  const outcome = await computeAndPersistScenarios(supabase, workspaceId, ent, { goalType: mission.goal_type, goalLabel: mission.goal_label }, missionId);
+  if (!("error" in outcome)) {
+    await supabase
+      .from("mission_events")
+      .insert({ workspace_id: workspaceId, mission_id: missionId, event_type: "progress_update", detail: "Nouvelle simulation lancée pour ajuster le plan." });
+  }
+  return outcome;
 }
 
 /**
@@ -343,7 +392,7 @@ export async function createMissionFromScenario(
     .single();
   if (missionError || !missionRow) return { error: `Échec de la création de la mission : ${missionError?.message}` };
 
-  await supabase.from("scenario_runs").update({ mission_id: missionRow.id }).eq("id", params.scenarioRunId);
+  await supabase.from("scenario_runs").update({ mission_id: missionRow.id, applied: true }).eq("id", params.scenarioRunId);
 
   const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
   const planContext: PlanBuilderContext = {
@@ -385,6 +434,81 @@ export async function createMissionFromScenario(
 
   revalidateBusinessTwinPaths();
   return { missionId: missionRow.id };
+}
+
+/**
+ * AJUSTEMENT (suite) — applique un scénario issu d'un run d'AJUSTEMENT à une
+ * mission EXISTANTE : ajoute de nouvelles mission_actions à la suite du
+ * plan actuel (jamais de suppression des actions déjà en cours), et met à
+ * jour le snapshot/scénario de référence de la mission. Contrairement à
+ * createMissionFromScenario, ne crée aucune nouvelle mission.
+ */
+export async function addScenarioToMission(
+  workspaceId: string,
+  params: { missionId: string; scenarioRunId: string; scenarioResultId: string; scenarioKey: ScenarioKey },
+): Promise<{ ok: true } | { error: string }> {
+  const supabase = await createClient();
+  const memberError = await assertMember(supabase, workspaceId);
+  if (memberError) return { error: memberError.error };
+
+  const { data: mission } = await supabase.from("missions").select("id, goal_type").eq("id", params.missionId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!mission) return { error: "Mission introuvable." };
+
+  const { data: runRow } = await supabase
+    .from("scenario_runs")
+    .select("id, snapshot_id, mission_id")
+    .eq("id", params.scenarioRunId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  if (!runRow || runRow.mission_id !== params.missionId) return { error: "Cette simulation ne correspond pas à cette mission." };
+
+  const plan = await getWorkspacePlan(workspaceId);
+  const ent = getEntitlements(plan);
+
+  const { count: existingCount } = await supabase.from("mission_actions").select("id", { count: "exact", head: true }).eq("mission_id", params.missionId);
+  const startOrder = existingCount ?? 0;
+
+  const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
+  const planContext: PlanBuilderContext = {
+    goalType: mission.goal_type,
+    scenarioKey: params.scenarioKey,
+    companyName: raw.companyName,
+    vertical: raw.vertical,
+    city: raw.city,
+    prospects: raw.prospects ?? [],
+    documents: raw.documents,
+    customers: raw.customers,
+  };
+  const drafts = buildPlan(planContext);
+
+  if (drafts.length > 0) {
+    await supabase.from("mission_actions").insert(
+      drafts.map((d, i) => ({
+        workspace_id: workspaceId,
+        mission_id: params.missionId,
+        step_order: startOrder + i,
+        action_type: d.actionType,
+        title: d.title,
+        reason: d.reason,
+        status: "proposed" as const,
+        target_ref: d.targetRef ?? null,
+        prepared_content: ent.businessTwinPreparedActions ? (d.preparedContent ?? null) : null,
+      })),
+    );
+  }
+
+  await Promise.all([
+    supabase.from("missions").update({ snapshot_id: runRow.snapshot_id, chosen_scenario_result_id: params.scenarioResultId }).eq("id", params.missionId),
+    supabase.from("scenario_runs").update({ applied: true }).eq("id", params.scenarioRunId),
+    supabase.from("mission_events").insert([
+      { workspace_id: workspaceId, mission_id: params.missionId, event_type: "scenario_chosen", detail: `Ajustement — scénario choisi : ${params.scenarioKey}` },
+      { workspace_id: workspaceId, mission_id: params.missionId, event_type: "plan_applied", detail: `${drafts.length} nouvelle(s) action(s) ajoutée(s) au plan.` },
+    ]),
+  ]);
+
+  revalidateBusinessTwinPaths();
+  revalidatePath(`/missions/${params.missionId}`);
+  return { ok: true };
 }
 
 export interface MissionSummary {

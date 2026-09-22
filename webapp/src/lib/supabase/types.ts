@@ -815,6 +815,7 @@ export interface Database {
           snapshot_id: string | null;
           goal_type: Database["public"]["Tables"]["missions"]["Row"]["goal_type"];
           prompt: string;
+          applied: boolean;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["scenario_runs"]["Row"]> & {

@@ -6,6 +6,7 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { getMissionDetail } from "@/lib/actions/business-twin";
 import { goalTemplate } from "@/lib/business-twin/goals";
 import { MissionActionItem } from "@/components/business-twin/mission-action-item";
+import { AdjustMissionButton } from "@/components/business-twin/adjust-mission-button";
 import type { DataField } from "@/lib/business-twin/types";
 
 const STATUS_LABEL: Record<string, { text: string; tone: BadgeTone }> = {
@@ -66,7 +67,10 @@ export default async function MissionDetailPage({ params }: PageProps<"/missions
               {detail.deadline && ` — Échéance : ${new Date(detail.deadline).toLocaleDateString("fr-FR")}`}
             </p>
           </div>
-          <Badge tone={STATUS_LABEL[displayStatus]?.tone ?? "neutral"}>{STATUS_LABEL[displayStatus]?.text ?? displayStatus}</Badge>
+          <div className="flex flex-col items-end gap-2">
+            <Badge tone={STATUS_LABEL[displayStatus]?.tone ?? "neutral"}>{STATUS_LABEL[displayStatus]?.text ?? displayStatus}</Badge>
+            {detail.status === "active" && <AdjustMissionButton workspaceId={workspaceId} missionId={detail.id} />}
+          </div>
         </div>
 
         <Card>

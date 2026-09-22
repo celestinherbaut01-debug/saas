@@ -97,6 +97,13 @@ create table if not exists public.scenario_runs (
     )
   ),
   prompt text not null,
+  -- true une fois qu'un scénario de ce run a été transformé en actions
+  -- (nouvelle mission OU ajustement d'une mission existante) — voir
+  -- lib/actions/business-twin.ts. Un run AJUSTEMENT a `mission_id` déjà
+  -- rempli dès sa création (contrairement à un premier run), donc on ne
+  -- peut pas distinguer "à choisir" de "déjà appliqué" par la seule
+  -- présence de mission_id.
+  applied boolean not null default false,
   created_at timestamptz not null default now()
 );
 

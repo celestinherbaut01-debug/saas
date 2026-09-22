@@ -1,4 +1,5 @@
 import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
@@ -38,13 +39,16 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
   const supabase = await createClient();
   const { data: run } = await supabase
     .from("scenario_runs")
-    .select("id, goal_type, prompt, mission_id")
+    .select("id, goal_type, prompt, mission_id, applied")
     .eq("id", scenarioRunId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
   if (!run) notFound();
 
-  if (run.mission_id) redirect(`/missions/${run.mission_id}`);
+  // `mission_id` est déjà rempli pour un run d'AJUSTEMENT dès sa création
+  // (voir runAdjustmentSimulation) — seul `applied` dit si un scénario de ce
+  // run a déjà été choisi ; sinon on affiche la comparaison normalement.
+  if (run.applied && run.mission_id) redirect(`/missions/${run.mission_id}`);
 
   const { data: results } = await supabase
     .from("scenario_results")
@@ -65,9 +69,15 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
             {template.icon} {run.prompt}
           </h1>
           <p className="mt-1 text-[13px] text-muted">
-            ProspectFlow compare plusieurs approches à partir de vos vraies données — aucun résultat futur n&apos;est
-            garanti, voir la confiance et les hypothèses de chaque scénario.
+            {run.mission_id
+              ? "Ajustement de mission — nouveau snapshot recalculé à partir de vos données actuelles. Choisissez un scénario pour ajouter des actions au plan existant."
+              : "ProspectFlow compare plusieurs approches à partir de vos vraies données — aucun résultat futur n'est garanti, voir la confiance et les hypothèses de chaque scénario."}
           </p>
+          {run.mission_id && (
+            <Link href={`/missions/${run.mission_id}`} className="mt-1 inline-block text-[12px] font-semibold text-accent">
+              ← Retour à la mission
+            </Link>
+          )}
         </div>
 
         <div className="grid gap-4 lg:grid-cols-3">
@@ -127,6 +137,7 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
                       goalType={run.goal_type}
                       goalLabel={run.prompt}
                       targetUnit={template.targetUnit}
+                      missionId={run.mission_id ?? undefined}
                     />
                   </div>
                 )}
