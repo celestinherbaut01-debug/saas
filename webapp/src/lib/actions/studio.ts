@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudioContent } from "@/lib/studio/generator";
 import { DEFAULT_BRAND_KIT, parseStudioInput, type BrandKit, type GeneratedContent, type OfferType, type StudioInput, type StudioStatus, type StudioVertical } from "@/lib/studio/types";
+import { STUDIO_PHOTOS_BUCKET, buildPhotoPath, validatePhotoFile, addPhoto, removePhoto, movePhoto, setPrimaryPhoto, parsePhotos } from "@/lib/studio/photos";
 
 function toBrandKit(row: { tone: string; primary_color: string; accent_color: string; tagline: string | null } | null): BrandKit {
   if (!row) return DEFAULT_BRAND_KIT;
@@ -145,6 +146,75 @@ export async function regenerateStudioCreation(
 
   revalidatePath("/studio");
   return { ok: true, content };
+}
+
+/**
+ * Upload réel vers Supabase Storage (bucket `studio-photos`, isolé par
+ * workspace via RLS — voir migration 0034) — jamais de base64 stocké en
+ * base, seule la référence (`path`) l'est. `file` vient d'un `<input
+ * type="file">` transmis via FormData depuis le composant client.
+ */
+export async function uploadStudioPhoto(workspaceId: string, creationId: string, file: File): Promise<{ ok: boolean; error?: string; path?: string }> {
+  const validationError = validatePhotoFile(file);
+  if (validationError) return { ok: false, error: validationError };
+
+  const supabase = await createClient();
+  const { data: creation } = await supabase.from("studio_creations").select("photos").eq("id", creationId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!creation) return { ok: false, error: "Création introuvable." };
+
+  const path = buildPhotoPath(workspaceId, creationId, file.name, crypto.randomUUID().slice(0, 8));
+  const { error: uploadError } = await supabase.storage.from(STUDIO_PHOTOS_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+  if (uploadError) return { ok: false, error: uploadError.message };
+
+  const nextPhotos = addPhoto(parsePhotos(creation.photos), { path });
+  const { error: updateError } = await supabase.from("studio_creations").update({ photos: nextPhotos }).eq("id", creationId).eq("workspace_id", workspaceId);
+  if (updateError) return { ok: false, error: updateError.message };
+
+  revalidatePath("/studio");
+  return { ok: true, path };
+}
+
+export async function deleteStudioPhoto(workspaceId: string, creationId: string, path: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: creation } = await supabase.from("studio_creations").select("photos").eq("id", creationId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!creation) return { ok: false, error: "Création introuvable." };
+
+  await supabase.storage.from(STUDIO_PHOTOS_BUCKET).remove([path]);
+  const nextPhotos = removePhoto(parsePhotos(creation.photos), path);
+  const { error } = await supabase.from("studio_creations").update({ photos: nextPhotos }).eq("id", creationId).eq("workspace_id", workspaceId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/studio");
+  return { ok: true };
+}
+
+export async function reorderStudioPhoto(workspaceId: string, creationId: string, path: string, direction: -1 | 1): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: creation } = await supabase.from("studio_creations").select("photos").eq("id", creationId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!creation) return { ok: false, error: "Création introuvable." };
+
+  const photos = parsePhotos(creation.photos);
+  const index = photos.findIndex((p) => p.path === path);
+  if (index === -1) return { ok: false, error: "Photo introuvable." };
+  const nextPhotos = movePhoto(photos, index, direction);
+  const { error } = await supabase.from("studio_creations").update({ photos: nextPhotos }).eq("id", creationId).eq("workspace_id", workspaceId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/studio");
+  return { ok: true };
+}
+
+export async function setPrimaryStudioPhoto(workspaceId: string, creationId: string, path: string): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { data: creation } = await supabase.from("studio_creations").select("photos").eq("id", creationId).eq("workspace_id", workspaceId).maybeSingle();
+  if (!creation) return { ok: false, error: "Création introuvable." };
+
+  const nextPhotos = setPrimaryPhoto(parsePhotos(creation.photos), path);
+  const { error } = await supabase.from("studio_creations").update({ photos: nextPhotos }).eq("id", creationId).eq("workspace_id", workspaceId);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/studio");
+  return { ok: true };
 }
 
 /**

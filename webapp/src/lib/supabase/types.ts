@@ -903,6 +903,7 @@ export interface Database {
           title: string;
           input_data: Record<string, unknown>;
           generated_content: Record<string, unknown>;
+          photos: { path: string }[];
           status: "draft" | "ready" | "published" | "archived";
           source_mission_id: string | null;
           created_at: string;

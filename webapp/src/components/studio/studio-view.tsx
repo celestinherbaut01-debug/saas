@@ -9,8 +9,10 @@ import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { OfferForm } from "@/components/studio/offer-form";
+import { PhotoUploader } from "@/components/studio/photo-uploader";
 import { createStudioCreation, regenerateStudioCreation, updateStudioCreationInput, updateStudioCreationStatus } from "@/lib/actions/studio";
 import { EMPTY_STUDIO_INPUT, parseGeneratedContent, parseStudioInput, type BrandKit, type GeneratedContent, type OfferType, type StudioInput, type StudioStatus, type StudioVertical } from "@/lib/studio/types";
+import { parsePhotos, photoPublicUrl } from "@/lib/studio/photos";
 import { OFFER_TYPE_LABEL, STUDIO_VERTICAL_LABEL, offerTypesForVertical } from "@/lib/studio/vertical";
 import type { Database } from "@/lib/supabase/types";
 
@@ -111,6 +113,7 @@ export function StudioView({
         title: formInput.title.trim(),
         input_data: formInput as unknown as Record<string, unknown>,
         generated_content: result.content as unknown as Record<string, unknown>,
+        photos: [],
         status: "draft",
         source_mission_id: prefillSourceMissionId,
         created_at: new Date().toISOString(),
@@ -244,6 +247,24 @@ export function StudioView({
         </div>
 
         {error && <p className="text-[12px] font-medium text-red-fg">{error}</p>}
+
+        {!editing && (
+          <Card>
+            <h2 className="font-display text-sm font-bold">Photos</h2>
+            <p className="mt-1 text-[11.5px] text-muted">
+              La première photo est utilisée comme photo principale dans les aperçus Instagram/Facebook/Site.
+            </p>
+            <div className="mt-3">
+              <PhotoUploader
+                workspaceId={workspaceId}
+                creationId={active.id}
+                photos={parsePhotos(active.photos)}
+                photoUrl={(path) => photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "", path)}
+                onPhotosChange={(photos) => setCreations((prev) => prev.map((c) => (c.id === active.id ? { ...c, photos } : c)))}
+              />
+            </div>
+          </Card>
+        )}
 
         {editing ? (
           <Card>
