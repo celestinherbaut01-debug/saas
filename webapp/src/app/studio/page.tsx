@@ -16,7 +16,7 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
 
   const supabase = await createClient();
   const [{ data: businessProfile }, { data: categories }, { data: creations }, { data: brandKitRow }] = await Promise.all([
-    supabase.from("business_profiles").select("own_category_id").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("business_profiles").select("own_category_id, company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
     supabase.from("business_categories").select("id, slug, parent_id"),
     supabase.from("studio_creations").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
     supabase.from("brand_kits").select("*").eq("workspace_id", workspaceId).maybeSingle(),
@@ -46,7 +46,15 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
 
   return (
     <AppShell>
-      <StudioView workspaceId={workspaceId} vertical={vertical} initialCreations={creations ?? []} brandKit={brandKit} prefill={prefill} />
+      <StudioView
+        workspaceId={workspaceId}
+        vertical={vertical}
+        initialCreations={creations ?? []}
+        brandKit={brandKit}
+        prefill={prefill}
+        companyName={businessProfile?.company_name ?? "Votre entreprise"}
+        city={businessProfile?.city ?? null}
+      />
     </AppShell>
   );
 }

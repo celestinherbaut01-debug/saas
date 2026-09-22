@@ -10,7 +10,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { OfferForm } from "@/components/studio/offer-form";
 import { PhotoUploader } from "@/components/studio/photo-uploader";
+import { ChannelPreview } from "@/components/studio/channel-preview";
 import { createStudioCreation, regenerateStudioCreation, updateStudioCreationInput, updateStudioCreationStatus } from "@/lib/actions/studio";
+import { generateStudioContent } from "@/lib/studio/generator";
 import { EMPTY_STUDIO_INPUT, parseGeneratedContent, parseStudioInput, type BrandKit, type GeneratedContent, type OfferType, type StudioInput, type StudioStatus, type StudioVertical } from "@/lib/studio/types";
 import { parsePhotos, photoPublicUrl } from "@/lib/studio/photos";
 import { OFFER_TYPE_LABEL, STUDIO_VERTICAL_LABEL, offerTypesForVertical } from "@/lib/studio/vertical";
@@ -60,12 +62,16 @@ export function StudioView({
   initialCreations,
   brandKit,
   prefill,
+  companyName,
+  city,
 }: {
   workspaceId: string;
   vertical: StudioVertical;
   initialCreations: CreationRow[];
   brandKit: BrandKit;
   prefill?: StudioPrefill | null;
+  companyName: string;
+  city: string | null;
 }) {
   const [creations, setCreations] = useState<CreationRow[]>(initialCreations);
   const [mode, setMode] = useState<ViewMode>(prefill ? "form" : "library");
@@ -86,7 +92,19 @@ export function StudioView({
 
   const active = creations.find((c) => c.id === activeId) ?? null;
   const activeContent = active ? parseGeneratedContent(active.generated_content) : null;
+  const activePhotos = active ? parsePhotos(active.photos) : [];
+  const activePrimaryPhotoUrl = activePhotos.length > 0 ? photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "", activePhotos[0].path) : null;
   const [editInput, setEditInput] = useState<StudioInput>(EMPTY_STUDIO_INPUT);
+
+  // Preview live — recalculée à chaque frappe côté client avec le même
+  // générateur que le serveur (aucune donnée de plus, aucun appel réseau) :
+  // ce que l'utilisateur voit pendant qu'il remplit le formulaire est
+  // EXACTEMENT ce qui sera généré au clic sur "Générer le contenu".
+  const liveContent = useMemo(
+    () => generateStudioContent({ input: formInput, offerType: formOfferType, vertical, brandKit, companyName, city }),
+    [formInput, formOfferType, vertical, brandKit, companyName, city],
+  );
+  const [formActiveChannel, setFormActiveChannel] = useState<(typeof CHANNEL_TABS)[number]["key"]>("instagram");
 
   const filtered = creations.filter((c) => c.status === statusFilter);
 
@@ -200,33 +218,63 @@ export function StudioView({
             Annuler
           </Button>
         </div>
-        <Card>
-          <div className="flex flex-col gap-3">
-            {prefillSourceMissionId && (
-              <p className="rounded-lg bg-accent/10 px-3 py-2 text-[11.5px] font-medium text-accent">
-                🧭 Pré-rempli depuis une action de votre mission Business Twin — vérifiez et complétez avant de générer.
-              </p>
-            )}
-            <div>
-              <Label htmlFor="studio-offer-type">Type d&apos;offre</Label>
-              <Select id="studio-offer-type" value={formOfferType} onChange={(e) => setFormOfferType(e.target.value as OfferType)} className="mt-1 w-full">
-                {availableOfferTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {OFFER_TYPE_LABEL[t]}
-                  </option>
-                ))}
-              </Select>
-              <p className="mt-1 text-[11px] text-faint">
-                Verticale détectée : {STUDIO_VERTICAL_LABEL[vertical]} — les types d&apos;offre proposés sont adaptés à votre métier.
-              </p>
+        <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+          <Card>
+            <h2 className="font-display text-sm font-bold">1. Informations</h2>
+            <div className="mt-3 flex flex-col gap-3">
+              {prefillSourceMissionId && (
+                <p className="rounded-lg bg-accent/10 px-3 py-2 text-[11.5px] font-medium text-accent">
+                  🧭 Pré-rempli depuis une action de votre mission Business Twin — vérifiez et complétez avant de générer.
+                </p>
+              )}
+              <div>
+                <Label htmlFor="studio-offer-type">Type d&apos;offre</Label>
+                <Select id="studio-offer-type" value={formOfferType} onChange={(e) => setFormOfferType(e.target.value as OfferType)} className="mt-1 w-full">
+                  {availableOfferTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {OFFER_TYPE_LABEL[t]}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1 text-[11px] text-faint">
+                  Verticale détectée : {STUDIO_VERTICAL_LABEL[vertical]} — les types d&apos;offre proposés sont adaptés à votre métier.
+                </p>
+              </div>
+              <OfferForm offerType={formOfferType} value={formInput} onChange={setFormInput} />
+              {error && <p className="text-[12px] font-medium text-red-fg">{error}</p>}
+              <Button onClick={submitNewCreation} disabled={pending || !formInput.title.trim()}>
+                {pending ? "Génération…" : "Générer le contenu"}
+              </Button>
+              <p className="text-[10.5px] text-faint">Les photos s&apos;ajoutent à l&apos;étape suivante, une fois la création enregistrée.</p>
             </div>
-            <OfferForm offerType={formOfferType} value={formInput} onChange={setFormInput} />
-            {error && <p className="text-[12px] font-medium text-red-fg">{error}</p>}
-            <Button onClick={submitNewCreation} disabled={pending || !formInput.title.trim()}>
-              {pending ? "Génération…" : "Générer le contenu"}
-            </Button>
-          </div>
-        </Card>
+          </Card>
+
+          <Card className="lg:sticky lg:top-20">
+            <h2 className="font-display text-sm font-bold">2. Aperçu en direct</h2>
+            <div className="mt-3 flex flex-wrap gap-1.5 border-b border-line pb-3">
+              {CHANNEL_TABS.map((c) => (
+                <button
+                  key={c.key}
+                  type="button"
+                  onClick={() => setFormActiveChannel(c.key)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[12px] font-semibold",
+                    formActiveChannel === c.key ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink",
+                  )}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4">
+              {formInput.title.trim() ? (
+                <ChannelPreview channel={formActiveChannel} content={liveContent} companyName={companyName} photoUrl={null} />
+              ) : (
+                <p className="py-10 text-center text-[12.5px] text-faint">Commencez à remplir le titre pour voir l&apos;aperçu.</p>
+              )}
+            </div>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -299,9 +347,18 @@ export function StudioView({
                 </button>
               ))}
             </div>
-            <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg bg-soft p-3.5 font-sans text-[13px] leading-relaxed text-ink">
-              {channelText(activeContent, activeChannel)}
-            </pre>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2 lg:items-start">
+              <div>
+                <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-faint">Aperçu</p>
+                <ChannelPreview channel={activeChannel} content={activeContent} companyName={companyName} photoUrl={activePrimaryPhotoUrl} />
+              </div>
+              <div>
+                <p className="mb-2 text-[10.5px] font-bold uppercase tracking-wider text-faint">Texte à copier</p>
+                <pre className="whitespace-pre-wrap break-words rounded-lg bg-soft p-3.5 font-sans text-[13px] leading-relaxed text-ink">
+                  {channelText(activeContent, activeChannel)}
+                </pre>
+              </div>
+            </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button size="sm" onClick={copyChannel}>
                 {copiedChannel === activeChannel ? "Copié ✓" : "Copier"}

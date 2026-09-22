@@ -17,7 +17,10 @@ const STATUS_TONE: Record<string, BadgeTone> = {
 function MissionRow({ mission }: { mission: MissionSummary }) {
   const pct = mission.totalActions > 0 ? Math.round((mission.doneActions / mission.totalActions) * 100) : 0;
   return (
-    <Link href={`/missions/${mission.id}`} className="flex flex-col gap-1.5 rounded-lg border border-line bg-bg px-3.5 py-3 hover:bg-soft">
+    <Link
+      href={`/missions/${mission.id}`}
+      className="flex flex-col gap-1.5 rounded-lg border border-line bg-bg px-3.5 py-3 shadow-[var(--shadow-sm)] transition-[box-shadow,transform,border-color] duration-200 hover:-translate-y-0.5 hover:border-accent/30 hover:bg-soft hover:shadow-[var(--shadow-md)]"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-[13px] font-semibold text-ink">{mission.goalLabel}</span>
         {mission.deadline && (
@@ -25,7 +28,7 @@ function MissionRow({ mission }: { mission: MissionSummary }) {
         )}
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-line">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-gradient-to-r from-accent to-accent-2 transition-[width] duration-500" style={{ width: `${pct}%` }} />
       </div>
       <span className="text-[11.5px] text-muted">
         Progression : {mission.doneActions} / {mission.totalActions}
