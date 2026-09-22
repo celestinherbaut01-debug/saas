@@ -117,7 +117,7 @@ Deno.serve(async (req) => {
     body.maxPlacesLookups ?? DEFAULT_MAX_PLACES_LOOKUPS,
     HARD_MAX_PLACES_LOOKUPS,
   );
-  const scoringProfile = resolveScoringProfile(body.ownCategorySlug ?? null, body.audience ?? null);
+  const scoringProfile = resolveScoringProfile(body.ownCategorySlug ?? null, body.audience ?? null, body.scoringProfileOverride ?? null);
 
   // Log temporaire de diagnostic (stage 1/8 : requête reçue) — visible
   // uniquement dans les logs Supabase Edge Functions, jamais renvoyé au

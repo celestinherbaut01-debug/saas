@@ -31,10 +31,23 @@ export const SCORING_PROFILE_LABEL: Record<ScoringProfile, string> = {
  * métiers explicitement couverts ont un profil dédié, tout le reste utilise
  * la formule générique plutôt qu'un profil deviné approximativement.
  */
+const VALID_PROFILES: ScoringProfile[] = ["digital_opportunity", "marketing_potential", "contract_potential", "b2b_commercial", "generic"];
+
+/**
+ * `override` vient de l'objectif de prospection choisi dans le nouveau
+ * parcours guidé (voir webapp/src/lib/prospecting/offer-catalog.ts
+ * scoringProfileForObjective) — LA MÊME entreprise doit pouvoir scorer
+ * différemment selon l'objectif ("création de site" vs "entretien de
+ * flotte"), pas seulement selon le métier/audience de l'utilisateur. Un
+ * override invalide ou absent retombe sur le calcul métier/audience
+ * habituel, jamais une erreur.
+ */
 export function resolveScoringProfile(
   ownSlug: string | null,
   audience: "b2b" | "b2c" | "both" | null,
+  override?: string | null,
 ): ScoringProfile {
+  if (override && (VALID_PROFILES as string[]).includes(override)) return override as ScoringProfile;
   if (ownSlug === "web" || ownSlug === "it") return "digital_opportunity";
   if (ownSlug === "marketing" || ownSlug === "design") return "marketing_potential";
   if (ownSlug === "cleaning" || ownSlug === "security") return "contract_potential";

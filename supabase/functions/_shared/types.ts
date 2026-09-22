@@ -24,6 +24,8 @@ export interface SearchRequest {
   ownCategorySlug?: string | null;
   /** Clientèle déclarée par l'utilisateur — affine le profil de scoring quand le métier seul ne suffit pas. */
   audience?: "b2b" | "b2c" | "both" | null;
+  /** Objectif de prospection choisi dans le parcours guidé — prioritaire sur ownCategorySlug/audience pour le calcul du score (voir resolveScoringProfile). */
+  scoringProfileOverride?: string | null;
 }
 
 /** Établissement brut renvoyé par l'API SIRENE / RNE (recherche-entreprises.api.gouv.fr). */

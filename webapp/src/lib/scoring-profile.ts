@@ -19,10 +19,14 @@ export const SCORING_PROFILE_LABEL: Record<ScoringProfile, string> = {
   generic: "Score d'opportunité",
 };
 
+const VALID_PROFILES: ScoringProfile[] = ["digital_opportunity", "marketing_potential", "contract_potential", "b2b_commercial", "generic"];
+
 export function resolveScoringProfile(
   ownSlug: string | null,
   audience: "b2b" | "b2c" | "both" | null,
+  override?: string | null,
 ): ScoringProfile {
+  if (override && (VALID_PROFILES as string[]).includes(override)) return override as ScoringProfile;
   if (ownSlug === "web" || ownSlug === "it") return "digital_opportunity";
   if (ownSlug === "marketing" || ownSlug === "design") return "marketing_potential";
   if (ownSlug === "cleaning" || ownSlug === "security") return "contract_potential";

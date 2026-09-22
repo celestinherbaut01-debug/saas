@@ -18,6 +18,8 @@ export interface SearchProspectsParams {
   /** Détermine le profil de scoring (voir lib/scoring-profile.ts) — jamais lié au prospect. */
   ownCategorySlug?: string | null;
   audience?: "b2b" | "b2c" | "both" | null;
+  /** Objectif de prospection choisi (voir lib/prospecting/offer-catalog.ts scoringProfileForObjective) — prioritaire sur ownCategorySlug/audience pour le score. */
+  scoringProfileOverride?: string | null;
 }
 
 export interface SearchProspectsResult {

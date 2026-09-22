@@ -47,7 +47,7 @@ const B2B_ORIENTED_EVEN_IF_B2C_AUDIENCE = new Set([
   "corporate-catering",
 ]);
 
-const RETENTION_ALTERNATIVES: ChannelAlternative[] = [
+export const RETENTION_ALTERNATIVES: ChannelAlternative[] = [
   {
     label: "Réactiver vos clients existants",
     description: "Vos clients inactifs depuis plusieurs mois sont une cible connue, déjà qualifiée — voir Business Twin, objectif \"Réactiver des clients\".",
