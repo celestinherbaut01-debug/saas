@@ -129,7 +129,11 @@ export function PhotoUploader({
             <div key={p.path} className="group relative overflow-hidden rounded-lg border border-line">
               {/* eslint-disable-next-line @next/next/no-img-element -- photos utilisateur en Storage, dimensions variables */}
               <img src={photoUrl(p.path)} alt="" className="aspect-square w-full object-cover" />
-              {i === 0 && <span className="absolute left-1 top-1 rounded-full bg-ink px-1.5 py-0.5 text-[9px] font-bold text-bg">Principale</span>}
+              {i === 0 && (
+                <span className="absolute left-1 top-1 rounded-full bg-[image:var(--gradient-signature)] px-1.5 py-0.5 text-[9px] font-bold text-accent-ink shadow-[var(--shadow-sm)]">
+                  Principale
+                </span>
+              )}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-ink/70 px-1 py-1 opacity-0 transition group-hover:opacity-100">
                 <button type="button" onClick={() => move(p.path, -1)} disabled={i === 0} className="text-[11px] text-bg disabled:opacity-30" title="Déplacer vers la gauche">
                   ←

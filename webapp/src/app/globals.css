@@ -8,7 +8,13 @@
   --ink: #12141c;
   --muted: #5b6472;
   --faint: #8890a0;
-  --accent: #2f5bea;
+  /* Identité ProspectFlow : indigo → violet → bleu — un dégradé signature
+     réutilisé sur les CTA, éléments actifs, icônes clés et le hero, jamais
+     étalé partout (le fond reste clair et sobre, la couleur marque les
+     points d'attention). */
+  --accent: #4f46e5;
+  --accent-2: #8b5cf6;
+  --accent-3: #2563eb;
   --accent-ink: #ffffff;
   --sidebar: #0b0d12;
   --sidebar-ink: #c7cdda;
@@ -21,10 +27,11 @@
   --red-bg: #fdeceb;
   --amber-fg: #8a5a00;
   --amber-bg: #fff4df;
-  --accent-2: #7c93ff;
+  --gradient-signature: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 1px rgba(16, 24, 40, 0.03);
   --shadow-md: 0 8px 24px -8px rgba(16, 24, 40, 0.14), 0 2px 8px -2px rgba(16, 24, 40, 0.06);
   --shadow-lg: 0 24px 48px -12px rgba(16, 24, 40, 0.22), 0 8px 16px -4px rgba(16, 24, 40, 0.08);
+  --glow-accent: 0 0 80px -20px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 @theme inline {
@@ -37,6 +44,7 @@
   --color-faint: var(--faint);
   --color-accent: var(--accent);
   --color-accent-2: var(--accent-2);
+  --color-accent-3: var(--accent-3);
   --color-accent-ink: var(--accent-ink);
   --color-sidebar: var(--sidebar);
   --color-sidebar-ink: var(--sidebar-ink);
@@ -63,7 +71,9 @@
     --ink: #eef1f6;
     --muted: #9aa3b5;
     --faint: #6d7688;
-    --accent: #5b86ff;
+    --accent: #818cf8;
+    --accent-2: #a78bfa;
+    --accent-3: #60a5fa;
     --accent-ink: #0b0d12;
     --green-fg: #5fd8a0;
     --green-bg: #123326;
@@ -71,10 +81,11 @@
     --red-bg: #3a1917;
     --amber-fg: #ffc978;
     --amber-bg: #3a2c0d;
-    --accent-2: #8fa6ff;
+    --gradient-signature: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.18);
     --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.24);
     --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.5), 0 8px 16px -4px rgba(0, 0, 0, 0.3);
+    --glow-accent: 0 0 80px -20px color-mix(in srgb, var(--accent) 55%, transparent);
   }
 }
 
@@ -86,7 +97,9 @@
   --ink: #eef1f6;
   --muted: #9aa3b5;
   --faint: #6d7688;
-  --accent: #5b86ff;
+  --accent: #818cf8;
+  --accent-2: #a78bfa;
+  --accent-3: #60a5fa;
   --accent-ink: #0b0d12;
   --green-fg: #5fd8a0;
   --green-bg: #123326;
@@ -94,10 +107,11 @@
   --red-bg: #3a1917;
   --amber-fg: #ffc978;
   --amber-bg: #3a2c0d;
-  --accent-2: #8fa6ff;
+  --gradient-signature: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.18);
   --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.24);
   --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.5), 0 8px 16px -4px rgba(0, 0, 0, 0.3);
+  --glow-accent: 0 0 80px -20px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 body {
@@ -105,8 +119,9 @@ body {
      subtils ancrés en haut de page, jamais assez marqués pour nuire à la
      lisibilité du contenu qui suit. */
   background:
-    radial-gradient(1100px circle at 12% -12%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 55%),
-    radial-gradient(900px circle at 100% -8%, color-mix(in srgb, var(--accent-2) 6%, transparent), transparent 50%),
+    radial-gradient(1100px circle at 12% -12%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 55%),
+    radial-gradient(900px circle at 100% -8%, color-mix(in srgb, var(--accent-2) 7%, transparent), transparent 50%),
+    radial-gradient(700px circle at 50% 40%, color-mix(in srgb, var(--accent-3) 4%, transparent), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   color: var(--ink);

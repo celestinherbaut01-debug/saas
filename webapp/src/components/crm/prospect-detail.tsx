@@ -327,7 +327,7 @@ export function ProspectDetail({
           {activities.length === 0 && <p className="text-[13px] text-muted">Aucun événement pour l&apos;instant.</p>}
           {activities.map((a) => (
             <li key={a.id} className="flex gap-3 text-[12.5px]">
-              <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
+              <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
               <div>
                 <span className="font-semibold">{ACTIVITY_LABEL[a.type]}</span>
                 {a.detail && <span className="text-muted"> — {a.detail}</span>}

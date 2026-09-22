@@ -62,9 +62,9 @@ export function CategoryCombobox({
       <button
         type="button"
         onClick={() => onChange(null)}
-        className="flex w-fit items-center gap-2 rounded-lg border border-ink bg-ink px-3 py-2 text-[13px] font-semibold text-bg"
+        className="flex w-fit items-center gap-2 rounded-lg border border-accent bg-accent px-3 py-2 text-[13px] font-semibold text-accent-ink"
       >
-        {selected.icon} {selected.name} <span className="text-bg/60">✕</span>
+        {selected.icon} {selected.name} <span className="text-accent-ink/60">✕</span>
       </button>
     );
   }

@@ -169,7 +169,7 @@ function ProjectDrawer({
                 key={s}
                 type="button"
                 onClick={() => onStatusChange(s)}
-                className={s === initial.status ? "rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold text-bg" : "rounded-full border border-line bg-panel px-3 py-1.5 text-[11px] font-semibold text-muted hover:bg-soft"}
+                className={s === initial.status ? "rounded-full bg-accent px-3 py-1.5 text-[11px] font-bold text-accent-ink shadow-[var(--shadow-sm)]" : "rounded-full border border-line bg-panel px-3 py-1.5 text-[11px] font-semibold text-muted hover:bg-soft"}
               >
                 {PROJECT_STATUS_LABEL[s].text}
               </button>

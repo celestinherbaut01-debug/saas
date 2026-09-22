@@ -44,7 +44,7 @@ export default async function ProspectionPage() {
           </p>
           <a
             href="/onboarding"
-            className="mt-4 inline-block rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg"
+            className="mt-4 inline-block rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-[13px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
           >
             Terminer la configuration
           </a>

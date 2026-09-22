@@ -106,7 +106,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
           <div key={label} className="flex flex-1 items-center gap-2">
             <div
               className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                i <= step ? "bg-ink text-bg" : "bg-soft text-faint"
+                i <= step ? "bg-accent text-accent-ink" : "bg-soft text-faint"
               }`}
             >
               {i + 1}
@@ -152,7 +152,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
                     type="button"
                     onClick={() => setAudience(a)}
                     className={`rounded-lg border px-3 py-1.5 text-[13px] ${
-                      audience === a ? "border-ink bg-ink text-bg" : "border-line bg-panel text-ink"
+                      audience === a ? "border-accent bg-accent text-accent-ink" : "border-line bg-panel text-ink"
                     }`}
                   >
                     {a === "b2b" ? "Entreprises (B2B)" : a === "b2c" ? "Particuliers (B2C)" : "Les deux"}
@@ -189,7 +189,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
                   onClick={() => setProductMode(opt.value)}
                   className={cn(
                     "rounded-lg border px-4 py-3 text-left transition-colors",
-                    productMode === opt.value ? "border-ink bg-ink text-bg" : "border-line bg-panel hover:bg-soft",
+                    productMode === opt.value ? "border-accent bg-accent text-accent-ink" : "border-line bg-panel hover:bg-soft",
                   )}
                 >
                   <p className="text-[14px] font-bold">{opt.label}</p>

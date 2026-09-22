@@ -163,14 +163,14 @@ export function PricingTable({
         <button
           type="button"
           onClick={() => setYearly(false)}
-          className={cn("rounded-full px-4 py-1.5 transition-colors", !yearly ? "bg-ink text-bg" : "text-muted hover:text-ink")}
+          className={cn("rounded-full px-4 py-1.5 transition-colors", !yearly ? "bg-accent text-accent-ink" : "text-muted hover:text-ink")}
         >
           Mensuel
         </button>
         <button
           type="button"
           onClick={() => setYearly(true)}
-          className={cn("rounded-full px-4 py-1.5 transition-colors", yearly ? "bg-ink text-bg" : "text-muted hover:text-ink")}
+          className={cn("rounded-full px-4 py-1.5 transition-colors", yearly ? "bg-accent text-accent-ink" : "text-muted hover:text-ink")}
         >
           Annuel <span className="text-[10px] opacity-80">(2 mois offerts)</span>
         </button>

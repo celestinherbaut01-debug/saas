@@ -33,7 +33,7 @@ export function PricingBusinessOs() {
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         <span className="flex items-center gap-2 rounded-full border border-line bg-bg px-4 py-2 text-[12px] font-semibold">
-          <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-bold text-bg">STANDARD</span>
+          <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-bold text-accent-ink">STANDARD</span>
           Business OS
         </span>
         <span className="flex items-center gap-2 rounded-full border border-accent/40 bg-bg px-4 py-2 text-[12px] font-semibold">

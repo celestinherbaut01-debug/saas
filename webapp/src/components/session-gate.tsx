@@ -20,7 +20,7 @@ export function SessionGate({ email, continueHref }: { email: string; continueHr
 
       <Link
         href={continueHref}
-        className="rounded-lg bg-ink px-4 py-2.5 text-center text-[13.5px] font-semibold text-bg shadow-sm transition hover:opacity-90"
+        className="rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-center text-[13.5px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
       >
         Continuer vers ProspectFlow
       </Link>

@@ -264,7 +264,7 @@ function Chip({
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition",
         selected
-          ? "border-ink bg-ink text-bg shadow-sm"
+          ? "border-accent bg-accent text-accent-ink shadow-sm"
           : "border-line bg-panel text-ink hover:border-ink/30 hover:bg-soft",
       )}
     >

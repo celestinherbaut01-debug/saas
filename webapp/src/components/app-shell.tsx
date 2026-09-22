@@ -6,6 +6,7 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { NavLink } from "@/components/nav-link";
 import { NavSection } from "@/components/nav-section";
 import { ProfileMenu } from "@/components/profile-menu";
+import { SidebarShell } from "@/components/sidebar-shell";
 import { ENTITLEMENTS, upgradeOptions, businessOsAtLeast, type Plan } from "@/lib/entitlements";
 
 export async function AppShell({ children }: { children: React.ReactNode }) {
@@ -143,7 +144,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
 
   const logo = (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 font-display text-[12px] font-extrabold text-white shadow-[var(--shadow-sm)]">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[image:var(--gradient-signature)] font-display text-[12px] font-extrabold text-accent-ink shadow-[var(--shadow-sm)]">
         PF
       </div>
       <div>
@@ -154,19 +155,23 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+  const collapsedLogo = (
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[image:var(--gradient-signature)] font-display text-[12px] font-extrabold text-accent-ink shadow-[var(--shadow-sm)]">
+      PF
+    </div>
+  );
 
   return (
-    <div className="flex min-h-screen flex-col md:grid md:grid-cols-[248px_1fr]">
-      {/* Desktop : sidebar fixe. Cachée sous md, remplacée par le menu déroulant mobile ci-dessous. */}
-      <aside className="sticky top-0 hidden h-screen flex-col gap-1 overflow-y-auto border-r border-sidebar-line bg-sidebar p-3.5 text-sidebar-ink md:flex">
-        <div className="px-1.5 pb-5 pt-1">{logo}</div>
-        {navLinks}
-        <div className="mt-auto flex flex-col gap-3 border-t border-sidebar-line pt-3.5">
-          {crossModuleLink}
-          {planBadge}
-          <ProfileMenu email={user.email ?? ""} />
-        </div>
-      </aside>
+    <div className="flex min-h-screen flex-col md:grid md:grid-cols-[auto_1fr]">
+      {/* Desktop : sidebar fixe repliable en mode icônes (voir SidebarShell). Cachée sous md, remplacée par le menu déroulant mobile ci-dessous. */}
+      <SidebarShell
+        logo={logo}
+        collapsedLogo={collapsedLogo}
+        navLinks={navLinks}
+        crossModuleLink={crossModuleLink}
+        planBadge={planBadge}
+        profileMenu={<ProfileMenu email={user.email ?? ""} />}
+      />
 
       {/* Mobile : bandeau + menu <details> natif, sans JS ni hydratation client pour l'ouverture/fermeture globale. */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-sidebar-line bg-sidebar px-3.5 py-2.5 text-sidebar-ink md:hidden">

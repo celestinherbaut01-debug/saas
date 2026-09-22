@@ -115,7 +115,7 @@ export function NovaOpportunities({
                   href={o.actionHref}
                   onClick={() => o.dismissible && handleStatus(o.key, "done")}
                   className={cn(
-                    "rounded-lg bg-ink px-3 py-1.5 text-[11.5px] font-semibold text-bg hover:opacity-90",
+                    "rounded-lg bg-[image:var(--gradient-signature)] px-3 py-1.5 text-[11.5px] font-semibold text-accent-ink transition hover:-translate-y-0.5 hover:shadow-[var(--glow-accent)]",
                     pending && pendingKey === o.key && "opacity-60",
                   )}
                 >

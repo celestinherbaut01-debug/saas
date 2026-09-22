@@ -7,8 +7,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-ink text-bg shadow-[var(--shadow-sm)] hover:opacity-90 hover:shadow-[var(--shadow-md)]",
-        outline: "border border-line bg-panel text-ink hover:bg-soft",
+        primary:
+          "bg-[image:var(--gradient-signature)] text-accent-ink shadow-[var(--shadow-sm)] hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]",
+        outline: "border border-line bg-panel text-ink hover:border-accent/30 hover:bg-soft",
         ghost: "text-ink hover:bg-soft",
         danger: "bg-red-fg text-white hover:opacity-90",
       },

@@ -44,7 +44,7 @@ export function OnboardingBanner() {
       <div className="flex shrink-0 items-center gap-2">
         <Link
           href="/onboarding"
-          className="rounded-lg bg-ink px-3 py-1.5 text-[12.5px] font-semibold text-bg"
+          className="rounded-lg bg-[image:var(--gradient-signature)] px-3 py-1.5 text-[12.5px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5"
         >
           Continuer la configuration
         </Link>

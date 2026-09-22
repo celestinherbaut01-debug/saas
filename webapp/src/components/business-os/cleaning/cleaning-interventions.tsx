@@ -217,7 +217,7 @@ function DetailDrawer({
               key={s}
               type="button"
               onClick={() => onPatch({ status: s, completed_at: s === "done" ? new Date().toISOString() : intervention.completed_at })}
-              className={s === intervention.status ? "rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold text-bg" : "rounded-full border border-line bg-panel px-3 py-1.5 text-[11px] font-semibold text-muted hover:bg-soft"}
+              className={s === intervention.status ? "rounded-full bg-accent px-3 py-1.5 text-[11px] font-bold text-accent-ink shadow-[var(--shadow-sm)]" : "rounded-full border border-line bg-panel px-3 py-1.5 text-[11px] font-semibold text-muted hover:bg-soft"}
             >
               {INTERVENTION_STATUS_LABEL[s].text}
             </button>

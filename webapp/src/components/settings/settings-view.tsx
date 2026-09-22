@@ -58,7 +58,7 @@ export function SettingsView({
               onClick={() => changeProductMode(opt.value)}
               className={cn(
                 "rounded-lg border px-3 py-2.5 text-left transition-colors disabled:opacity-60",
-                productMode === opt.value ? "border-ink bg-ink text-bg" : "border-line bg-panel hover:bg-soft",
+                productMode === opt.value ? "border-accent bg-accent text-accent-ink" : "border-line bg-panel hover:bg-soft",
               )}
             >
               <p className="text-[12.5px] font-bold">{opt.label}</p>
@@ -108,7 +108,7 @@ export function SettingsView({
         </div>
         <Link
           href="/abonnement"
-          className="shrink-0 rounded-lg bg-ink px-3.5 py-2 text-[12.5px] font-semibold text-bg"
+          className="shrink-0 rounded-lg bg-[image:var(--gradient-signature)] px-3.5 py-2 text-[12.5px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
         >
           Voir mon abonnement →
         </Link>

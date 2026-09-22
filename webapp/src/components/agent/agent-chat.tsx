@@ -145,7 +145,7 @@ export function AgentChat({
                 key={i}
                 className={
                   m.role === "user"
-                    ? "ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-ink px-3.5 py-2 text-[13px] text-bg"
+                    ? "ml-auto max-w-[80%] rounded-2xl rounded-br-sm bg-accent px-3.5 py-2 text-[13px] text-accent-ink"
                     : "mr-auto max-w-[80%] rounded-2xl rounded-bl-sm bg-soft px-3.5 py-2 text-[13px] text-ink"
                 }
               >

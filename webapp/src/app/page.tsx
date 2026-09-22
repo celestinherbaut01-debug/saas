@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
 import { PricingTrust } from "@/components/pricing-trust";
+import { PersonaSelector } from "@/components/persona-selector";
 import { Reveal } from "@/components/reveal";
 import { cn } from "@/lib/utils";
 
@@ -43,7 +44,10 @@ export default async function Home() {
             avant d&apos;être montrée.
           </p>
           <div className="relative flex flex-wrap justify-center gap-3">
-            <Link href={ctaHref} className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg shadow-[var(--shadow-md)] transition hover:-translate-y-0.5">
+            <Link
+              href={ctaHref}
+              className="rounded-lg bg-[image:var(--gradient-signature)] px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[var(--shadow-md)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg),var(--glow-accent)]"
+            >
               {ctaLabel}
             </Link>
             <Link
@@ -58,6 +62,11 @@ export default async function Home() {
             <HeroMockup />
           </Reveal>
         </section>
+
+        {/* SÉLECTEUR "JE SUIS..." — explique la valeur en un coup d'œil selon le métier, avant même de faire défiler la page. */}
+        <Reveal className="w-full max-w-2xl">
+          <PersonaSelector />
+        </Reveal>
 
         {/* FLUX OBJECTIF -> RESULTAT */}
         <Reveal className="w-full max-w-5xl">
@@ -164,7 +173,10 @@ export default async function Home() {
         <Reveal className="flex w-full max-w-2xl flex-col items-center gap-4 rounded-2xl border border-line bg-panel p-10 text-center shadow-[var(--shadow-md)]">
           <h2 className="font-display text-xl font-extrabold">Prêt à trouver vos prochains clients ?</h2>
           <p className="text-[13px] text-muted">Gratuit pour démarrer, aucune carte requise.</p>
-          <Link href={ctaHref} className="rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-bg shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5">
+          <Link
+            href={ctaHref}
+            className="rounded-lg bg-[image:var(--gradient-signature)] px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
+          >
             {user ? "Accéder à mon espace" : "Créer mon compte"}
           </Link>
         </Reveal>

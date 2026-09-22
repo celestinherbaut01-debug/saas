@@ -386,7 +386,7 @@ function RepairOrderDetail({
               onClick={() => onSetStatus(s)}
               className={
                 s === order.status
-                  ? "rounded-full bg-ink px-3 py-1.5 text-[11px] font-bold text-bg"
+                  ? "rounded-full bg-accent px-3 py-1.5 text-[11px] font-bold text-accent-ink shadow-[var(--shadow-sm)]"
                   : "rounded-full border border-line bg-panel px-3 py-1.5 text-[11px] font-semibold text-muted hover:bg-soft"
               }
             >

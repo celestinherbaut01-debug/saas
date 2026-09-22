@@ -31,6 +31,25 @@ const CONFIDENCE_TITLE: Record<SignalConfidence, string> = {
   unknown: "Donnée inconnue tant que non vérifiée",
 };
 
+// Icône par famille d'objectif — dérivée du préfixe de l'id (garage_, web_,
+// cleaning_...), pas du catalogue lui-même : évite de retoucher les ~38
+// définitions d'objectifs pour un simple habillage visuel des chips.
+const OBJECTIVE_ICON_PREFIXES: [string, string][] = [
+  ["garage_", "🔧"],
+  ["web_", "🌐"],
+  ["marketing_", "📣"],
+  ["cleaning_", "🧹"],
+  ["restaurant_", "🍽"],
+  ["salon_", "💇"],
+  ["artisan_", "🛠"],
+  ["realestate_", "🏠"],
+  ["supplier_", "📦"],
+  ["generic_", "✨"],
+];
+function objectiveIcon(id: string): string {
+  return OBJECTIVE_ICON_PREFIXES.find(([prefix]) => id.startsWith(prefix))?.[1] ?? "🎯";
+}
+
 const WEB_SIGNAL_CARDS: { id: string; icon: string; title: string; description: string; webFilter: ProspectionFilters["webFilter"] }[] = [
   { id: "no_website", icon: "🌐", title: "Aucun site détecté", description: "Entreprises pour lesquelles aucun site n'a été identifié.", webFilter: "none" },
   { id: "weak_website", icon: "⚠️", title: "Site à analyser", description: "Entreprises possédant un site pouvant nécessiter une refonte.", webFilter: "weak" },
@@ -273,12 +292,13 @@ export function ProspectingWizard({
               onClick={() => selectObjective(o.id)}
               style={{ animationDelay: `${i * 40}ms` }}
               className={cn(
-                "animate-fade-up rounded-full border px-3.5 py-2 text-[13px] font-medium transition",
+                "animate-fade-up flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-medium transition hover:-translate-y-0.5",
                 objectiveId === o.id
-                  ? "border-transparent bg-gradient-to-r from-accent to-accent-2 text-white shadow-[var(--shadow-sm)]"
+                  ? "border-transparent bg-[image:var(--gradient-signature)] text-accent-ink shadow-[var(--shadow-sm),var(--glow-accent)]"
                   : "border-line bg-panel text-ink hover:border-accent/30 hover:bg-soft",
               )}
             >
+              <span aria-hidden>{objectiveIcon(o.id)}</span>
               {o.label}
             </button>
           ))}
@@ -330,7 +350,10 @@ export function ProspectingWizard({
 
           {objective.recommendations.length > 0 && (
             <div className="mt-3">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Cibles recommandées</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">
+                ProspectFlow recommande — {objective.recommendations.length} secteur{objective.recommendations.length > 1 ? "s" : ""} pertinent
+                {objective.recommendations.length > 1 ? "s" : ""}
+              </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {objective.recommendations.map((chip) => {
                   const isSelected = effectiveChipIds.has(chip.id);
@@ -340,8 +363,10 @@ export function ProspectingWizard({
                       type="button"
                       onClick={() => toggleChip(chip.id)}
                       className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition",
-                        isSelected ? "border-accent/40 bg-accent/10 text-ink" : "border-line bg-panel text-faint line-through opacity-60 hover:opacity-100",
+                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition hover:-translate-y-0.5",
+                        isSelected
+                          ? "border-accent/40 bg-accent/10 text-ink shadow-[var(--shadow-sm)]"
+                          : "border-line bg-panel text-faint line-through opacity-60 hover:opacity-100",
                       )}
                     >
                       <span>{chip.icon}</span>
@@ -350,7 +375,19 @@ export function ProspectingWizard({
                     </button>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setExploreOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-full border border-dashed border-line px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:border-accent/40 hover:bg-accent/5"
+                >
+                  {exploreOpen ? "▾" : "＋"} Explorer d&apos;autres secteurs
+                </button>
               </div>
+              {exploreOpen && (
+                <div className="animate-fade-up mt-3 rounded-xl border border-line bg-soft p-3">
+                  <TargetCategoryPicker categories={categories} value={targetIds} onChange={setManualTargetIds} />
+                </div>
+              )}
             </div>
           )}
 
@@ -432,16 +469,18 @@ export function ProspectingWizard({
                 />
               </div>
 
-              <div>
-                <button type="button" onClick={() => setExploreOpen((v) => !v)} className="text-[12.5px] font-semibold text-accent hover:underline">
-                  {exploreOpen ? "▾" : "▸"} Explorer d&apos;autres secteurs
-                </button>
-                {exploreOpen && (
-                  <div className="mt-3">
-                    <TargetCategoryPicker categories={categories} value={targetIds} onChange={setManualTargetIds} />
-                  </div>
-                )}
-              </div>
+              {objective.recommendations.length === 0 && (
+                <div>
+                  <button type="button" onClick={() => setExploreOpen((v) => !v)} className="text-[12.5px] font-semibold text-accent hover:underline">
+                    {exploreOpen ? "▾" : "▸"} Explorer d&apos;autres secteurs
+                  </button>
+                  {exploreOpen && (
+                    <div className="mt-3">
+                      <TargetCategoryPicker categories={categories} value={targetIds} onChange={setManualTargetIds} />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

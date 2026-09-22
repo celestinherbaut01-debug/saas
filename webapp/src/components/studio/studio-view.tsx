@@ -259,7 +259,7 @@ export function StudioView({
                   onClick={() => setFormActiveChannel(c.key)}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[12px] font-semibold",
-                    formActiveChannel === c.key ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink",
+                    formActiveChannel === c.key ? "bg-accent text-accent-ink" : "bg-soft text-muted hover:text-ink",
                   )}
                 >
                   {c.label}
@@ -340,7 +340,7 @@ export function StudioView({
                   onClick={() => setActiveChannel(c.key)}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[12.5px] font-semibold",
-                    activeChannel === c.key ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink",
+                    activeChannel === c.key ? "bg-accent text-accent-ink" : "bg-soft text-muted hover:text-ink",
                   )}
                 >
                   {c.label}
@@ -412,7 +412,7 @@ export function StudioView({
               onClick={() => setStatusFilter(tab.key)}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[12.5px] font-semibold",
-                statusFilter === tab.key ? "bg-ink text-bg" : "bg-soft text-muted hover:text-ink",
+                statusFilter === tab.key ? "bg-accent text-accent-ink" : "bg-soft text-muted hover:text-ink",
               )}
             >
               {tab.label} {count > 0 && <span className="opacity-60">({count})</span>}

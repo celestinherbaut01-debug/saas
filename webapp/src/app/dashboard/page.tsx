@@ -145,28 +145,31 @@ export default async function DashboardPage() {
             </h1>
             <p className="mt-1 text-[13px] text-muted">Voici ce qui mérite votre attention aujourd&apos;hui.</p>
           </div>
-          <Link href="/prospection" className="shrink-0 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg">
+          <Link
+            href="/prospection"
+            className="shrink-0 rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-[13px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
+          >
             Lancer une recherche →
           </Link>
         </div>
 
         {workspaceId && businessTwinStatus && (
           <div className="flex flex-col gap-2.5">
-            <SectionLabel>Objectif Business Twin</SectionLabel>
+            <SectionLabel>🧭 Objectif Business Twin</SectionLabel>
             <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />
           </div>
         )}
 
         {workspaceId && missions && missions.length > 0 && (
           <div className="flex flex-col gap-2.5">
-            <SectionLabel>Missions</SectionLabel>
+            <SectionLabel>🎯 Missions</SectionLabel>
             <MissionsPreview missions={missions} />
           </div>
         )}
 
         {workspaceId && opportunitiesResult.opportunities.length > 0 && (
           <div className="flex flex-col gap-2.5">
-            <SectionLabel>Opportunités NOVA</SectionLabel>
+            <SectionLabel>✦ Opportunités NOVA</SectionLabel>
             <NovaOpportunities
               workspaceId={workspaceId}
               opportunities={opportunitiesResult.opportunities}
@@ -177,7 +180,7 @@ export default async function DashboardPage() {
 
         {hasPriorityActions && (
           <div className="flex flex-col gap-2.5">
-            <SectionLabel>Actions prioritaires</SectionLabel>
+            <SectionLabel>⚡ Actions prioritaires</SectionLabel>
             <Card>
               <ul className="flex flex-col gap-2.5 text-[12.5px]">
                 {toContactCount > 0 && (
@@ -202,7 +205,7 @@ export default async function DashboardPage() {
         )}
 
         <div className="flex flex-col gap-2.5">
-          <SectionLabel>KPI réels</SectionLabel>
+          <SectionLabel>📊 KPI réels</SectionLabel>
           {total === 0 ? (
             <Card className="flex flex-col items-center gap-3 py-12 text-center">
               <span className="text-3xl">⌕</span>
@@ -211,7 +214,10 @@ export default async function DashboardPage() {
                 Lancez votre première recherche pour trouver de vraies entreprises (registre officiel + Google
                 Places) dans votre zone, puis ajoutez les meilleures au CRM.
               </p>
-              <Link href="/prospection" className="mt-1 rounded-lg bg-ink px-4 py-2.5 text-[13px] font-semibold text-bg">
+              <Link
+                href="/prospection"
+                className="mt-1 rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-[13px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
+              >
                 Trouver mes premiers prospects
               </Link>
             </Card>
@@ -250,68 +256,76 @@ export default async function DashboardPage() {
           )}
         </div>
 
-        <Card>
-          <h2 className="font-display text-sm font-bold">NOVA</h2>
-          {novaConfigured ? (
-            <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              {novaContexts(plan).includes("commercial")
-                ? "NOVA peut rédiger vos prochains emails de prospection à partir de vos vraies données CRM."
-                : "NOVA peut répondre à partir des vraies données de votre Business OS (planning, stock, clients)."}{" "}
-              <Link href="/agent" className="font-semibold text-accent">
-                Ouvrir NOVA →
-              </Link>
-            </p>
-          ) : (
-            <p className="mt-2 text-[13px] leading-relaxed text-muted">
-              NOVA n&apos;est pas encore configurée sur ce projet (clé API manquante côté serveur).
-            </p>
-          )}
-        </Card>
-
-        {workspaceId && usageNova && usageProspects && usageSearches && (
+        <div className="grid gap-4 lg:grid-cols-2">
           <Card>
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-sm font-bold">Usage du forfait</h2>
-              <Link href="/abonnement" className="text-[12px] font-semibold text-accent">
-                Gérer →
-              </Link>
-            </div>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <UsageBar label="Prospects" status={usageProspects} />
-              <UsageBar label="Recherches" status={usageSearches} />
-              <UsageBar label="NOVA" status={usageNova} />
-            </div>
-          </Card>
-        )}
-
-        {xp && (
-          <Card>
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-display text-sm font-bold">
-                  Niveau {xp.level.level} — {xp.level.label}
-                </h2>
-                <p className="mt-0.5 text-[11.5px] text-muted">
-                  {xp.totalXp} XP{xp.next ? ` — ${xp.next.minXp - xp.totalXp} XP avant ${xp.next.label}` : " — niveau maximum atteint"}
-                </p>
-              </div>
-              <div className="font-display text-2xl font-extrabold">{xp.totalXp}</div>
-            </div>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
-              <div className="h-full rounded-full bg-accent" style={{ width: `${xp.progressPct}%` }} />
-            </div>
-            {xp.recentEvents.length > 0 && (
-              <ul className="mt-4 flex flex-col gap-1.5 text-[12px]">
-                {xp.recentEvents.map((e, i) => (
-                  <li key={i} className="flex justify-between text-muted">
-                    <span>{xpActionLabel(e.action)}</span>
-                    <span className="font-semibold text-accent">+{e.xp_amount} XP</span>
-                  </li>
-                ))}
-              </ul>
+            <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
+              <span aria-hidden>✦</span> NOVA
+            </h2>
+            {novaConfigured ? (
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                {novaContexts(plan).includes("commercial")
+                  ? "NOVA peut rédiger vos prochains emails de prospection à partir de vos vraies données CRM."
+                  : "NOVA peut répondre à partir des vraies données de votre Business OS (planning, stock, clients)."}{" "}
+                <Link href="/agent" className="font-semibold text-accent">
+                  Ouvrir NOVA →
+                </Link>
+              </p>
+            ) : (
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                NOVA n&apos;est pas encore configurée sur ce projet (clé API manquante côté serveur).
+              </p>
             )}
           </Card>
-        )}
+
+          {workspaceId && usageNova && usageProspects && usageSearches && (
+            <Card>
+              <div className="flex items-center justify-between">
+                <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
+                  <span aria-hidden>◆</span> Usage du forfait
+                </h2>
+                <Link href="/abonnement" className="text-[12px] font-semibold text-accent">
+                  Gérer →
+                </Link>
+              </div>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <UsageBar label="Prospects" status={usageProspects} />
+                <UsageBar label="Recherches" status={usageSearches} />
+                <UsageBar label="NOVA" status={usageNova} />
+              </div>
+            </Card>
+          )}
+
+          {xp && (
+            <Card className="lg:col-span-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
+                    <span aria-hidden>★</span> Niveau {xp.level.level} — {xp.level.label}
+                  </h2>
+                  <p className="mt-0.5 text-[11.5px] text-muted">
+                    {xp.totalXp} XP{xp.next ? ` — ${xp.next.minXp - xp.totalXp} XP avant ${xp.next.label}` : " — niveau maximum atteint"}
+                  </p>
+                </div>
+                <div className="bg-[image:var(--gradient-signature)] bg-clip-text font-display text-2xl font-extrabold text-transparent">
+                  {xp.totalXp}
+                </div>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
+                <div className="h-full rounded-full bg-[image:var(--gradient-signature)]" style={{ width: `${xp.progressPct}%` }} />
+              </div>
+              {xp.recentEvents.length > 0 && (
+                <ul className="mt-4 grid gap-1.5 text-[12px] sm:grid-cols-2">
+                  {xp.recentEvents.map((e, i) => (
+                    <li key={i} className="flex justify-between text-muted">
+                      <span>{xpActionLabel(e.action)}</span>
+                      <span className="font-semibold text-accent">+{e.xp_amount} XP</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+        </div>
 
         {targetCount === 0 && (
           <Card className="border-line bg-soft">

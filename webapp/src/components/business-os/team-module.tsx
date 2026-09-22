@@ -61,7 +61,7 @@ export function TeamModule({
               onClick={() => setActiveOnly((v) => !v)}
               className={cn(
                 "mb-2.5 rounded-full border px-2.5 py-1.5 text-[11.5px] font-semibold",
-                activeOnly ? "border-ink bg-ink text-bg" : "border-line bg-panel text-muted hover:bg-soft",
+                activeOnly ? "border-accent bg-accent text-accent-ink" : "border-line bg-panel text-muted hover:bg-soft",
               )}
             >
               {activeOnly ? "Actifs uniquement" : `Voir tous (${inactiveCount} inactif${inactiveCount > 1 ? "s" : ""})`}

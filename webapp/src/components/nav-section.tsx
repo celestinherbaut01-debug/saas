@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useSidebarCollapsed } from "@/components/sidebar-collapse-context";
 
 /**
  * Groupe de liens repliable — remplace les sections toujours dépliées
@@ -28,6 +30,25 @@ export function NavSection({
   // jamais synchronisé via un effet (voir react-hooks/set-state-in-effect).
   const [manualOverride, setManualOverride] = useState<boolean | null>(null);
   const open = manualOverride ?? containsActive;
+  const collapsed = useSidebarCollapsed();
+
+  // Sidebar en mode icônes : un groupe repliable n'a pas de place pour un
+  // accordéon — il devient un simple lien direct vers sa première page,
+  // avec l'icône seule et un tooltip natif pour le libellé.
+  if (collapsed) {
+    return (
+      <Link
+        href={hrefs[0]}
+        title={label}
+        className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-lg text-[13px] transition-colors",
+          containsActive ? "bg-sidebar-active text-white shadow-[var(--shadow-sm)]" : "text-sidebar-ink-dim hover:bg-white/[0.06] hover:text-white",
+        )}
+      >
+        {icon}
+      </Link>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-0.5">
