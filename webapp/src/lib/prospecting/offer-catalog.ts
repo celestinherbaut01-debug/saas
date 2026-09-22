@@ -10,6 +10,17 @@
 // catégorie NAF choisie (une entreprise de nettoyage utilise probablement
 // des véhicules), jamais une donnée confirmée sur l'entreprise elle-même —
 // voir SignalDef.confidence et son affichage dans la stratégie recommandée.
+//
+// RECOMMANDATIONS EN CHIPS (jamais une liste géante) — bug corrigé : une
+// première version résolvait des familles ENTIÈRES (parfois 15-20 métiers
+// feuilles) et les affichait toutes, nommément, dans une seule phrase —
+// donnant l'impression exactement inverse de "ProspectFlow comprend mon
+// activité". Chaque objectif porte maintenant 5 à 8 CHIPS curés à la main
+// (ex. "Artisans" représente un sous-ensemble représentatif de métiers du
+// bâtiment, jamais tous), sélectionnés par défaut mais désélectionnables
+// individuellement. Le catalogue complet reste accessible via "Explorer
+// d'autres secteurs" (voir prospecting-wizard.tsx) — rien n'est supprimé,
+// seule la présentation par défaut change.
 
 export type SignalConfidence = "confirmed" | "probable" | "unknown";
 
@@ -19,6 +30,14 @@ export interface SignalDef {
   confidence: SignalConfidence;
 }
 
+export interface RecommendationChip {
+  id: string;
+  label: string;
+  icon: string;
+  /** Slugs de catégories FEUILLES réelles que ce chip représente (jamais une famille entière listée nommément). */
+  leafSlugs: string[];
+}
+
 export interface ProspectingObjective {
   id: string;
   /** Libellé du choix ("Entretien de flottes professionnelles"). */
@@ -26,21 +45,42 @@ export interface ProspectingObjective {
   /** "Pour cette offre, nous allons privilégier..." — affiché dans l'étape Stratégie. */
   strategyExplanation: string;
   audience: "b2b" | "b2c";
-  /** Familles entières (slugs, parent_id null) recommandées. */
-  recommendedFamilySlugs: string[];
-  /** Métiers précis (slugs feuilles) recommandés, en plus ou à la place des familles. */
-  recommendedLeafSlugs: string[];
+  /** Recommandations par défaut — 5 à 8 chips maximum, jamais une liste exhaustive. */
+  recommendations: RecommendationChip[];
   signals: SignalDef[];
-  /** true seulement pour l'objectif "création/refonte de site" — seul cas où le statut du site est un signal pertinent. */
+  /** true seulement pour les objectifs digitaux — seul cas où le statut du site est un signal pertinent. */
   showWebSignal: boolean;
 }
 
 const PROXIMITY_SIGNAL: SignalDef = { id: "proximity", label: "Proximité géographique", confidence: "confirmed" };
 const CONTACT_SIGNAL: SignalDef = { id: "contact", label: "Coordonnées disponibles (téléphone/fiche)", confidence: "confirmed" };
 const SIZE_SIGNAL: SignalDef = { id: "size", label: "Taille de la structure (si connue)", confidence: "unknown" };
+const MULTI_SITE_SIGNAL: SignalDef = { id: "multi_site", label: "Multi-établissements", confidence: "confirmed" };
 const ACTIVITY_VEHICLES_SIGNAL: SignalDef = { id: "activity_vehicles", label: "Activité impliquant probablement des déplacements/véhicules", confidence: "probable" };
 const ESTABLISHMENTS_SIGNAL: SignalDef = { id: "establishments", label: "Nombre d'établissements", confidence: "confirmed" };
 const ACTIVE_PRESENCE_SIGNAL: SignalDef = { id: "active_presence", label: "Présence Google active (avis récents)", confidence: "probable" };
+
+// --- Chips réutilisés tels quels par plusieurs objectifs (jamais redéfinis deux fois différemment) ---
+const CHIP_TRANSPORT: RecommendationChip = { id: "transport", label: "Transport / livraison", icon: "🚚", leafSlugs: ["transport", "moving", "freight", "taxi", "vanrental"] };
+const CHIP_BTP: RecommendationChip = { id: "btp", label: "BTP", icon: "🏗", leafSlugs: ["carpentry", "masonry", "electric", "plumbing", "roofing", "painting"] };
+const CHIP_CLEANING: RecommendationChip = { id: "cleaning", label: "Nettoyage", icon: "🧹", leafSlugs: ["cleaning"] };
+const CHIP_SECURITY: RecommendationChip = { id: "security", label: "Sécurité", icon: "🛡", leafSlugs: ["security"] };
+const CHIP_MAINTENANCE: RecommendationChip = { id: "maintenance", label: "Maintenance", icon: "🔧", leafSlugs: ["repair"] };
+const CHIP_HOME_SERVICES: RecommendationChip = { id: "home_services", label: "Services à domicile", icon: "🏠", leafSlugs: ["landscape", "petgroom", "laundry"] };
+const CHIP_RESTAURANTS: RecommendationChip = { id: "restaurants", label: "Restaurants", icon: "🍽", leafSlugs: ["restaurants", "pizzeria", "fastfood"] };
+const CHIP_GARAGES: RecommendationChip = { id: "garages", label: "Garages", icon: "🚗", leafSlugs: ["garages", "bodyshop", "tyres"] };
+const CHIP_ARTISANS: RecommendationChip = { id: "artisans", label: "Artisans", icon: "🛠", leafSlugs: ["carpentry", "masonry", "electric", "plumbing", "painting"] };
+const CHIP_SALONS: RecommendationChip = { id: "salons", label: "Salons", icon: "💇", leafSlugs: ["hair", "beauty", "barbers", "nails", "spa"] };
+const CHIP_LOCAL_SHOPS: RecommendationChip = { id: "local_shops", label: "Commerces locaux", icon: "🛍", leafSlugs: ["clothing", "bookstores", "florists", "jewelry", "shoes", "hardware"] };
+const CHIP_INDEPENDENT_OFFICES: RecommendationChip = { id: "offices", label: "Cabinets indépendants", icon: "💼", leafSlugs: ["accounting", "law", "consulting", "architects"] };
+const CHIP_FOOD_SHOPS: RecommendationChip = { id: "food_shops", label: "Commerces alimentaires", icon: "🥖", leafSlugs: ["bakery", "butcher", "greengrocer", "cheese", "wine"] };
+const CHIP_DECOR_SHOPS: RecommendationChip = { id: "decor_shops", label: "Décoration / mobilier", icon: "🛋", leafSlugs: ["furniture", "decor", "florists"] };
+const CHIP_HOTELS: RecommendationChip = { id: "hotels", label: "Hôtels", icon: "🏨", leafSlugs: ["hotels", "gites", "campings"] };
+const CHIP_SUPERMARKETS: RecommendationChip = { id: "supermarkets", label: "Supermarchés", icon: "🛒", leafSlugs: ["supermarkets", "convenience"] };
+const CHIP_REALESTATE_PROS: RecommendationChip = { id: "realestate_pros", label: "Immobilier / syndics", icon: "🏢", leafSlugs: ["realestate", "propertymgmt"] };
+const CHIP_WAREHOUSES: RecommendationChip = { id: "warehouses", label: "Entrepôts / logistique", icon: "📦", leafSlugs: ["warehousing", "freight", "transport"] };
+const CHIP_EVENTS: RecommendationChip = { id: "events", label: "Événementiel", icon: "🎉", leafSlugs: ["events"] };
+const CHIP_INSURANCE_DEALERS: RecommendationChip = { id: "insurance_dealers", label: "Assurances / concessionnaires", icon: "🤝", leafSlugs: ["insurance", "dealers", "carrental"] };
 
 const GARAGE_OBJECTIVES: ProspectingObjective[] = [
   {
@@ -48,8 +88,7 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Entretien de flottes professionnelles",
     strategyExplanation: "Pour cette offre, toutes les entreprises ne sont pas pertinentes. Nous allons privilégier les activités susceptibles d'utiliser plusieurs véhicules.",
     audience: "b2b",
-    recommendedFamilySlugs: ["transport-logistique", "btp-artisans"],
-    recommendedLeafSlugs: ["cleaning", "security", "moving", "taxi"],
+    recommendations: [CHIP_TRANSPORT, CHIP_BTP, CHIP_CLEANING, CHIP_SECURITY, CHIP_MAINTENANCE, CHIP_HOME_SERVICES],
     signals: [ACTIVITY_VEHICLES_SIGNAL, SIZE_SIGNAL, ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -58,8 +97,7 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Réparation de véhicules professionnels",
     strategyExplanation: "Nous allons privilégier les entreprises dont l'activité repose probablement sur des véhicules utilitaires ou professionnels.",
     audience: "b2b",
-    recommendedFamilySlugs: ["transport-logistique", "btp-artisans"],
-    recommendedLeafSlugs: ["cleaning", "security"],
+    recommendations: [CHIP_TRANSPORT, CHIP_BTP, CHIP_CLEANING, CHIP_SECURITY],
     signals: [ACTIVITY_VEHICLES_SIGNAL, PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -68,9 +106,17 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Pneus professionnels",
     strategyExplanation: "Les flottes professionnelles renouvellent leurs pneus régulièrement — nous privilégions les activités à forte utilisation de véhicules.",
     audience: "b2b",
-    recommendedFamilySlugs: ["transport-logistique"],
-    recommendedLeafSlugs: ["moving", "taxi"],
+    recommendations: [CHIP_TRANSPORT, CHIP_BTP, CHIP_HOME_SERVICES],
     signals: [ACTIVITY_VEHICLES_SIGNAL, SIZE_SIGNAL, PROXIMITY_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "garage_contract",
+    label: "Contrat d'entretien pour entreprises",
+    strategyExplanation: "Nous privilégions les entreprises susceptibles de vouloir externaliser l'entretien de leurs véhicules sur la durée.",
+    audience: "b2b",
+    recommendations: [CHIP_TRANSPORT, CHIP_BTP, CHIP_CLEANING, CHIP_SECURITY, CHIP_MAINTENANCE],
+    signals: [ACTIVITY_VEHICLES_SIGNAL, SIZE_SIGNAL, ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL],
     showWebSignal: false,
   },
   {
@@ -78,8 +124,7 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Partenariats entreprises (assurances, concessionnaires...)",
     strategyExplanation: "Nous recherchons des professionnels qui orientent régulièrement leurs propres clients vers un garage de confiance.",
     audience: "b2b",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: ["insurance", "dealers", "carrental"],
+    recommendations: [CHIP_INSURANCE_DEALERS],
     signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -88,8 +133,7 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Vente de véhicules d'occasion",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -98,8 +142,7 @@ const GARAGE_OBJECTIVES: ProspectingObjective[] = [
     label: "Entretien / réparation pour particuliers",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -114,14 +157,15 @@ const DIGITAL_SIGNALS: SignalDef[] = [
   { id: "independent", label: "Indépendants (hors chaînes/franchises)", confidence: "confirmed" },
 ];
 
+const AGENCY_WEB_RECOMMENDATIONS = [CHIP_RESTAURANTS, CHIP_GARAGES, CHIP_ARTISANS, CHIP_SALONS, CHIP_LOCAL_SHOPS, CHIP_INDEPENDENT_OFFICES];
+
 const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "web_creation",
     label: "Création de site internet",
     strategyExplanation: "Pour cette offre, l'absence de site (ou un site très faible) est le signal le plus pertinent — nous privilégions les commerces et artisans locaux.",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce", "btp-artisans"],
-    recommendedLeafSlugs: ["restaurants", "hair", "beauty", "garages", "realestate", "dentists", "hotels"],
+    recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -130,8 +174,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
     label: "Refonte de site",
     strategyExplanation: "Nous privilégions les entreprises avec un site déjà existant mais daté ou peu qualitatif.",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce", "btp-artisans"],
-    recommendedLeafSlugs: ["restaurants", "hair", "beauty", "garages", "realestate", "dentists", "hotels"],
+    recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -140,8 +183,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
     label: "E-commerce",
     strategyExplanation: "Nous privilégions les commerces vendant des produits physiques, sans boutique en ligne détectée.",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce", "commerce-alimentaire"],
-    recommendedLeafSlugs: [],
+    recommendations: [CHIP_LOCAL_SHOPS, CHIP_FOOD_SHOPS, CHIP_DECOR_SHOPS],
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -150,8 +192,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
     label: "SEO / référencement",
     strategyExplanation: "Nous privilégions les entreprises avec une présence web existante mais peu optimisée.",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce", "btp-artisans", "services-b2b"],
-    recommendedLeafSlugs: ["restaurants", "hair", "beauty", "realestate"],
+    recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -160,8 +201,16 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
     label: "Maintenance de site",
     strategyExplanation: "Nous privilégions les entreprises ayant déjà un site (donc un contrat de maintenance possible).",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce", "btp-artisans"],
-    recommendedLeafSlugs: ["restaurants", "hair", "realestate"],
+    recommendations: AGENCY_WEB_RECOMMENDATIONS,
+    signals: DIGITAL_SIGNALS,
+    showWebSignal: true,
+  },
+  {
+    id: "web_digital_acquisition",
+    label: "Acquisition digitale (SEA/social ads)",
+    strategyExplanation: "Nous privilégions les entreprises avec une présence en ligne existante mais peu de visibilité payante détectable.",
+    audience: "b2b",
+    recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -173,8 +222,7 @@ const MARKETING_OBJECTIVES: ProspectingObjective[] = [
     label: "Visibilité locale / réseaux sociaux",
     strategyExplanation: "Nous privilégions les commerces avec une présence en ligne faible malgré une activité réelle (avis, fiche Google).",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce"],
-    recommendedLeafSlugs: ["restaurants", "hair", "beauty", "realestate"],
+    recommendations: [CHIP_RESTAURANTS, CHIP_SALONS, CHIP_LOCAL_SHOPS, CHIP_REALESTATE_PROS],
     signals: DIGITAL_SIGNALS,
     showWebSignal: true,
   },
@@ -183,8 +231,7 @@ const MARKETING_OBJECTIVES: ProspectingObjective[] = [
     label: "Campagnes publicitaires",
     strategyExplanation: "Nous privilégions les commerces locaux avec une clientèle grand public.",
     audience: "b2b",
-    recommendedFamilySlugs: ["commerce"],
-    recommendedLeafSlugs: ["restaurants", "hair", "beauty"],
+    recommendations: [CHIP_RESTAURANTS, CHIP_SALONS, CHIP_LOCAL_SHOPS],
     signals: [ACTIVE_PRESENCE_SIGNAL, PROXIMITY_SIGNAL],
     showWebSignal: false,
   },
@@ -193,12 +240,47 @@ const MARKETING_OBJECTIVES: ProspectingObjective[] = [
 const CLEANING_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "cleaning_offices",
-    label: "Nettoyage de bureaux / locaux commerciaux",
+    label: "Nettoyage de bureaux",
     strategyExplanation: "Nous privilégions les entreprises et cabinets disposant de locaux professionnels réguliers — jamais un critère de site web, sans rapport avec ce besoin.",
     audience: "b2b",
-    recommendedFamilySlugs: ["services-b2b", "sante", "commerce"],
-    recommendedLeafSlugs: ["hotels", "realestate", "gyms"],
+    recommendations: [CHIP_INDEPENDENT_OFFICES, CHIP_REALESTATE_PROS],
     signals: [ESTABLISHMENTS_SIGNAL, SIZE_SIGNAL, PROXIMITY_SIGNAL, CONTACT_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "cleaning_commerce",
+    label: "Nettoyage de commerces",
+    strategyExplanation: "Nous privilégions les commerces et supermarchés avec un passage régulier.",
+    audience: "b2b",
+    recommendations: [CHIP_LOCAL_SHOPS, CHIP_SUPERMARKETS],
+    signals: [ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "cleaning_hotels",
+    label: "Nettoyage d'hôtels",
+    strategyExplanation: "Nous privilégions les hébergements avec un besoin de nettoyage quotidien.",
+    audience: "b2b",
+    recommendations: [CHIP_HOTELS],
+    signals: [SIZE_SIGNAL, MULTI_SITE_SIGNAL, PROXIMITY_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "cleaning_copro",
+    label: "Nettoyage de copropriétés",
+    strategyExplanation: "Nous privilégions les gestionnaires immobiliers et syndics susceptibles de mandater un prestataire.",
+    audience: "b2b",
+    recommendations: [CHIP_REALESTATE_PROS],
+    signals: [ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "cleaning_warehouses",
+    label: "Nettoyage d'entrepôts",
+    strategyExplanation: "Nous privilégions les acteurs de la logistique avec de grandes surfaces à entretenir.",
+    audience: "b2b",
+    recommendations: [CHIP_WAREHOUSES],
+    signals: [SIZE_SIGNAL, ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL],
     showWebSignal: false,
   },
   {
@@ -206,8 +288,7 @@ const CLEANING_OBJECTIVES: ProspectingObjective[] = [
     label: "Nettoyage après chantier",
     strategyExplanation: "Nous privilégions les artisans et entreprises du bâtiment susceptibles de sous-traiter le nettoyage de fin de chantier.",
     audience: "b2b",
-    recommendedFamilySlugs: ["btp-artisans"],
-    recommendedLeafSlugs: [],
+    recommendations: [CHIP_BTP],
     signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -216,8 +297,7 @@ const CLEANING_OBJECTIVES: ProspectingObjective[] = [
     label: "Nettoyage pour particuliers",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -229,8 +309,7 @@ const RESTAURANT_OBJECTIVES: ProspectingObjective[] = [
     label: "Clientèle locale (service à table)",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -239,8 +318,7 @@ const RESTAURANT_OBJECTIVES: ProspectingObjective[] = [
     label: "Traiteur entreprise / restauration collective",
     strategyExplanation: "Nous privilégions les entreprises susceptibles d'organiser des événements internes ou des repas de groupe réguliers.",
     audience: "b2b",
-    recommendedFamilySlugs: ["services-b2b"],
-    recommendedLeafSlugs: ["realestate"],
+    recommendations: [CHIP_INDEPENDENT_OFFICES, CHIP_REALESTATE_PROS, CHIP_EVENTS],
     signals: [SIZE_SIGNAL, PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -249,8 +327,7 @@ const RESTAURANT_OBJECTIVES: ProspectingObjective[] = [
     label: "Livraison / vente à emporter",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -262,8 +339,7 @@ const SALON_OBJECTIVES: ProspectingObjective[] = [
     label: "Clientèle particuliers",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -272,8 +348,7 @@ const SALON_OBJECTIVES: ProspectingObjective[] = [
     label: "Partenariats entreprises (CE, événementiel)",
     strategyExplanation: "Nous privilégions les entreprises susceptibles d'organiser des prestations bien-être pour leurs équipes.",
     audience: "b2b",
-    recommendedFamilySlugs: ["services-b2b"],
-    recommendedLeafSlugs: ["realestate"],
+    recommendations: [CHIP_INDEPENDENT_OFFICES, CHIP_REALESTATE_PROS, CHIP_EVENTS],
     signals: [SIZE_SIGNAL, PROXIMITY_SIGNAL],
     showWebSignal: false,
   },
@@ -285,8 +360,7 @@ const ARTISAN_OBJECTIVES: ProspectingObjective[] = [
     label: "Chantiers pour particuliers",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -295,8 +369,7 @@ const ARTISAN_OBJECTIVES: ProspectingObjective[] = [
     label: "Sous-traitance pour professionnels du bâtiment",
     strategyExplanation: "Nous privilégions les autres corps de métier du bâtiment susceptibles de sous-traiter une partie de leurs chantiers.",
     audience: "b2b",
-    recommendedFamilySlugs: ["btp-artisans", "commerce"],
-    recommendedLeafSlugs: ["realestate"],
+    recommendations: [CHIP_BTP, CHIP_REALESTATE_PROS],
     signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -305,8 +378,7 @@ const ARTISAN_OBJECTIVES: ProspectingObjective[] = [
     label: "Grandes entreprises / marchés professionnels",
     strategyExplanation: "Nous privilégions les entreprises et gestionnaires de locaux avec des besoins de travaux réguliers.",
     audience: "b2b",
-    recommendedFamilySlugs: ["services-b2b"],
-    recommendedLeafSlugs: ["realestate"],
+    recommendations: [CHIP_INDEPENDENT_OFFICES, CHIP_REALESTATE_PROS],
     signals: [SIZE_SIGNAL, ESTABLISHMENTS_SIGNAL],
     showWebSignal: false,
   },
@@ -315,12 +387,38 @@ const ARTISAN_OBJECTIVES: ProspectingObjective[] = [
 const REALESTATE_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "realestate_sellers",
-    label: "Trouver des propriétaires vendeurs (particuliers)",
+    label: "Trouver des propriétaires vendeurs",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
+    showWebSignal: false,
+  },
+  {
+    id: "realestate_buyers",
+    label: "Trouver des acquéreurs",
+    strategyExplanation: "",
+    audience: "b2c",
+    recommendations: [],
+    signals: [],
+    showWebSignal: false,
+  },
+  {
+    id: "realestate_rental",
+    label: "Location",
+    strategyExplanation: "",
+    audience: "b2c",
+    recommendations: [],
+    signals: [],
+    showWebSignal: false,
+  },
+  {
+    id: "realestate_investors",
+    label: "Investisseurs",
+    strategyExplanation: "Nous privilégions les professionnels conseillant ou accompagnant des investisseurs immobiliers.",
+    audience: "b2b",
+    recommendations: [{ id: "advisors", label: "Cabinets conseil / gestion de patrimoine", icon: "📊", leafSlugs: ["accounting", "consulting", "expertise"] }],
+    signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
   {
@@ -328,9 +426,17 @@ const REALESTATE_OBJECTIVES: ProspectingObjective[] = [
     label: "Immobilier commercial / bureaux pour entreprises",
     strategyExplanation: "Nous privilégions les entreprises susceptibles de rechercher ou céder des locaux professionnels.",
     audience: "b2b",
-    recommendedFamilySlugs: ["services-b2b", "commerce"],
-    recommendedLeafSlugs: [],
+    recommendations: [CHIP_INDEPENDENT_OFFICES, CHIP_LOCAL_SHOPS],
     signals: [SIZE_SIGNAL, PROXIMITY_SIGNAL],
+    showWebSignal: false,
+  },
+  {
+    id: "realestate_partners",
+    label: "Partenaires professionnels (notaires, courtiers...)",
+    strategyExplanation: "Nous recherchons des professionnels qui orientent régulièrement leurs propres clients.",
+    audience: "b2b",
+    recommendations: [{ id: "notaries", label: "Notaires / courtiers", icon: "🤝", leafSlugs: ["notary", "insurance"] }],
+    signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
 ];
@@ -341,8 +447,7 @@ const SUPPLIER_OBJECTIVES: ProspectingObjective[] = [
     label: "Fourniture de matériel / consommables professionnels",
     strategyExplanation: "Nous privilégions les entreprises structurées avec un volume d'achat professionnel régulier.",
     audience: "b2b",
-    recommendedFamilySlugs: ["btp-artisans", "services-b2b", "transport-logistique"],
-    recommendedLeafSlugs: [],
+    recommendations: [CHIP_BTP, CHIP_TRANSPORT, CHIP_LOCAL_SHOPS, CHIP_GARAGES],
     signals: [SIZE_SIGNAL, ESTABLISHMENTS_SIGNAL, PROXIMITY_SIGNAL],
     showWebSignal: false,
   },
@@ -355,8 +460,7 @@ const GENERIC_OBJECTIVES: ProspectingObjective[] = [
     label: "Développer ma clientèle professionnelle (B2B)",
     strategyExplanation: "Décrivez votre offre pour affiner les cibles recommandées — en attendant, nous partons sur un ciblage professionnel généraliste.",
     audience: "b2b",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [SIZE_SIGNAL, PROXIMITY_SIGNAL, CONTACT_SIGNAL],
     showWebSignal: false,
   },
@@ -365,8 +469,7 @@ const GENERIC_OBJECTIVES: ProspectingObjective[] = [
     label: "Développer ma clientèle particuliers (B2C)",
     strategyExplanation: "",
     audience: "b2c",
-    recommendedFamilySlugs: [],
-    recommendedLeafSlugs: [],
+    recommendations: [],
     signals: [],
     showWebSignal: false,
   },
@@ -421,7 +524,12 @@ const CONTRACT_OBJECTIVE_IDS = new Set([
   "garage_fleet",
   "garage_pro_repair",
   "garage_pro_tyres",
+  "garage_contract",
   "cleaning_offices",
+  "cleaning_commerce",
+  "cleaning_hotels",
+  "cleaning_copro",
+  "cleaning_warehouses",
   "artisan_corporate",
   "artisan_subcontracting",
   "supplier_b2b",
@@ -444,17 +552,21 @@ export function scoringProfileForObjective(objective: ProspectingObjective): "di
   return "generic";
 }
 
-/** Résout familles + feuilles recommandées de l'objectif en slugs de catégories réelles — même logique que recommendedSlugsForOffer, sans la dupliquer inutilement (source différente : objectif fermé plutôt que texte libre). */
-export function resolveObjectiveTargetSlugs(
-  objective: ProspectingObjective,
-  categories: { id: string; slug: string; parent_id: string | null }[],
-): string[] {
+/** Résout les slugs de catégories réelles représentés par un chip. */
+export function resolveChipTargetSlugs(chip: RecommendationChip): string[] {
+  return chip.leafSlugs;
+}
+
+/**
+ * Union des chips SÉLECTIONNÉS (tous par défaut) en slugs de catégories
+ * réelles — jamais une famille entière listée nommément (voir l'en-tête de
+ * ce fichier). `selectedChipIds` omis = tous les chips de l'objectif.
+ */
+export function resolveObjectiveTargetSlugs(objective: ProspectingObjective, selectedChipIds?: Set<string>): string[] {
   const slugs = new Set<string>();
-  for (const familySlug of objective.recommendedFamilySlugs) {
-    const family = categories.find((c) => c.slug === familySlug && c.parent_id === null);
-    if (!family) continue;
-    for (const child of categories.filter((c) => c.parent_id === family.id)) slugs.add(child.slug);
+  for (const chip of objective.recommendations) {
+    if (selectedChipIds && !selectedChipIds.has(chip.id)) continue;
+    for (const slug of chip.leafSlugs) slugs.add(slug);
   }
-  for (const leaf of objective.recommendedLeafSlugs) slugs.add(leaf);
   return [...slugs];
 }

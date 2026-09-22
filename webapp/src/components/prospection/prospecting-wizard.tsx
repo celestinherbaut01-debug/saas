@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TargetCategoryPicker } from "@/components/onboarding/target-category-picker";
 import { AddressField, type AddressValue } from "@/components/onboarding/address-field";
+import { OwnActivityEditor } from "@/components/prospection/own-activity-editor";
 import { cn } from "@/lib/utils";
 import { saveProspectingConfig } from "@/lib/actions/prospecting";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
@@ -30,6 +30,13 @@ const CONFIDENCE_TITLE: Record<SignalConfidence, string> = {
   probable: "Signal probable, jamais garanti",
   unknown: "Donnée inconnue tant que non vérifiée",
 };
+
+const WEB_SIGNAL_CARDS: { id: string; icon: string; title: string; description: string; webFilter: ProspectionFilters["webFilter"] }[] = [
+  { id: "no_website", icon: "🌐", title: "Aucun site détecté", description: "Entreprises pour lesquelles aucun site n'a été identifié.", webFilter: "none" },
+  { id: "weak_website", icon: "⚠️", title: "Site à analyser", description: "Entreprises possédant un site pouvant nécessiter une refonte.", webFilter: "weak" },
+  { id: "gmb_no_site", icon: "📍", title: "Fiche Google active", description: "Présence locale existante mais présence web à compléter.", webFilter: "unknown" },
+  { id: "all", icon: "✨", title: "Tous les statuts", description: "Ne filtrer sur aucun statut de site en particulier.", webFilter: "all" },
+];
 
 export interface WizardLaunchParams {
   targetIds: string[];
@@ -62,10 +69,15 @@ export function ProspectingWizard({
   searching: boolean;
   onLaunch: (params: WizardLaunchParams) => void;
 }) {
-  const ownCategory = businessProfile?.own_category_id ? categories.find((c) => c.id === businessProfile.own_category_id) : null;
+  // Métier modifiable EN PLACE (voir OwnActivityEditor) — état local, jamais
+  // figé depuis le rendu serveur initial : changer d'activité doit
+  // recalculer objectifs/cibles/signaux IMMÉDIATEMENT, sans recharger la
+  // page ni refaire l'onboarding.
+  const [ownCategoryId, setOwnCategoryId] = useState<string | null>(businessProfile?.own_category_id ?? null);
+  const [ownCategoryLabel, setOwnCategoryLabel] = useState<string | null>(businessProfile?.own_category_label ?? null);
+  const ownCategory = ownCategoryId ? categories.find((c) => c.id === ownCategoryId) : null;
   const parentSlug = ownCategory?.parent_id ? categories.find((c) => c.id === ownCategory.parent_id)?.slug ?? null : null;
   const ownSlug = ownCategory?.slug ?? null;
-  const ownLabel = ownCategory?.name ?? businessProfile?.own_category_label ?? null;
 
   const objectives = useMemo(() => resolveProspectingObjectives(ownSlug, parentSlug), [ownSlug, parentSlug]);
 
@@ -73,13 +85,33 @@ export function ProspectingWizard({
   const objective = objectives.find((o) => o.id === objectiveId) ?? null;
 
   const [freeTextOffer, setFreeTextOffer] = useState(businessProfile?.offer_description ?? "");
-  // targetIds dérivées de l'objectif choisi par défaut (jamais une
-  // pré-sélection large du catalogue) — un ajustement manuel via "Explorer
-  // d'autres secteurs" prend le dessus tant que l'objectif ne change pas.
+  // Chips recommandés SÉLECTIONNÉS pour l'objectif courant — tous cochés
+  // par défaut (voir offer-catalog.ts), désélectionnables individuellement.
+  // `null` = "tous" (évite de devoir lister tous les ids au choix de
+  // l'objectif).
+  const [selectedChipIds, setSelectedChipIds] = useState<Set<string> | null>(null);
   const [manualTargetIds, setManualTargetIds] = useState<string[] | null>(null);
   const [exploreOpen, setExploreOpen] = useState(false);
   const [refineOpen, setRefineOpen] = useState(false);
   const [showAdvancedB2bSearch, setShowAdvancedB2bSearch] = useState(false);
+
+  /** Change d'activité : repart de zéro sur objectif/cibles/offre libre — aucun résidu de l'ancien métier ne doit survivre (test bloquant). */
+  function changeActivity(categoryId: string | null, label: string | null) {
+    setOwnCategoryId(categoryId);
+    setOwnCategoryLabel(label);
+    setObjectiveId(null);
+    setSelectedChipIds(null);
+    setManualTargetIds(null);
+    setFreeTextOffer("");
+    setShowAdvancedB2bSearch(false);
+  }
+
+  function selectObjective(id: string) {
+    setObjectiveId(id);
+    setSelectedChipIds(null);
+    setManualTargetIds(null);
+    setShowAdvancedB2bSearch(false);
+  }
 
   const [address, setAddress] = useState<AddressValue | null>(
     businessProfile?.lat && businessProfile.lng
@@ -119,25 +151,23 @@ export function ProspectingWizard({
     googleFicheOnly,
   };
 
-  // Repli générique honnête (objectif "Développer ma clientèle B2B" sans
-  // cibles pré-catalogées) : réutilise le moteur existant offre-en-texte-
-  // libre plutôt que d'en dupliquer un second, moins précis mais jamais un
-  // blocage pour un métier hors catalogue.
+  // Repli générique honnête (objectif sans chips pré-catalogués) : réutilise
+  // le moteur existant offre-en-texte-libre plutôt que d'en dupliquer un
+  // second, moins précis mais jamais un blocage pour un métier hors catalogue.
   const genericRecommendation = useMemo(
-    () => (objective && objective.recommendedFamilySlugs.length === 0 && objective.recommendedLeafSlugs.length === 0 ? recommendedSlugsForOffer(freeTextOffer, ownSlug, categories) : null),
+    () => (objective && objective.recommendations.length === 0 ? recommendedSlugsForOffer(freeTextOffer, ownSlug, categories) : null),
     [objective, freeTextOffer, ownSlug, categories],
   );
 
-  // Cibles recommandées de l'objectif choisi — valeur DÉRIVÉE, jamais une
-  // pré-sélection large du catalogue stockée en state : soit les cibles
-  // spécifiques de l'objectif, soit (repli générique) celles du moteur
-  // offre-en-texte-libre existant, filtrées par audience. Un ajustement
-  // manuel (Explorer d'autres secteurs) prend le dessus via manualTargetIds
-  // tant que l'objectif ne change pas (voir le bouton objectif ci-dessous).
+  const effectiveChipIds = useMemo(() => selectedChipIds ?? new Set(objective?.recommendations.map((c) => c.id) ?? []), [selectedChipIds, objective]);
+
+  // Cibles recommandées — valeur DÉRIVÉE, jamais une pré-sélection large du
+  // catalogue stockée en state. Un ajustement manuel (Explorer d'autres
+  // secteurs) prend le dessus tant que l'objectif ne change pas.
   const resolvedTargetIds = useMemo(() => {
     if (!objective || objective.audience !== "b2b") return [];
-    if (objective.recommendedFamilySlugs.length > 0 || objective.recommendedLeafSlugs.length > 0) {
-      const slugs = resolveObjectiveTargetSlugs(objective, categories);
+    if (objective.recommendations.length > 0) {
+      const slugs = resolveObjectiveTargetSlugs(objective, effectiveChipIds);
       return categories.filter((c) => slugs.includes(c.slug)).map((c) => c.id);
     }
     if (genericRecommendation) {
@@ -145,15 +175,18 @@ export function ProspectingWizard({
       return categories.filter((c) => filteredSlugs.includes(c.slug)).map((c) => c.id);
     }
     return [];
-  }, [objective, genericRecommendation, categories]);
+  }, [objective, effectiveChipIds, genericRecommendation, categories]);
   const targetIds = manualTargetIds ?? resolvedTargetIds;
 
-  const webCriteriaRelevant = objective?.showWebSignal ?? getProspectingFilterProfile(freeTextOffer, ownSlug).showWebCriteria;
+  function toggleChip(chipId: string) {
+    setSelectedChipIds(new Set([...effectiveChipIds].includes(chipId) ? [...effectiveChipIds].filter((id) => id !== chipId) : [...effectiveChipIds, chipId]));
+    setManualTargetIds(null);
+  }
 
   // Sauvegarde automatique — même principe que l'ancienne page (jamais de
   // bouton "Enregistrer" à retenir de cliquer), déclenchée par tout
-  // changement de la configuration finale (objectif -> offre/audience
-  // dérivées, cibles, zone, filtres).
+  // changement de la configuration finale (activité, objectif -> offre/
+  // audience dérivées, cibles, zone, filtres).
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const isFirstRender = useRef(true);
   useEffect(() => {
@@ -179,9 +212,12 @@ export function ProspectingWizard({
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [objective?.id, freeTextOffer, targetIds, address, radiusKm, JSON.stringify(filters)]);
+  }, [ownCategoryId, objective?.id, freeTextOffer, targetIds, address, radiusKm, JSON.stringify(filters)]);
 
-  const targetNames = useMemo(() => categories.filter((c) => targetIds.includes(c.id)).map((c) => c.name), [categories, targetIds]);
+  // Repli honnête pour un métier hors catalogue (objectifs génériques) :
+  // le signal web reste pertinent si l'offre en texte libre en parle,
+  // même sans showWebSignal explicite (réservé aux objectifs catalogués).
+  const showWebSignal = objective?.showWebSignal || Boolean(genericRecommendation && getProspectingFilterProfile(freeTextOffer, ownSlug).showWebCriteria);
 
   const searchFlowVisible = !objective || objective.audience === "b2b" || showAdvancedB2bSearch;
   const canLaunch = Boolean(objective && address && targetIds.length > 0);
@@ -200,17 +236,21 @@ export function ProspectingWizard({
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <Card>
-        <SectionLabel>Votre entreprise</SectionLabel>
-        <p className="mt-2 text-[14px] font-semibold text-ink">
-          {ownLabel ?? "Métier non renseigné"}
-          {!ownLabel && (
-            <Link href="/parametres" className="ml-2 text-[12px] font-semibold text-accent">
-              Renseigner mon métier →
-            </Link>
-          )}
-        </p>
+    <div className="flex flex-col gap-4">
+      <Card className="bg-gradient-to-br from-panel to-soft">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="font-display text-[17px] font-extrabold text-ink">Prospection intelligente</p>
+            <p className="mt-0.5 text-[12.5px] text-muted">Trouvez les entreprises qui ont réellement besoin de ce que vous vendez.</p>
+          </div>
+          <OwnActivityEditor
+            workspaceId={workspaceId}
+            categories={categories}
+            ownCategoryId={ownCategoryId}
+            ownCategoryLabel={ownCategoryLabel}
+            onChange={changeActivity}
+          />
+        </div>
       </Card>
 
       <Card>
@@ -226,18 +266,17 @@ export function ProspectingWizard({
           </p>
         )}
         <div className="mt-3 flex flex-wrap gap-2">
-          {objectives.map((o) => (
+          {objectives.map((o, i) => (
             <button
               key={o.id}
               type="button"
-              onClick={() => {
-                setObjectiveId(o.id);
-                setManualTargetIds(null);
-                setShowAdvancedB2bSearch(false);
-              }}
+              onClick={() => selectObjective(o.id)}
+              style={{ animationDelay: `${i * 40}ms` }}
               className={cn(
-                "rounded-full border px-3.5 py-2 text-[13px] font-medium transition",
-                objectiveId === o.id ? "border-ink bg-ink text-bg shadow-sm" : "border-line bg-panel text-ink hover:border-ink/30 hover:bg-soft",
+                "animate-fade-up rounded-full border px-3.5 py-2 text-[13px] font-medium transition",
+                objectiveId === o.id
+                  ? "border-transparent bg-gradient-to-r from-accent to-accent-2 text-white shadow-[var(--shadow-sm)]"
+                  : "border-line bg-panel text-ink hover:border-accent/30 hover:bg-soft",
               )}
             >
               {o.label}
@@ -247,7 +286,7 @@ export function ProspectingWizard({
       </Card>
 
       {objective && objective.audience === "b2c" && (
-        <>
+        <div className="animate-fade-up flex flex-col gap-2">
           <ChannelStrategyBanner
             strategy={{
               channel: "b2c_not_registry",
@@ -265,11 +304,11 @@ export function ProspectingWizard({
               Cas particulier : utiliser quand même la recherche dans le registre d&apos;entreprises →
             </button>
           )}
-        </>
+        </div>
       )}
 
       {objective && searchFlowVisible && (
-        <Card className="border-accent/30 bg-accent/[0.04]">
+        <Card className="animate-fade-up border-accent/30 bg-gradient-to-br from-accent/[0.05] to-transparent">
           <SectionLabel>Stratégie recommandée</SectionLabel>
           <p className="mt-2 font-display text-[15px] font-extrabold text-ink">{objective.label}</p>
           {objective.strategyExplanation && <p className="mt-1.5 text-[13px] leading-relaxed text-muted">{objective.strategyExplanation}</p>}
@@ -287,10 +326,31 @@ export function ProspectingWizard({
             </div>
           )}
 
-          {targetNames.length > 0 && (
+          {showWebSignal && <WebSignalCards value={webFilter} onChange={setWebFilter} />}
+
+          {objective.recommendations.length > 0 && (
             <div className="mt-3">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Cibles prioritaires</p>
-              <p className="mt-1 text-[13px] text-ink">{targetNames.join(" · ")}</p>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Cibles recommandées</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {objective.recommendations.map((chip) => {
+                  const isSelected = effectiveChipIds.has(chip.id);
+                  return (
+                    <button
+                      key={chip.id}
+                      type="button"
+                      onClick={() => toggleChip(chip.id)}
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition",
+                        isSelected ? "border-accent/40 bg-accent/10 text-ink" : "border-line bg-panel text-faint line-through opacity-60 hover:opacity-100",
+                      )}
+                    >
+                      <span>{chip.icon}</span>
+                      <span>{chip.label}</span>
+                      {isSelected && <span className="text-accent">✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -317,26 +377,9 @@ export function ProspectingWizard({
             </div>
           )}
 
-          {webCriteriaRelevant && (
-            <div className="mt-3">
-              <label className="text-[11px] font-semibold text-muted">Signal à privilégier</label>
-              <select
-                value={webFilter}
-                onChange={(e) => setWebFilter(e.target.value as typeof webFilter)}
-                className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
-              >
-                <option value="all">Tous les statuts web</option>
-                <option value="no_or_weak">Aucun site détecté + site faible</option>
-                <option value="none">Aucun site détecté uniquement</option>
-                <option value="weak">Site existant à analyser uniquement</option>
-                <option value="unknown">À vérifier uniquement</option>
-              </select>
-            </div>
-          )}
-
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button onClick={launch} disabled={!canLaunch || searching}>
-              {searching ? "Recherche…" : "Lancer la recherche"}
+              {searching ? "Recherche…" : "Trouver mes prospects →"}
             </Button>
             <Button variant="ghost" onClick={() => setObjectiveId(null)}>
               Modifier l&apos;objectif
@@ -409,6 +452,36 @@ export function ProspectingWizard({
           </p>
         </Card>
       )}
+    </div>
+  );
+}
+
+function WebSignalCards({ value, onChange }: { value: ProspectionFilters["webFilter"]; onChange: (v: ProspectionFilters["webFilter"]) => void }) {
+  return (
+    <div className="mt-3">
+      <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Quel type d&apos;opportunité recherchez-vous ?</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {WEB_SIGNAL_CARDS.map((card) => {
+          const isSelected = value === card.webFilter;
+          return (
+            <button
+              key={card.id}
+              type="button"
+              onClick={() => onChange(card.webFilter)}
+              className={cn(
+                "flex items-start gap-2.5 rounded-xl border p-3 text-left transition",
+                isSelected ? "border-accent/50 bg-accent/[0.06] shadow-[var(--shadow-sm)]" : "border-line bg-panel hover:border-accent/25 hover:bg-soft",
+              )}
+            >
+              <span className="text-[18px]">{card.icon}</span>
+              <span>
+                <span className="block text-[12.5px] font-bold text-ink">{card.title}</span>
+                <span className="block text-[11px] text-muted">{card.description}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

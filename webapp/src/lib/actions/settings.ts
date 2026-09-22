@@ -136,3 +136,33 @@ export async function updateProductMode(
   revalidatePath("/", "layout");
   return { ok: true };
 }
+
+/**
+ * Change le métier PROPRE du workspace (business_profiles.own_category_id)
+ * — modifiable à tout moment depuis Prospection, jamais besoin de refaire
+ * tout l'onboarding. `categoryId: null` + `label` gère le cas "métier non
+ * catalogué" (mêmes règles que CategoryCombobox en onboarding : jamais
+ * bloquant). Le rechargement du catalogue d'objectifs/cibles/signaux se
+ * fait CÔTÉ CLIENT à partir de la réponse — voir OwnActivityEditor.
+ */
+export async function updateOwnCategory(
+  workspaceId: string,
+  categoryId: string | null,
+  label: string | null,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Session expirée." };
+
+  const { error } = await supabase
+    .from("business_profiles")
+    .update({ own_category_id: categoryId, own_category_label: categoryId ? null : label?.trim() || null })
+    .eq("workspace_id", workspaceId);
+
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/prospection");
+  revalidatePath("/studio");
+  return { ok: true };
+}
