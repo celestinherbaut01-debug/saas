@@ -11,7 +11,7 @@ const SECTIONS: Section[] = [
     title: "Authentification",
     status: "live",
     text:
-      "Connexion par Google (OAuth) ou email/mot de passe, gérée par Supabase Auth. Les sessions passent par des cookies httpOnly gérés côté serveur (@supabase/ssr) — le jeton de session n'est jamais exposé au JavaScript de la page.",
+      "Connexion par Google (OAuth) ou email/mot de passe, gérée par Supabase Auth. L’application utilise des cookies de session et vérifie l’identité côté serveur avant d’accéder aux fonctionnalités privées.",
   },
   {
     title: "Isolation des données (Row Level Security)",
@@ -47,7 +47,7 @@ const SECTIONS: Section[] = [
     title: "Confidentialité",
     status: "live",
     text:
-      "Vos données de prospection et de CRM ne sont ni revendues ni partagées avec d'autres clients — l'isolation par Row Level Security (ci-dessus) le garantit techniquement, pas seulement contractuellement. Les entreprises affichées en prospection viennent de sources publiques (registre SIRENE, Google Places) : ce ne sont pas des données personnelles que nous collectons sur vous.",
+      "Les règles d’accès en base séparent les espaces de travail. La prospection s’appuie sur le registre des entreprises et sur Google Places quand la vérification est disponible. Ces sources peuvent contenir des coordonnées professionnelles ; une donnée publique n’est pas nécessairement dépourvue de caractère personnel.",
   },
   {
     title: "Sauvegardes",

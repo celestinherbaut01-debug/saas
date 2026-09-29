@@ -72,7 +72,7 @@ export function computeQualityScore(
   profile: ScoringProfile = "generic",
 ): { score: number; sources: Record<string, boolean> } {
   let score = 40;
-  const sources: Record<string, boolean> = {};
+  const sources: Record<string, boolean> = { [`profile_${profile}`]: true, scoring_v2: true };
 
   // Statut opérationnel confirmé par Google = donnée fiable, pas une supposition.
   if (p.businessStatus === "OPERATIONAL") {
@@ -86,17 +86,16 @@ export function computeQualityScore(
     sources.google_temp_closed = true;
   }
 
-  // Besoin digital — au cœur de l'opportunité pour digital_opportunity et
-  // marketing_potential, un simple signal secondaire pour les autres profils.
-  const webWeight = profile === "digital_opportunity" ? 1.4 : profile === "marketing_potential" ? 1.1 : 1;
-  if (p.websiteQuality === "none") {
+  // Website condition has no commercial relevance to cleaning or fleet maintenance.
+  const digital = profile === "digital_opportunity" || profile === "marketing_potential";
+  const webWeight = profile === "digital_opportunity" ? 1.4 : 1.1;
+  if (digital && p.placeId && !p.websiteUri && p.websiteQuality === "none") {
     score += Math.round(20 * webWeight);
     sources.no_website = true;
-  } else if (p.websiteQuality === "weak") {
+  } else if (digital && p.websiteUri && p.websiteQuality === "weak") {
     score += Math.round(12 * webWeight);
     sources.weak_website = true;
-  } else if (p.websiteQuality === "unknown") {
-    score += 4;
+  } else if (digital && p.websiteQuality === "unknown") {
     sources.website_unverified = true;
   }
 
@@ -149,6 +148,7 @@ export function computeQualityScore(
   if ((profile === "marketing_potential" || profile === "contract_potential") && p.googleRatingCount) {
     score += p.googleRatingCount >= 50 ? 10 : 5;
     sources.google_reviews_signal = true;
+    sources.google_reviews_many = p.googleRatingCount >= 50;
   }
 
   // Proximité : plus c'est proche du point de départ, plus c'est actionnable.

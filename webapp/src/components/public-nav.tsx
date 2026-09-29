@@ -16,7 +16,9 @@ export async function PublicNav() {
         <span className="font-display text-[14px] font-extrabold">ProspectFlow</span>
       </Link>
       <nav className="flex items-center gap-2 text-[13px] font-medium sm:gap-4">
-        <Link href="/tarifs" className="hidden text-muted hover:text-ink sm:inline">
+        <Link href="/#metiers" className="hidden text-muted hover:text-ink lg:inline">Pour votre métier</Link>
+        <Link href="/#demo" className="hidden text-muted hover:text-ink md:inline">Démo</Link>
+        <Link href="/tarifs" className="text-muted hover:text-ink">
           Tarifs
         </Link>
         <Link href="/securite" className="hidden text-muted hover:text-ink sm:inline">

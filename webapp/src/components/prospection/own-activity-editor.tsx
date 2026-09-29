@@ -45,13 +45,12 @@ export function OwnActivityEditor({
   function confirm() {
     if (!draftId && !draftLabel.trim()) return;
     setError(null);
-    // Mise à jour immédiate côté client — le reste du parcours (objectif,
-    // cibles, signaux, score) doit changer SANS attendre la réponse serveur.
-    onChange(draftId, draftId ? null : draftLabel.trim());
-    setEditing(false);
+    // Persist first: a failed save must not let searches use another activity than the form.
     startTransition(async () => {
       const result = await updateOwnCategory(workspaceId, draftId, draftId ? null : draftLabel.trim());
-      if (!result.ok) setError(result.error ?? "Échec de l'enregistrement — la modification reste appliquée ici mais n'a pas pu être sauvegardée.");
+      if (!result.ok) { setError(result.error ?? "Impossible d’enregistrer l’activité. Réessayez."); return; }
+      onChange(draftId, draftId ? null : draftLabel.trim());
+      setEditing(false);
     });
   }
 
@@ -84,9 +83,10 @@ export function OwnActivityEditor({
         customLabel={draftLabel}
         onCustomLabelChange={setDraftLabel}
       />
+      {error && <p role="alert" className="text-sm text-red-fg">{error}</p>}
       <div className="flex gap-2">
-        <Button size="sm" onClick={confirm} disabled={!draftId && !draftLabel.trim()}>
-          Confirmer
+        <Button size="sm" onClick={confirm} disabled={pending || (!draftId && !draftLabel.trim())}>
+          {pending ? "Enregistrement…" : "Confirmer"}
         </Button>
         <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
           Annuler

@@ -1,263 +1,436 @@
 import Link from "next/link";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  Building2,
+  Check,
+  CirclePlay,
+  ClipboardList,
+  Globe2,
+  LockKeyhole,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Wrench,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
-import { PricingTrust } from "@/components/pricing-trust";
-import { PersonaSelector } from "@/components/persona-selector";
+import { ProductDemo } from "@/components/product-demo";
 import { Reveal } from "@/components/reveal";
-import { cn } from "@/lib/utils";
+import { ENTITLEMENTS } from "@/lib/entitlements";
+import {
+  ENABLE_MONEY_BACK_GUARANTEE,
+  MONEY_BACK_GUARANTEE_DAYS,
+} from "@/lib/trust-config";
 
 export default async function Home() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  // Plus de redirection automatique et invisible : "/" reste toujours la
-  // landing, même pour un utilisateur déjà connecté. C'est "/login" qui
-  // propose explicitement de continuer vers son espace (voir SessionGate).
-  const ctaHref = user ? "/login" : "/signup";
-  const ctaLabel = user ? "Accéder à mon espace" : "Essayer gratuitement";
-
+  const ctaHref = user ? "/dashboard" : "/signup";
+  const ctaLabel = user ? "Ouvrir mon espace" : "Commencer gratuitement";
   return (
-    <div className="flex flex-1 flex-col overflow-x-hidden">
+    <div className="marketing-page">
       <PublicNav />
-
-      <main className="flex flex-col items-center gap-28 px-6 pb-28">
-        {/* HERO */}
-        <section className="relative flex w-full max-w-5xl flex-col items-center gap-7 pt-20 text-center">
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 left-1/2 h-[560px] w-[900px] -translate-x-1/2 rounded-full opacity-70 blur-3xl"
-            style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent), transparent 70%)" }}
-          />
-          <span className="relative rounded-full border border-line bg-panel/80 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-accent shadow-[var(--shadow-sm)] backdrop-blur">
-            Business Twin · Acquisition · Studio · Business OS
-          </span>
-          <h1 className="relative max-w-3xl text-balance font-display text-4xl font-extrabold tracking-tight sm:text-6xl">
-            ProspectFlow comprend votre activité{" "}
-            <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">avant</span> de vous
-            proposer quoi que ce soit.
-          </h1>
-          <p className="relative max-w-xl text-pretty text-[15px] leading-relaxed text-muted">
-            Un objectif, une vraie analyse de vos données, des opportunités expliquées — jamais devinées — et des
-            actions prêtes à exécuter. Chaque entreprise affichée est vérifiée (registre officiel français + Google)
-            avant d&apos;être montrée.
-          </p>
-          <div className="relative flex flex-wrap justify-center gap-3">
-            <Link
-              href={ctaHref}
-              className="rounded-lg bg-[image:var(--gradient-signature)] px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[var(--shadow-md)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-lg),var(--glow-accent)]"
-            >
-              {ctaLabel}
-            </Link>
-            <Link
-              href="/tarifs"
-              className="rounded-lg border border-line bg-panel px-5 py-2.5 text-sm font-semibold text-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5"
-            >
-              Voir les tarifs
+      <main>
+        <section className="landing-hero marketing-container">
+          <div className="hero-copy">
+            <p className="eyebrow">
+              <span className="status-dot" />
+              Pour les entreprises qui font le terrain
+            </p>
+            <h1>
+              Les bons clients.
+              <br />
+              <span>Pour votre métier.</span>
+            </h1>
+            <p className="hero-description">
+              Votre agence web ne cherche pas les mêmes clients qu’une
+              entreprise de nettoyage. Trouvez des prospects adaptés à votre
+              offre, puis gérez la suite au même endroit.
+            </p>
+            <div className="hero-actions">
+              <Link href={ctaHref} className="marketing-cta">
+                {ctaLabel}
+                <ArrowRight size={17} />
+              </Link>
+              <a href="#demo" className="marketing-secondary">
+                <CirclePlay size={19} />
+                Voir le produit
+              </a>
+            </div>
+            <div className="hero-assurance">
+              <span>
+                <Check size={14} />
+                Sans carte bancaire
+              </span>
+              <span>
+                <Check size={14} />
+                Version gratuite disponible
+              </span>
+            </div>
+            <div className="hero-note">
+              <span className="note-line" />
+              Prospection pour vos clients professionnels.
+              <br />
+              Gestion métier pour votre quotidien.
+            </div>
+          </div>
+          <div className="hero-product">
+            <div className="hero-product-label">
+              <span />
+              Essayez : changez de métier ci-dessous
+              <ArrowRight size={14} />
+            </div>
+            <ProductDemo />
+            <div className="hero-product-caption">
+              <SlidersHorizontal size={14} />
+              Votre offre change. Votre recherche aussi.
+            </div>
+          </div>
+        </section>
+        <div className="source-strip">
+          <div className="marketing-container">
+            <span>Des informations que vous pouvez vérifier</span>
+            <strong>Registre officiel français</strong>
+            <span className="source-divider" />
+            <strong>Fiches Google, si disponibles</strong>
+            <span className="source-divider" />
+            <strong>Critères expliqués</strong>
+          </div>
+        </div>
+        <Reveal className="marketing-container section-space">
+          <div id="metiers" className="section-heading">
+            <p className="eyebrow">Votre métier donne la direction</p>
+            <h2>
+              Un besoin concret.
+              <br />
+              <span>Un parcours qui lui correspond.</span>
+            </h2>
+            <p>
+              Commencez par ce que vous vendez. Les bons critères en découlent.
+            </p>
+          </div>
+          <div className="vertical-grid">
+            <article className="vertical-card vertical-web">
+              <span className="vertical-icon">
+                <Globe2 size={23} />
+              </span>
+              <span className="vertical-tag">Acquisition</span>
+              <h3>
+                Vous créez
+                <br />
+                des sites internet.
+              </h3>
+              <p>
+                Ciblez les commerces et artisans sans site renseigné sur Google,
+                dans votre zone.
+              </p>
+              <div className="vertical-proof">
+                <Search size={15} />
+                <span>Signal web vérifié, besoin à confirmer</span>
+              </div>
+              <a href="#demo">
+                Voir la démonstration
+                <ArrowUpRight size={17} />
+              </a>
+            </article>
+            <article className="vertical-card vertical-cleaning">
+              <span className="vertical-icon">
+                <Building2 size={23} />
+              </span>
+              <span className="vertical-tag">Acquisition</span>
+              <h3>
+                Vous entretenez
+                <br />
+                des locaux.
+              </h3>
+              <p>
+                Bureaux, hôtels ou copropriétés : choisissez la prestation pour
+                obtenir des secteurs adaptés.
+              </p>
+              <div className="vertical-proof">
+                <ClipboardList size={15} />
+                <span>Surface et contrat actuel à qualifier</span>
+              </div>
+              <a href="#demo">
+                Voir la démonstration
+                <ArrowUpRight size={17} />
+              </a>
+            </article>
+            <article className="vertical-card vertical-garage">
+              <span className="vertical-icon">
+                <Wrench size={23} />
+              </span>
+              <span className="vertical-tag">Gestion métier</span>
+              <h3>
+                Vous faites
+                <br />
+                tourner un atelier.
+              </h3>
+              <p>
+                Retrouvez vos clients, véhicules et interventions. Développez
+                les flottes seulement si c’est votre offre.
+              </p>
+              <div className="vertical-proof">
+                <Check size={15} />
+                <span>Votre atelier au premier plan</span>
+              </div>
+              <Link href="/tarifs">
+                Découvrir la gestion
+                <ArrowUpRight size={17} />
+              </Link>
+            </article>
+          </div>
+        </Reveal>
+        <section id="demo" className="demo-section section-space">
+          <div className="marketing-container demo-section-grid">
+            <div>
+              <p className="eyebrow">Voyez ce qui change</p>
+              <h2>
+                Moins de listes.
+                <br />
+                <span>Plus de pertinence.</span>
+              </h2>
+              <p className="section-description">
+                Une courte explication des parcours agence web, nettoyage et
+                garage. La vidéo présente la logique de ciblage, sans recherche
+                réelle.
+              </p>
+              <ol className="demo-steps">
+                <li>
+                  <span>01</span>
+                  <div>
+                    <strong>Votre offre</strong>
+                    <p>
+                      Création de site, nettoyage de bureaux, entretien de
+                      flottes…
+                    </p>
+                  </div>
+                </li>
+                <li>
+                  <span>02</span>
+                  <div>
+                    <strong>Vos critères et votre zone</strong>
+                    <p>Secteurs, rayon et signaux utiles à votre prestation.</p>
+                  </div>
+                </li>
+                <li>
+                  <span>03</span>
+                  <div>
+                    <strong>Votre prochaine action</strong>
+                    <p>
+                      Vérifiez le besoin, puis ajoutez le prospect à votre CRM.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </div>
+            <div className="video-frame">
+              <div className="video-label">
+                <CirclePlay size={16} />
+                <span>Le produit en 18 secondes</span>
+                <span>Aperçu illustratif</span>
+              </div>
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                poster="/demo/poster.jpg"
+                aria-label="Démonstration des trois parcours ProspectFlow"
+              >
+                <source src="/demo/parcours-metiers.mp4" type="video/mp4" />
+                <track
+                  kind="captions"
+                  src="/demo/parcours-metiers.vtt"
+                  srcLang="fr"
+                  label="Français"
+                  default
+                />
+              </video>
+              <p>
+                Sans son · parcours illustratifs · testez aussi les boutons de
+                l’aperçu en haut de page.
+              </p>
+            </div>
+          </div>
+        </section>
+        <Reveal className="marketing-container section-space workflow-section">
+          <div className="section-heading">
+            <p className="eyebrow">Du premier contact au suivi</p>
+            <h2>
+              Trouver un contact,
+              <br />
+              <span>c’est le début.</span>
+            </h2>
+          </div>
+          <div className="workflow-grid">
+            <article>
+              <span className="workflow-number">01 / TROUVER</span>
+              <Search size={25} />
+              <h3>Une recherche ciblée</h3>
+              <p>
+                Une offre, des secteurs choisis et un rayon précis. Les critères
+                de sélection restent visibles.
+              </p>
+            </article>
+            <article>
+              <span className="workflow-number">02 / QUALIFIER</span>
+              <ClipboardList size={25} />
+              <h3>Un CRM pour avancer</h3>
+              <p>
+                Ajoutez vos prospects, gardez vos notes et suivez les échanges
+                jusqu’au devis et au client gagné.
+              </p>
+            </article>
+            <article>
+              <span className="workflow-number">03 / PILOTER</span>
+              <Sparkles size={25} />
+              <h3>Votre activité réunie</h3>
+              <p>
+                Avec la gestion métier, retrouvez les modules adaptés à votre
+                quotidien, selon votre abonnement.
+              </p>
+            </article>
+          </div>
+        </Reveal>
+        <section className="marketing-container trust-section">
+          <div>
+            <span className="trust-icon">
+              <ShieldCheck size={29} />
+            </span>
+            <p className="eyebrow">La confiance se vérifie</p>
+            <h2>
+              Testez d’abord.
+              <br />
+              Décidez ensuite.
+            </h2>
+            <p>
+              Comprenez ce que le produit fait, ce que les données permettent de
+              savoir et ce qui reste à vérifier.
+            </p>
+            <Link href="/securite">
+              Lire nos engagements de sécurité
+              <ArrowUpRight size={16} />
             </Link>
           </div>
-
-          <Reveal delay={150} className="relative mt-6 w-full max-w-3xl">
-            <HeroMockup />
-          </Reveal>
-        </section>
-
-        {/* SÉLECTEUR "JE SUIS..." — explique la valeur en un coup d'œil selon le métier, avant même de faire défiler la page. */}
-        <Reveal className="w-full max-w-2xl">
-          <PersonaSelector />
-        </Reveal>
-
-        {/* FLUX OBJECTIF -> RESULTAT */}
-        <Reveal className="w-full max-w-5xl">
-          <h2 className="text-center font-display text-2xl font-extrabold">De l&apos;objectif au résultat, sans étape devinée</h2>
-          <div className="mt-10 grid gap-3 sm:grid-cols-5">
-            {[
-              { icon: "🎯", label: "Objectif" },
-              { icon: "🔍", label: "Analyse" },
-              { icon: "💡", label: "Opportunité" },
-              { icon: "⚡", label: "Action" },
-              { icon: "📈", label: "Résultat" },
-            ].map((step, i, arr) => (
-              <Reveal key={step.label} delay={i * 90} className="relative flex flex-col items-center gap-2">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-line bg-panel text-xl shadow-[var(--shadow-sm)]">
-                  {step.icon}
+          <div className="trust-points">
+            <article>
+              <LockKeyhole size={20} />
+              <div>
+                <h3>Un accès par compte</h3>
+                <p>
+                  Connexion Google ou email et accès aux espaces de travail
+                  réservé à leurs membres.
+                </p>
+              </div>
+            </article>
+            <article>
+              <Search size={20} />
+              <div>
+                <h3>Des inconnues signalées</h3>
+                <p>
+                  Une entreprise sans site renseigné n’est pas une vente
+                  garantie. Vous gardez la main sur la qualification.
+                </p>
+              </div>
+            </article>
+            <article>
+              <Check size={20} />
+              <div>
+                <h3>Un essai sans carte bancaire</h3>
+                <p>
+                  Le plan gratuit comprend{" "}
+                  {ENTITLEMENTS.free.searchMonthlyLimit} recherches et{" "}
+                  {ENTITLEMENTS.free.prospectMonthlyLimit} prospects par mois,
+                  dans un rayon maximal de {ENTITLEMENTS.free.maxRadiusKm} km.
+                </p>
+              </div>
+            </article>
+            {ENABLE_MONEY_BACK_GUARANTEE && (
+              <article>
+                <ShieldCheck size={20} />
+                <div>
+                  <h3>
+                    {MONEY_BACK_GUARANTEE_DAYS} jours satisfait ou remboursé
+                  </h3>
+                  <p>Selon les conditions de la garantie.</p>
                 </div>
-                <p className="text-[12.5px] font-bold">{step.label}</p>
-                {i < arr.length - 1 && (
-                  <span className="pointer-events-none absolute right-[-14px] top-7 hidden text-line sm:block" aria-hidden>
-                    →
-                  </span>
-                )}
-              </Reveal>
+              </article>
+            )}
+          </div>
+        </section>
+        <section className="marketing-container section-space faq-section">
+          <div>
+            <p className="eyebrow">Les bonnes questions</p>
+            <h2>
+              Avant de
+              <br />
+              vous lancer.
+            </h2>
+            <Link href="/tarifs" className="marketing-secondary">
+              Consulter les tarifs
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+          <div className="faq-list">
+            {[
+              [
+                "Est-ce adapté à mon entreprise ?",
+                "La prospection s’adresse aux offres vendues à des entreprises : création de sites, nettoyage, sécurité ou entretien de flottes, par exemple. Pour une activité centrée sur les particuliers, comme un garage, la gestion métier est le point de départ le plus utile.",
+              ],
+              [
+                "Les prospects ont-ils forcément besoin de moi ?",
+                "Non. Les secteurs et signaux permettent de repérer des clients potentiels. Le besoin réel, le budget et l’existence d’un prestataire doivent être confirmés lors du contact. Aucune vente n’est garantie.",
+              ],
+              [
+                "Comment vérifiez-vous l’absence de site ?",
+                "La recherche utilise les entreprises du registre officiel et leur fiche Google lorsqu’elle peut être identifiée. Sans site renseigné sur cette fiche, le prospect peut correspondre à une offre de création de site. Une vérification complémentaire reste nécessaire : le site peut simplement ne pas être renseigné sur Google.",
+              ],
+              [
+                "Puis-je utiliser uniquement la gestion ?",
+                "Oui. Les offres Acquisition et Business OS sont distinctes. Les tarifs précisent les modules, volumes et limites compris dans chaque formule.",
+              ],
+            ].map(([q, a]) => (
+              <details key={q}>
+                <summary>
+                  {q}
+                  <span>+</span>
+                </summary>
+                <p>{a}</p>
+              </details>
             ))}
           </div>
-        </Reveal>
-
-        {/* 4 PILIERS */}
-        <Reveal className="w-full max-w-5xl">
-          <h2 className="text-center font-display text-2xl font-extrabold">Un seul produit, quatre piliers</h2>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <PillarCard icon="🧭" title="Business Twin" text="Comprendre votre situation réelle et décider quel objectif poursuivre, avec des scénarios comparés honnêtement." />
-            <PillarCard icon="⌕" title="Acquisition" text="Trouver les bonnes opportunités selon ce que vous vendez réellement — jamais un catalogue générique de cibles." />
-            <PillarCard icon="🎨" title="Studio" text="Transformer une offre — produit, bien, réalisation, événement — en contenu prêt à publier sur chaque canal." />
-            <PillarCard icon="▣" title="Business OS" text="Gérer votre activité au quotidien avec un vocabulaire et des modules adaptés à votre métier." />
-          </div>
-        </Reveal>
-
-        <Reveal className="flex w-full max-w-3xl flex-col items-center gap-3 text-center">
-          <h2 className="font-display text-2xl font-extrabold">Le problème</h2>
-          <p className="max-w-xl text-[14px] leading-relaxed text-muted">
-            Trouver des prospects pertinents prend des heures — recherches manuelles, listes achetées
-            périmées, entreprises fermées ou hors cible. ProspectFlow automatise la partie fastidieuse et
-            garde la partie humaine (le contact) entre vos mains.
+        </section>
+        <section className="final-cta marketing-container">
+          <p className="eyebrow">Votre prochaine étape</p>
+          <h2>
+            Faites avancer
+            <br />
+            votre activité.
+          </h2>
+          <p>
+            Commencez gratuitement. Explorez le parcours adapté à votre métier.
           </p>
-        </Reveal>
-
-        <Reveal className="grid w-full max-w-4xl gap-4 sm:grid-cols-3">
-          <FeatureCard
-            title="Prospection vérifiée"
-            text="Registre officiel des entreprises (SIRENE) + Google Places en enrichissement optionnel. Distance, statut et indépendance réels, jamais devinés."
-          />
-          <FeatureCard
-            title="CRM avec score expliqué"
-            text="Chaque prospect a un score d'opportunité détaillé — proximité, secteur, présence web — jamais une note opaque."
-          />
-          <FeatureCard
-            title="NOVA, l'agent commercial"
-            text="Répond avec vos vraies données (CRM, activité) et rédige des emails personnalisés à valider avant envoi."
-          />
-        </Reveal>
-
-        <Reveal className="w-full max-w-4xl">
-          <h2 className="text-center font-display text-2xl font-extrabold">Comment ça marche</h2>
-          <div className="mt-8 grid gap-6 sm:grid-cols-4">
-            <Step n={1} title="Votre activité" text="Métier, offre et clientèle cible en quelques questions." />
-            <Step n={2} title="Votre zone" text="Position précise (GPS ou adresse) et rayon de prospection." />
-            <Step n={3} title="Prospects vérifiés" text="Des entreprises réelles, scorées par pertinence." />
-            <Step n={4} title="CRM + NOVA" text="Suivez chaque contact, laissez NOVA préparer vos emails." />
-          </div>
-        </Reveal>
-
-        <Reveal className="w-full max-w-3xl rounded-2xl border border-line bg-panel p-8 text-center shadow-[var(--shadow-sm)]">
-          <h2 className="font-display text-xl font-extrabold">Business OS</h2>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">
-            Sur les plans Pro et Max, ProspectFlow devient aussi le logiciel de gestion de votre métier —
-            clients, stock, planning — avec un vocabulaire et des modules adaptés (garage, salon, restaurant,
-            nettoyage, sécurité, agence web...). Un seul outil pour prospecter et gérer.
-          </p>
-        </Reveal>
-
-        <Reveal className="w-full max-w-3xl">
-          <h2 className="text-center font-display text-xl font-extrabold">Questions fréquentes</h2>
-          <div className="mt-6 flex flex-col gap-4">
-            <Faq
-              q="Les prospects affichés sont-ils réels ?"
-              a="Oui, toujours. Chaque entreprise vient du registre officiel français (SIRENE). Si une information n'est pas vérifiée, ProspectFlow l'affiche comme « à vérifier » plutôt que de l'inventer."
-            />
-            <Faq
-              q="Dois-je payer pour essayer ?"
-              a="Non. Le plan Free permet de tester ProspectFlow sans carte bancaire, avec un volume volontairement limité."
-            />
-            <Faq
-              q="NOVA et Studio utilisent-ils une IA générative ?"
-              a="Le contenu généré aujourd'hui est déterministe — composé à partir de vos vraies données, jamais inventé — et non issu d'un modèle génératif tiers. L'architecture est prête pour en connecter un, sans changer ce principe : rien n'est jamais présenté comme généré par IA si ce n'est pas le cas."
-            />
-          </div>
-        </Reveal>
-
-        <Reveal className="w-full max-w-4xl">
-          <PricingTrust />
-        </Reveal>
-
-        <Reveal className="flex w-full max-w-2xl flex-col items-center gap-4 rounded-2xl border border-line bg-panel p-10 text-center shadow-[var(--shadow-md)]">
-          <h2 className="font-display text-xl font-extrabold">Prêt à trouver vos prochains clients ?</h2>
-          <p className="text-[13px] text-muted">Gratuit pour démarrer, aucune carte requise.</p>
-          <Link
-            href={ctaHref}
-            className="rounded-lg bg-[image:var(--gradient-signature)] px-5 py-2.5 text-sm font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
-          >
-            {user ? "Accéder à mon espace" : "Créer mon compte"}
+          <Link href={ctaHref} className="marketing-cta">
+            {ctaLabel}
+            <ArrowRight size={17} />
           </Link>
-        </Reveal>
+        </section>
       </main>
-    </div>
-  );
-}
-
-/**
- * Diagramme illustratif en HTML/CSS — jamais une capture d'écran du vrai
- * produit présentée comme telle : une représentation stylisée de ce que
- * fait ProspectFlow, clairement composée de blocs génériques (aucune
- * donnée, aucun nom d'entreprise réel).
- */
-function HeroMockup() {
-  return (
-    <div className="relative rounded-2xl border border-line bg-panel/90 p-4 shadow-[var(--shadow-lg)] backdrop-blur">
-      <div className="flex items-center gap-1.5 border-b border-line pb-3">
-        <span className="h-2.5 w-2.5 rounded-full bg-red-fg/60" />
-        <span className="h-2.5 w-2.5 rounded-full bg-amber-fg/60" />
-        <span className="h-2.5 w-2.5 rounded-full bg-green-fg/60" />
-        <span className="ml-3 text-[10.5px] font-semibold text-faint">Business Twin — Objectif</span>
-      </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-accent/30 bg-accent/5 p-3.5 text-left">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-accent">Objectif</p>
-          <p className="mt-1 text-[12.5px] font-semibold">Remplir les créneaux du jeudi</p>
-        </div>
-        <div className="rounded-xl border border-line bg-soft p-3.5 text-left">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-faint">Scénario recommandé</p>
-          <p className="mt-1 text-[12.5px] font-semibold">Réactiver 24 clients inactifs</p>
-          <p className="mt-1 text-[10.5px] text-faint">Confiance élevée</p>
-        </div>
-        <div className="rounded-xl border border-line bg-soft p-3.5 text-left">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-faint">Action prête</p>
-          <p className="mt-1 text-[12.5px] font-semibold">Campagne SMS préparée</p>
-          <p className="mt-1 text-[10.5px] text-faint">À valider avant envoi</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PillarCard({ icon, title, text }: { icon: string; title: string; text: string }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-line bg-panel p-5 text-left shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-2 text-[15px] text-white">
-        {icon}
-      </span>
-      <h3 className={cn("font-display text-[14px] font-bold")}>{title}</h3>
-      <p className="text-[12.5px] leading-relaxed text-muted">{text}</p>
-    </div>
-  );
-}
-
-function FeatureCard({ title, text }: { title: string; text: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel p-5 text-left shadow-[var(--shadow-sm)]">
-      <h3 className="font-display text-[14px] font-bold">{title}</h3>
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{text}</p>
-    </div>
-  );
-}
-
-function Step({ n, title, text }: { n: number; title: string; text: string }) {
-  return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-ink to-ink/80 font-display text-[13px] font-extrabold text-bg shadow-[var(--shadow-sm)]">
-        {n}
-      </div>
-      <h3 className="font-display text-[13px] font-bold">{title}</h3>
-      <p className="text-[12px] leading-relaxed text-muted">{text}</p>
-    </div>
-  );
-}
-
-function Faq({ q, a }: { q: string; a: string }) {
-  return (
-    <div className="rounded-xl border border-line bg-panel p-4 shadow-[var(--shadow-sm)]">
-      <p className="text-[13px] font-bold">{q}</p>
-      <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{a}</p>
+      <footer className="marketing-footer marketing-container">
+        <Link href="/" className="font-display text-lg font-extrabold">
+          ProspectFlow<span>•</span>
+        </Link>
+        <p>Des outils concrets pour les entreprises de terrain.</p>
+        <nav>
+          <Link href="/tarifs">Tarifs</Link>
+          <Link href="/securite">Sécurité</Link>
+          <Link href="/login">Connexion</Link>
+        </nav>
+      </footer>
     </div>
   );
 }

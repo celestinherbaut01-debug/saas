@@ -69,7 +69,7 @@ export function CategoryCombobox({
     );
   }
 
-  if (customLabel) {
+  if (customLabel && !notFoundOpen) {
     return (
       <div className="flex flex-col gap-1.5">
         <button
@@ -151,7 +151,7 @@ export function CategoryCombobox({
           </div>
           <p className="text-[10.5px] text-faint">
             Votre inscription n&apos;est jamais bloquée par un métier absent du catalogue — votre espace démarre en
-            configuration générale, et nous ajoutons ce métier au catalogue.
+            configuration générale, avec ce libellé conservé dans votre profil.
           </p>
         </div>
       )}

@@ -29,7 +29,7 @@ export function computeVerificationStatus(
 export const VERIFICATION_STATUS_LABEL: Record<VerificationStatus, { text: string; cls: string }> = {
   REGISTRY_ONLY: { text: "À vérifier", cls: "bg-soft text-muted" },
   GOOGLE_VERIFIED: { text: "Google vérifié", cls: "bg-green-bg text-green-fg" },
-  NO_WEBSITE_CONFIRMED: { text: "Aucun site confirmé", cls: "bg-green-bg text-green-fg" },
+  NO_WEBSITE_CONFIRMED: { text: "Sans site renseigné sur Google", cls: "bg-green-bg text-green-fg" },
   WEBSITE_FOUND: { text: "Site trouvé", cls: "bg-soft text-muted" },
   WEBSITE_WEAK: { text: "Site à améliorer", cls: "bg-amber-bg text-amber-fg" },
   WEBSITE_GOOD: { text: "Site correct", cls: "bg-soft text-muted" },

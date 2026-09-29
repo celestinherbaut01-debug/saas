@@ -1,15 +1,39 @@
 "use server";
 
-import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from "@supabase/supabase-js";
+import {
+  FunctionsFetchError,
+  FunctionsHttpError,
+  FunctionsRelayError,
+} from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspacePlan } from "@/lib/plan";
 import { assertQuota, incrementUsage } from "@/lib/quota";
 import { ENTITLEMENTS } from "@/lib/entitlements";
-import { normalizeSearchResponse, type ProspectionSearchResponse } from "@/lib/search-response";
+import {
+  normalizeSearchResponse,
+  type ProspectionSearchResponse,
+} from "@/lib/search-response";
+import { normalizeProspectionFilters } from "@/lib/prospecting-config";
+import {
+  findObjective,
+  scoringProfileForObjective,
+} from "@/lib/prospecting/offer-catalog";
+import {
+  filtersForObjective,
+  matchesSearchCriteria,
+  offerReason,
+} from "@/lib/prospecting/search-policy";
+import {
+  computeQualityScore,
+  SCORING_PROFILE_LABEL,
+} from "../../../../supabase/functions/_shared/scoring";
+import { computeRelevance } from "../../../../supabase/functions/_shared/relevance";
 
 export type { ProspectionSearchResponse };
 
 export interface SearchProspectsParams {
+  objectiveId: string;
+  targetCategoryIds: string[];
   lat: number;
   lng: number;
   radiusKm: number;
@@ -37,13 +61,21 @@ function isDev() {
   return process.env.NODE_ENV !== "production";
 }
 
-type ErrorOrigin = "auth" | "validation" | "external_api" | "supabase_infra" | "network" | "unknown";
+type ErrorOrigin =
+  | "auth"
+  | "validation"
+  | "external_api"
+  | "supabase_infra"
+  | "network"
+  | "unknown";
 
 const ORIGIN_LABEL: Record<ErrorOrigin, string> = {
   auth: "Authentification (session invalide côté Edge Function)",
   validation: "Requête invalide (paramètres rejetés par la fonction)",
-  external_api: "API externe en échec (registre entreprises et/ou Google Places)",
-  supabase_infra: "Infrastructure Supabase (fonction introuvable ou relais indisponible)",
+  external_api:
+    "API externe en échec (registre entreprises et/ou Google Places)",
+  supabase_infra:
+    "Infrastructure Supabase (fonction introuvable ou relais indisponible)",
   network: "Réseau (impossible de joindre l'Edge Function)",
   unknown: "Cause non identifiée",
 };
@@ -101,10 +133,20 @@ async function describeFunctionError(error: unknown): Promise<{
     return { status, bodyText, serverMessage, origin };
   }
   if (error instanceof FunctionsRelayError) {
-    return { status: null, bodyText: error.message, serverMessage: null, origin: "supabase_infra" };
+    return {
+      status: null,
+      bodyText: error.message,
+      serverMessage: null,
+      origin: "supabase_infra",
+    };
   }
   if (error instanceof FunctionsFetchError) {
-    return { status: null, bodyText: error.message, serverMessage: null, origin: "network" };
+    return {
+      status: null,
+      bodyText: error.message,
+      serverMessage: null,
+      origin: "network",
+    };
   }
   return {
     status: null,
@@ -130,6 +172,70 @@ export async function runProspectSearch(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Session expirée." };
 
+  const { data: membership } = await supabase
+    .from("workspace_members")
+    .select("workspace_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!membership)
+    return { ok: false, error: "Vous n’avez pas accès à cet espace." };
+
+  const [{ data: profile }, { data: categories }] = await Promise.all([
+    supabase
+      .from("business_profiles")
+      .select("own_category_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    supabase.from("business_categories").select("*"),
+  ]);
+  const ownCategory = categories?.find(
+    (c) => c.id === profile?.own_category_id,
+  );
+  const parent = categories?.find((c) => c.id === ownCategory?.parent_id);
+  const objective = findObjective(
+    ownCategory?.slug ?? null,
+    parent?.slug ?? null,
+    params.objectiveId,
+  );
+  if (!objective || objective.audience !== "b2b") {
+    return {
+      ok: false,
+      error:
+        "Choisissez une offre destinée aux entreprises. Pour vos clients particuliers, ouvrez la gestion métier.",
+    };
+  }
+  if (
+    !Number.isFinite(params.lat) ||
+    Math.abs(params.lat) > 90 ||
+    !Number.isFinite(params.lng) ||
+    Math.abs(params.lng) > 180 ||
+    !Number.isFinite(params.radiusKm) ||
+    params.radiusKm < 0.5
+  ) {
+    return {
+      ok: false,
+      error: "Validez une adresse et un rayon de recherche valides.",
+    };
+  }
+  const selectedIds = Array.isArray(params.targetCategoryIds)
+    ? params.targetCategoryIds
+    : [];
+  const selectedCategories = (categories ?? []).filter(
+    (c) => c.parent_id && selectedIds.includes(c.id),
+  );
+  const nafCodes = [...new Set(selectedCategories.flatMap((c) => c.naf_codes))];
+  if (!nafCodes.length)
+    return {
+      ok: false,
+      error: "Sélectionnez au moins un secteur à prospecter.",
+    };
+  const searchFilters = filtersForObjective(
+    objective,
+    normalizeProspectionFilters(params.filters),
+  );
+  const scoringProfile = scoringProfileForObjective(objective);
+
   const plan = await getWorkspacePlan(workspaceId);
 
   const maxRadiusKm = ENTITLEMENTS[plan].maxRadiusKm;
@@ -143,7 +249,10 @@ export async function runProspectSearch(
   try {
     await assertQuota(workspaceId, "searches", plan);
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Quota atteint." };
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Quota atteint.",
+    };
   }
 
   // Log temporaire de diagnostic (stage "requête envoyée") — uniquement en
@@ -160,7 +269,20 @@ export async function runProspectSearch(
     });
   }
 
-  const { data, error } = await supabase.functions.invoke("search-prospects", { body: params });
+  // Retrieve candidates with no web filter; apply the current policy here even
+  // when the independently deployed Edge Function is on an older version.
+  const { data, error } = await supabase.functions.invoke("search-prospects", {
+    body: {
+      lat: params.lat,
+      lng: params.lng,
+      radiusKm: params.radiusKm,
+      nafCodes,
+      filters: { ...searchFilters, webFilter: "all" },
+      ownCategorySlug: ownCategory?.slug ?? null,
+      audience: "both", // A buyer's own customer audience does not determine whether it can buy our service.
+      scoringProfileOverride: scoringProfile,
+    },
+  });
 
   if (error) {
     const info = await describeFunctionError(error);
@@ -204,6 +326,69 @@ export async function runProspectSearch(
   }
 
   const normalized = normalizeSearchResponse(data);
+  const exclusions = new Map<string, string[]>();
+  for (const category of selectedCategories) {
+    for (const code of category.naf_codes)
+      exclusions.set(code, [
+        ...(exclusions.get(code) ?? []),
+        ...(category.exclusion_keywords ?? []),
+      ]);
+  }
+  const seen = new Set<string>();
+  const candidates = normalized.results;
+  normalized.results = candidates
+    .filter((r) => {
+      if (
+        !r.siret ||
+        seen.has(r.siret) ||
+        !matchesSearchCriteria(r, nafCodes, params.radiusKm, searchFilters)
+      )
+        return false;
+      seen.add(r.siret);
+      return true;
+    })
+    .map((r) => {
+      const { score, sources } = computeQualityScore(r, scoringProfile);
+      const relevance = computeRelevance(
+        r.nafCode,
+        null,
+        new Map(),
+        scoringProfile,
+        r.companyName,
+        exclusions,
+      );
+      return {
+        ...r,
+        qualityScore: score,
+        verificationSources: {
+          ...sources,
+          cached: r.verificationSources?.cached === true,
+        },
+        relevanceScore: relevance.score,
+        relevanceTier: relevance.tier,
+        relevanceReasons: [...relevance.reasons, offerReason(objective)],
+      };
+    })
+    .sort(
+      (a, b) =>
+        Number(a.relevanceTier === "secondary") -
+          Number(b.relevanceTier === "secondary") ||
+        b.qualityScore - a.qualityScore,
+    );
+  normalized.displayed = normalized.results.length;
+  normalized.googleVerified = normalized.results.filter(
+    (r) => r.placeId,
+  ).length;
+  normalized.scoringProfileLabel = SCORING_PROFILE_LABEL[scoringProfile];
+  if (searchFilters.webFilter !== "all") {
+    const unknownCount = candidates.filter(
+      (r) => !r.placeId && !r.websiteUri,
+    ).length;
+    if (unknownCount)
+      normalized.warnings.push(
+        `${unknownCount} entreprise(s) avec un statut de site inconnu ne sont pas retenues par votre filtre web. Une absence d’information ne prouve pas une absence de site.`,
+      );
+  }
 
   // Log temporaire de diagnostic (stage "résultats après normalisation") —
   // uniquement en dev. Montre exactement ce que l'UI va recevoir, y compris
