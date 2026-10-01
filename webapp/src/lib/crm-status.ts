@@ -35,3 +35,9 @@ export const STATUS_LABEL: Record<ProspectStatus, string> = Object.fromEntries(S
 export function isValidProspectStatus(value: string): value is ProspectStatus {
   return STATUS_OPTIONS.some(([v]) => v === value);
 }
+
+/** Fonction top-level plutôt qu'un appel direct à Date.now() dans un composant — voir react-hooks/purity. */
+export function isFollowupOverdue(nextFollowupAt: string | null): boolean {
+  if (!nextFollowupAt) return false;
+  return new Date(nextFollowupAt).getTime() < Date.now();
+}

@@ -15,10 +15,7 @@ import { businessOsAtLeast, getEntitlements } from "@/lib/entitlements";
 import { buildAppointmentInsights, buildLowStockInsight, buildRenewalInsight, type ProactiveInsight } from "@/lib/automation-insights";
 import { ProactiveInsights } from "@/components/business-os/proactive-insights";
 import { getOpportunities } from "@/lib/actions/nova-opportunities";
-import { NovaOpportunities } from "@/components/nova-opportunities";
-import { getBusinessTwinStatus, listMissions } from "@/lib/actions/business-twin";
-import { GoalPicker } from "@/components/business-twin/goal-picker";
-import { MissionsPreview } from "@/components/business-twin/missions-preview";
+import { listMissions } from "@/lib/actions/business-twin";
 import { BusinessOsView } from "@/components/business-os/business-os-view";
 import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
@@ -57,27 +54,42 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings, opportunitiesResult, businessTwinStatus, missions] = await Promise.all([
+  const [businessProfile, profile, automationSettings, opportunitiesResult, missions] = await Promise.all([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
     getOpportunities(workspaceId),
-    getBusinessTwinStatus(workspaceId),
     listMissions(workspaceId),
   ]);
   const vertical = profile.vertical;
-  const opportunitiesBlock = (
-    <>
-      <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />
-      {missions.length > 0 && <MissionsPreview missions={missions} />}
-      {opportunitiesResult.opportunities.length > 0 && (
-        <NovaOpportunities
-          workspaceId={workspaceId}
-          opportunities={opportunitiesResult.opportunities}
-          actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
-        />
+
+  // Teaser compact plutôt que les trois blocs complets (GoalPicker +
+  // MissionsPreview + NovaOpportunities) — la liste complète vit sur
+  // /missions et /nova/actions. Business OS garde son rôle : gérer
+  // l'activité opérationnelle, pas réafficher le pilotage stratégique.
+  const activeMissionsCount = missions.filter((m) => m.status === "active").length;
+  const novaOpportunitiesCount = opportunitiesResult.opportunities.length;
+  const canSeeActionCenter = getEntitlements(plan).canUseActionCenter;
+  const opportunitiesBlock = (activeMissionsCount > 0 || novaOpportunitiesCount > 0) && (
+    <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 bg-[image:var(--gradient-signature)]/[0.04]">
+      {activeMissionsCount > 0 && (
+        <Link href="/missions" className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink hover:text-accent">
+          <span aria-hidden>🎯</span>
+          {activeMissionsCount} mission{activeMissionsCount > 1 ? "s" : ""} active{activeMissionsCount > 1 ? "s" : ""}
+          <span className="text-faint">→</span>
+        </Link>
       )}
-    </>
+      {novaOpportunitiesCount > 0 && (
+        <Link
+          href={canSeeActionCenter ? "/nova/actions" : "/abonnement"}
+          className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink hover:text-accent"
+        >
+          <span aria-hidden>✦</span>
+          {novaOpportunitiesCount} opportunité{novaOpportunitiesCount > 1 ? "s" : ""} NOVA détectée{novaOpportunitiesCount > 1 ? "s" : ""}
+          <span className="text-faint">→</span>
+        </Link>
+      )}
+    </Card>
   );
 
   const header = (

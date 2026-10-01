@@ -6,6 +6,7 @@ import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { setMissionActionStatus } from "@/lib/actions/business-twin";
 import type { MissionActionView } from "@/lib/actions/business-twin";
+import { preparedContentLabel } from "@/lib/business-twin/metric-labels";
 
 /** Construit le lien de préremplissage Studio IA à partir du contenu déjà préparé par le plan (voir generateCampaignTemplate) — jamais de nouveau texte inventé ici. */
 function studioPrefillHref(missionId: string, action: MissionActionView): string {
@@ -31,7 +32,7 @@ function PreparedContent({ content }: { content: Record<string, unknown> }) {
     <div className="mt-2 flex flex-col gap-2">
       {entries.map(([key, value]) => (
         <div key={key} className="rounded-lg border border-line bg-bg p-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wide text-faint">{key}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-faint">{preparedContentLabel(key)}</p>
           <pre className="mt-1 whitespace-pre-wrap font-sans text-[11.5px] leading-relaxed text-ink">{String(value)}</pre>
         </div>
       ))}

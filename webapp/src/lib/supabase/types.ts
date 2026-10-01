@@ -186,6 +186,8 @@ export interface Database {
           verification_sources: Record<string, boolean>;
           status: ProspectStatus;
           notes: string;
+          next_followup_at: string | null;
+          deal_value: number | null;
           created_at: string;
           updated_at: string;
         };

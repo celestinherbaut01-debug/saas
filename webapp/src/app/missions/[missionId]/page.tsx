@@ -8,6 +8,7 @@ import { goalTemplate } from "@/lib/business-twin/goals";
 import { MissionActionItem } from "@/components/business-twin/mission-action-item";
 import { AdjustMissionButton } from "@/components/business-twin/adjust-mission-button";
 import type { DataField } from "@/lib/business-twin/types";
+import { snapshotMetricLabel, formatSnapshotFieldValue } from "@/lib/business-twin/metric-labels";
 
 const STATUS_LABEL: Record<string, { text: string; tone: BadgeTone }> = {
   active: { text: "Active", tone: "accent" },
@@ -23,13 +24,6 @@ const FIELD_STATUS_LABEL: Record<DataField<unknown>["status"], { text: string; t
   hypothesis: { text: "Hypothèse", tone: "warning" },
   insufficient: { text: "Donnée insuffisante", tone: "neutral" },
 };
-
-function formatFieldValue(field: DataField<unknown>): string {
-  if (field.status === "insufficient") return field.reason;
-  const v = field.value;
-  if (typeof v === "object" && v !== null) return JSON.stringify(v);
-  return String(v);
-}
 
 export default async function MissionDetailPage({ params }: PageProps<"/missions/[missionId]">) {
   const { missionId } = await params;
@@ -119,9 +113,9 @@ export default async function MissionDetailPage({ params }: PageProps<"/missions
             <ul className="mt-3 flex flex-col gap-1.5">
               {Object.entries(detail.snapshotMetrics).map(([key, field]) => (
                 <li key={key} className="flex items-center justify-between gap-2 text-[12px]">
-                  <span className="text-muted">{key}</span>
+                  <span className="text-muted">{snapshotMetricLabel(key)}</span>
                   <span className="flex items-center gap-2">
-                    <span className="text-ink">{formatFieldValue(field)}</span>
+                    <span className="text-ink">{formatSnapshotFieldValue(key, field)}</span>
                     <Badge tone={FIELD_STATUS_LABEL[field.status].tone}>{FIELD_STATUS_LABEL[field.status].text}</Badge>
                   </span>
                 </li>

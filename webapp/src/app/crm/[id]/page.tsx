@@ -11,11 +11,12 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
   if (!user) redirect("/login");
   const supabase = await createClient();
 
-  // Les deux requêtes ne dépendent que de `id` (pas l'une de l'autre) :
+  // Les trois requêtes ne dépendent que de `id` (pas l'une de l'autre) :
   // parallélisées plutôt qu'attendues l'une après l'autre.
-  const [{ data: prospect }, { data: activities }] = await Promise.all([
+  const [{ data: prospect }, { data: activities }, { data: appointments }] = await Promise.all([
     supabase.from("prospects").select("*").eq("id", id).maybeSingle(),
     supabase.from("activities").select("*").eq("prospect_id", id).order("created_at", { ascending: false }),
+    supabase.from("appointments").select("*").eq("prospect_id", id).order("starts_at", { ascending: false }),
   ]);
   if (!prospect) notFound();
 
@@ -40,7 +41,12 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
 
   return (
     <AppShell>
-      <ProspectDetail prospect={prospect} initialActivities={activities ?? []} scoreLabel={scoreLabel} />
+      <ProspectDetail
+        prospect={prospect}
+        initialActivities={activities ?? []}
+        appointments={appointments ?? []}
+        scoreLabel={scoreLabel}
+      />
     </AppShell>
   );
 }

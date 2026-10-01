@@ -4,34 +4,23 @@ import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedBusinessProfile } from "@/lib/session";
 import { Card } from "@/components/ui/card";
 import { StatTile } from "@/components/ui/stat-tile";
-import { UsageBar } from "@/components/ui/usage-bar";
 import { SectionLabel } from "@/components/ui/section-label";
 import { AppShell } from "@/components/app-shell";
-import { getXpSummary, xpActionLabel } from "@/lib/xp";
 import { getUserAppState } from "@/lib/app-state";
-import { getUsage } from "@/lib/quota";
-import { isNovaConfigured } from "@/lib/actions/nova";
-import { novaContexts, getEntitlements } from "@/lib/entitlements";
 import { ACTIVITY_LABEL } from "@/lib/activity-labels";
 import type { ProspectStatus } from "@/lib/crm-status";
 import { PlanIntentBanner } from "@/components/plan-intent";
 import { OnboardingBanner } from "@/components/onboarding-banner";
 import { getOpportunities } from "@/lib/actions/nova-opportunities";
-import { NovaOpportunities } from "@/components/nova-opportunities";
-import { getBusinessTwinStatus, listMissions } from "@/lib/actions/business-twin";
-import { GoalPicker } from "@/components/business-twin/goal-picker";
-import { MissionsPreview } from "@/components/business-twin/missions-preview";
+import { listMissions } from "@/lib/actions/business-twin";
 
-const CONTACTED_OR_LATER: ProspectStatus[] = [
-  "contacted",
-  "replied",
-  "interested",
-  "rdv",
-  "quote",
-  "won",
-  "lost",
-];
-const RESPONDED: ProspectStatus[] = ["replied", "interested", "rdv", "quote", "won"];
+// Accueil = CE QUE JE DOIS SAVOIR ET FAIRE AUJOURD'HUI. Jamais une troisième
+// copie de la liste complète des missions ou des opportunités NOVA (déjà
+// sur /missions et /nova/actions) — seulement un teaser qui y renvoie. Voir
+// l'audit : Dashboard et Business OS affichaient auparavant les TROIS mêmes
+// blocs complets (GoalPicker/MissionsPreview/NovaOpportunities), ce qui
+// donnait l'impression de pages qui se répètent.
+const CONTACTED_OR_LATER: ProspectStatus[] = ["contacted", "replied", "interested", "rdv", "quote", "won", "lost"];
 
 export default async function DashboardPage() {
   const user = await getCachedUser();
@@ -53,67 +42,42 @@ export default async function DashboardPage() {
     if (businessProfile?.product_mode === "business_os") redirect("/business-os");
   }
 
-  const [
-    { count: targetCount },
-    { data: statusRows },
-    { data: appointments },
-    { data: recentActivities },
-    xp,
-    novaConfigured,
-    usageNova,
-    usageProspects,
-    usageSearches,
-    opportunitiesResult,
-    businessTwinStatus,
-    missions,
-  ] = workspaceId
-    ? await Promise.all([
-        supabase
-          .from("workspace_targets")
-          .select("category_id", { count: "exact", head: true })
-          .eq("workspace_id", workspaceId),
-        supabase.from("prospects").select("status").eq("workspace_id", workspaceId),
-        supabase
-          .from("appointments")
-          .select("id, title, starts_at")
-          .eq("workspace_id", workspaceId)
-          .order("starts_at"),
-        supabase
-          .from("activities")
-          .select("id, type, detail, created_at, prospect_id")
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false })
-          .limit(6),
-        getXpSummary(workspaceId),
-        isNovaConfigured(),
-        getUsage(workspaceId, "nova_requests", plan),
-        getUsage(workspaceId, "prospects_added", plan),
-        getUsage(workspaceId, "searches", plan),
-        getOpportunities(workspaceId),
-        getBusinessTwinStatus(workspaceId),
-        listMissions(workspaceId),
-      ])
-    : [
-        { count: 0 },
-        { data: [] },
-        { data: [] },
-        { data: [] },
-        null,
-        false,
-        null,
-        null,
-        null,
-        { opportunities: [], canSeeAcquisition: false, canSeeBusinessOs: false },
-        null,
-        [],
-      ];
+  const [{ count: targetCount }, { data: statusRows }, { data: appointments }, { data: recentActivities }, opportunitiesResult, missions] =
+    workspaceId
+      ? await Promise.all([
+          supabase
+            .from("workspace_targets")
+            .select("category_id", { count: "exact", head: true })
+            .eq("workspace_id", workspaceId),
+          supabase.from("prospects").select("status").eq("workspace_id", workspaceId),
+          supabase
+            .from("appointments")
+            .select("id, title, starts_at")
+            .eq("workspace_id", workspaceId)
+            .order("starts_at"),
+          supabase
+            .from("activities")
+            .select("id, type, detail, created_at, prospect_id")
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: false })
+            .limit(6),
+          getOpportunities(workspaceId),
+          listMissions(workspaceId),
+        ])
+      : [
+          { count: 0 },
+          { data: [] },
+          { data: [] },
+          { data: [] },
+          { opportunities: [], canSeeAcquisition: false, canSeeBusinessOs: false },
+          [],
+        ];
 
   const configured = businessProfileExists;
   const statuses = statusRows ?? [];
   const total = statuses.length;
   const wonCount = statuses.filter((s) => s.status === "won").length;
   const contactedCount = statuses.filter((s) => CONTACTED_OR_LATER.includes(s.status as ProspectStatus)).length;
-  const respondedCount = statuses.filter((s) => RESPONDED.includes(s.status as ProspectStatus)).length;
   const conversionRate = total > 0 ? Math.round((wonCount / total) * 100) : null;
 
   const now = new Date().getTime();
@@ -130,7 +94,9 @@ export default async function DashboardPage() {
   const prospectNameById = new Map((activityProspects ?? []).map((p) => [p.id, p.company_name]));
 
   const toContactCount = statuses.filter((s) => s.status === "to_contact").length;
-  const hasPriorityActions = toContactCount > 0 || upcoming.length > 0;
+  const activeMissionsCount = missions.filter((m) => m.status === "active").length;
+  const novaOpportunitiesCount = opportunitiesResult.opportunities.length;
+  const hasPriorityActions = toContactCount > 0 || upcoming.length > 0 || activeMissionsCount > 0 || novaOpportunitiesCount > 0;
 
   return (
     <AppShell>
@@ -153,28 +119,28 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {workspaceId && businessTwinStatus && (
-          <div className="flex flex-col gap-2.5">
-            <SectionLabel>🧭 Objectif Business Twin</SectionLabel>
-            <GoalPicker workspaceId={workspaceId} status={businessTwinStatus} />
-          </div>
-        )}
-
-        {workspaceId && missions && missions.length > 0 && (
-          <div className="flex flex-col gap-2.5">
-            <SectionLabel>🎯 Missions</SectionLabel>
-            <MissionsPreview missions={missions} />
-          </div>
-        )}
-
-        {workspaceId && opportunitiesResult.opportunities.length > 0 && (
-          <div className="flex flex-col gap-2.5">
-            <SectionLabel>✦ Opportunités NOVA</SectionLabel>
-            <NovaOpportunities
-              workspaceId={workspaceId}
-              opportunities={opportunitiesResult.opportunities}
-              actionCenterHref={getEntitlements(plan).canUseActionCenter ? "/nova/actions" : undefined}
-            />
+        {total === 0 ? (
+          <Card className="flex flex-col items-center gap-3 py-12 text-center">
+            <span className="text-3xl">⌕</span>
+            <h2 className="font-display text-[17px] font-extrabold">Aucun prospect pour l&apos;instant</h2>
+            <p className="max-w-sm text-[13px] leading-relaxed text-muted">
+              Lancez votre première recherche pour trouver de vraies entreprises (registre officiel + Google Places)
+              dans votre zone, puis ajoutez les meilleures au CRM.
+            </p>
+            <Link
+              href="/prospection"
+              className="mt-1 rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-[13px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
+            >
+              Trouver mes premiers prospects
+            </Link>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <StatTile label="Prospects trouvés" value={String(total)} />
+            <StatTile label="Contactés" value={String(contactedCount)} />
+            <StatTile label="RDV à venir" value={String(upcoming.length)} />
+            <StatTile label="Clients gagnés" value={String(wonCount)} />
+            <StatTile label="Taux de conversion" value={conversionRate !== null ? `${conversionRate}%` : "—"} />
           </div>
         )}
 
@@ -199,133 +165,47 @@ export default async function DashboardPage() {
                     </span>
                   </li>
                 ))}
+                {activeMissionsCount > 0 && (
+                  <li>
+                    <Link href="/missions" className="font-semibold text-accent">
+                      {activeMissionsCount} mission{activeMissionsCount > 1 ? "s" : ""} active{activeMissionsCount > 1 ? "s" : ""}
+                    </Link>{" "}
+                    <span className="text-muted">en cours de suivi</span>
+                  </li>
+                )}
+                {novaOpportunitiesCount > 0 && (
+                  <li>
+                    <Link href="/nova/actions" className="font-semibold text-accent">
+                      {novaOpportunitiesCount} opportunité{novaOpportunitiesCount > 1 ? "s" : ""} NOVA
+                    </Link>{" "}
+                    <span className="text-muted">détectée{novaOpportunitiesCount > 1 ? "s" : ""} dans vos données</span>
+                  </li>
+                )}
               </ul>
             </Card>
           </div>
         )}
 
-        <div className="flex flex-col gap-2.5">
-          <SectionLabel>📊 KPI réels</SectionLabel>
-          {total === 0 ? (
-            <Card className="flex flex-col items-center gap-3 py-12 text-center">
-              <span className="text-3xl">⌕</span>
-              <h2 className="font-display text-[17px] font-extrabold">Aucun prospect pour l&apos;instant</h2>
-              <p className="max-w-sm text-[13px] leading-relaxed text-muted">
-                Lancez votre première recherche pour trouver de vraies entreprises (registre officiel + Google
-                Places) dans votre zone, puis ajoutez les meilleures au CRM.
-              </p>
-              <Link
-                href="/prospection"
-                className="mt-1 rounded-lg bg-[image:var(--gradient-signature)] px-4 py-2.5 text-[13px] font-semibold text-accent-ink shadow-[var(--shadow-sm)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md),var(--glow-accent)]"
-              >
-                Trouver mes premiers prospects
-              </Link>
-            </Card>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <StatTile label="Prospects trouvés" value={String(total)} />
-                <StatTile label="Contactés" value={String(contactedCount)} />
-                <StatTile label="Réponses" value={String(respondedCount)} />
-                <StatTile label="Rendez-vous à venir" value={String(upcoming.length)} />
-                <StatTile label="Clients gagnés" value={String(wonCount)} />
-                <StatTile label="Taux de conversion" value={conversionRate !== null ? `${conversionRate}%` : "—"} />
-              </div>
-
-              <Card>
-                <h2 className="font-display text-sm font-bold">Activité récente</h2>
-                {(recentActivities ?? []).length === 0 ? (
-                  <p className="mt-3 text-[12.5px] text-muted">Aucune activité récente.</p>
-                ) : (
-                  <ul className="mt-3 flex flex-col gap-2.5">
-                    {(recentActivities ?? []).map((a) => (
-                      <li key={a.id} className="text-[12.5px]">
-                        <span className="font-semibold">{ACTIVITY_LABEL[a.type]}</span>{" "}
-                        <span className="text-muted">
-                          — {prospectNameById.get(a.prospect_id) ?? "prospect supprimé"}
-                        </span>
-                        <div className="text-[10.5px] text-faint">
-                          {new Date(a.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Card>
-            </>
-          )}
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
+        {total > 0 && (
           <Card>
-            <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
-              <span aria-hidden>✦</span> NOVA
-            </h2>
-            {novaConfigured ? (
-              <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                {novaContexts(plan).includes("commercial")
-                  ? "NOVA peut rédiger vos prochains emails de prospection à partir de vos vraies données CRM."
-                  : "NOVA peut répondre à partir des vraies données de votre Business OS (planning, stock, clients)."}{" "}
-                <Link href="/agent" className="font-semibold text-accent">
-                  Ouvrir NOVA →
-                </Link>
-              </p>
+            <h2 className="font-display text-sm font-bold">Activité récente</h2>
+            {(recentActivities ?? []).length === 0 ? (
+              <p className="mt-3 text-[12.5px] text-muted">Aucune activité récente.</p>
             ) : (
-              <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                NOVA n&apos;est pas encore configurée sur ce projet (clé API manquante côté serveur).
-              </p>
+              <ul className="mt-3 flex flex-col gap-2.5">
+                {(recentActivities ?? []).map((a) => (
+                  <li key={a.id} className="text-[12.5px]">
+                    <span className="font-semibold">{ACTIVITY_LABEL[a.type]}</span>{" "}
+                    <span className="text-muted">— {prospectNameById.get(a.prospect_id) ?? "prospect supprimé"}</span>
+                    <div className="text-[10.5px] text-faint">
+                      {new Date(a.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             )}
           </Card>
-
-          {workspaceId && usageNova && usageProspects && usageSearches && (
-            <Card>
-              <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
-                  <span aria-hidden>◆</span> Usage du forfait
-                </h2>
-                <Link href="/abonnement" className="text-[12px] font-semibold text-accent">
-                  Gérer →
-                </Link>
-              </div>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <UsageBar label="Prospects" status={usageProspects} />
-                <UsageBar label="Recherches" status={usageSearches} />
-                <UsageBar label="NOVA" status={usageNova} />
-              </div>
-            </Card>
-          )}
-
-          {xp && (
-            <Card className="lg:col-span-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="flex items-center gap-1.5 font-display text-sm font-bold">
-                    <span aria-hidden>★</span> Niveau {xp.level.level} — {xp.level.label}
-                  </h2>
-                  <p className="mt-0.5 text-[11.5px] text-muted">
-                    {xp.totalXp} XP{xp.next ? ` — ${xp.next.minXp - xp.totalXp} XP avant ${xp.next.label}` : " — niveau maximum atteint"}
-                  </p>
-                </div>
-                <div className="bg-[image:var(--gradient-signature)] bg-clip-text font-display text-2xl font-extrabold text-transparent">
-                  {xp.totalXp}
-                </div>
-              </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
-                <div className="h-full rounded-full bg-[image:var(--gradient-signature)]" style={{ width: `${xp.progressPct}%` }} />
-              </div>
-              {xp.recentEvents.length > 0 && (
-                <ul className="mt-4 grid gap-1.5 text-[12px] sm:grid-cols-2">
-                  {xp.recentEvents.map((e, i) => (
-                    <li key={i} className="flex justify-between text-muted">
-                      <span>{xpActionLabel(e.action)}</span>
-                      <span className="font-semibold text-accent">+{e.xp_amount} XP</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
-        </div>
+        )}
 
         {targetCount === 0 && (
           <Card className="border-line bg-soft">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { Activity, Prospect } from "@/lib/supabase/types";
+import type { Activity, Appointment, Prospect } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { scoreBreakdown } from "@/lib/score-breakdown";
 import { computeVerificationStatus, VERIFICATION_STATUS_LABEL } from "@/lib/verification-status";
 import { opportunityLevel } from "@/lib/opportunity-level";
 import { cn } from "@/lib/utils";
-import { STATUS_OPTIONS } from "@/lib/crm-status";
+import { STATUS_OPTIONS, isFollowupOverdue } from "@/lib/crm-status";
 import { ACTIVITY_LABEL } from "@/lib/activity-labels";
 
 const WEBSITE_QUALITY_LABEL: Record<string, string> = {
@@ -25,10 +25,12 @@ const WEBSITE_QUALITY_LABEL: Record<string, string> = {
 export function ProspectDetail({
   prospect: initialProspect,
   initialActivities,
+  appointments,
   scoreLabel = "Score d'opportunité",
 }: {
   prospect: Prospect;
   initialActivities: Activity[];
+  appointments: Appointment[];
   scoreLabel?: string;
 }) {
   const supabase = createClient();
@@ -39,6 +41,10 @@ export function ProspectDetail({
   const [savingStatus, setSavingStatus] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [followupDraft, setFollowupDraft] = useState(prospect.next_followup_at?.slice(0, 10) ?? "");
+  const [savingFollowup, setSavingFollowup] = useState(false);
+  const [dealValueDraft, setDealValueDraft] = useState(prospect.deal_value != null ? String(prospect.deal_value) : "");
+  const [savingDealValue, setSavingDealValue] = useState(false);
 
   async function logActivity(type: Activity["type"], detail: string) {
     const { data } = await supabase
@@ -66,6 +72,23 @@ export function ProspectDetail({
     const { error } = await supabase.from("prospects").update({ notes }).eq("id", prospect.id);
     setSavingNotes(false);
     if (!error) setProspect((p) => ({ ...p, notes }));
+  }
+
+  async function saveFollowup(value: string) {
+    setSavingFollowup(true);
+    const next_followup_at = value ? new Date(value).toISOString() : null;
+    const { error } = await supabase.from("prospects").update({ next_followup_at }).eq("id", prospect.id);
+    setSavingFollowup(false);
+    if (!error) setProspect((p) => ({ ...p, next_followup_at }));
+  }
+
+  async function saveDealValue(value: string) {
+    setSavingDealValue(true);
+    const parsed = value.trim() === "" ? null : Number(value);
+    const deal_value = parsed != null && Number.isFinite(parsed) ? parsed : null;
+    const { error } = await supabase.from("prospects").update({ deal_value }).eq("id", prospect.id);
+    setSavingDealValue(false);
+    if (!error) setProspect((p) => ({ ...p, deal_value }));
   }
 
   async function addTimelineNote() {
@@ -274,6 +297,85 @@ export function ProspectDetail({
               </ul>
             </div>
           </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card>
+          <h2 className="font-display text-sm font-bold">Suivi</h2>
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <label className="text-[11px] font-semibold text-muted">Prochaine relance</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="date"
+                  value={followupDraft}
+                  onChange={(e) => setFollowupDraft(e.target.value)}
+                  className="rounded-lg border border-line bg-soft px-2.5 py-1.5 text-[13px]"
+                />
+                <Button size="sm" variant="outline" disabled={savingFollowup} onClick={() => saveFollowup(followupDraft)}>
+                  {savingFollowup ? "…" : "Définir"}
+                </Button>
+                {prospect.next_followup_at && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFollowupDraft("");
+                      void saveFollowup("");
+                    }}
+                    className="text-[11.5px] font-semibold text-muted hover:text-ink"
+                  >
+                    Effacer
+                  </button>
+                )}
+              </div>
+              {isFollowupOverdue(prospect.next_followup_at) && (
+                <p className="mt-1 text-[11.5px] font-semibold text-red-fg">⏰ Relance en retard</p>
+              )}
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-muted">Valeur commerciale (optionnel)</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={dealValueDraft}
+                  onChange={(e) => setDealValueDraft(e.target.value)}
+                  placeholder="Ex. 2500"
+                  className="w-32 rounded-lg border border-line bg-soft px-2.5 py-1.5 text-[13px]"
+                />
+                <span className="text-[12px] text-faint">€</span>
+                <Button size="sm" variant="outline" disabled={savingDealValue} onClick={() => saveDealValue(dealValueDraft)}>
+                  {savingDealValue ? "…" : "Enregistrer"}
+                </Button>
+              </div>
+              <p className="mt-1 text-[10.5px] text-faint">Jamais estimée automatiquement — uniquement si vous la renseignez.</p>
+            </div>
+            <div className="border-t border-line pt-2.5 text-[11.5px] text-faint">
+              <span className="font-semibold text-muted">Source : </span>Prospection
+            </div>
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="font-display text-sm font-bold">Rendez-vous</h2>
+          {appointments.length === 0 ? (
+            <p className="mt-2 text-[12.5px] text-muted">Aucun rendez-vous lié à ce prospect pour l&apos;instant.</p>
+          ) : (
+            <ul className="mt-3 flex flex-col gap-2">
+              {appointments.map((a) => (
+                <li key={a.id} className="rounded-lg border border-line bg-bg px-3 py-2 text-[12.5px]">
+                  <p className="font-semibold text-ink">{a.title}</p>
+                  <p className="text-[11px] text-faint">
+                    {new Date(a.starts_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 border-t border-line pt-2.5 text-[10.5px] text-faint">
+            Campagnes/messages Studio liés : non disponible pour l&apos;instant — Studio ne rattache pas encore ses créations à un prospect précis.
+          </p>
         </Card>
       </div>
 
