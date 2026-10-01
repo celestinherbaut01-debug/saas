@@ -1,16 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
-import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions/search";
+import {
+  runProspectSearch,
+  type ProspectionSearchResponse,
+  type SearchProspectsResult,
+} from "@/lib/actions/search";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
-import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
-import { ProspectingWizard, type WizardLaunchParams } from "@/components/prospection/prospecting-wizard";
+import {
+  ResultCard,
+  type ProspectionResult,
+} from "@/components/prospection/result-card";
+import {
+  ProspectingWizard,
+  type WizardLaunchParams,
+} from "@/components/prospection/prospecting-wizard";
 
 type SearchResult = ProspectionResult;
 
@@ -31,17 +41,28 @@ export function ProspectionView({
   maxRadiusKm: number;
   planLabel: string;
 }) {
+  const requestVersion = useRef(0);
   const [searching, setSearching] = useState(false);
-  const [status, setStatus] = useState<{ kind: "info" | "ok" | "err"; text: string; devDetail?: string } | null>(null);
+  const [status, setStatus] = useState<{
+    kind: "info" | "ok" | "err";
+    text: string;
+    devDetail?: string;
+  } | null>(null);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
-  const [scoringProfileLabel, setScoringProfileLabel] = useState("Score d'opportunité");
+  const [scoringProfileLabel, setScoringProfileLabel] = useState(
+    "Score d'opportunité",
+  );
   const [checked, setChecked] = useState<Set<number>>(new Set());
-  const [manuallyVerified, setManuallyVerified] = useState<Set<number>>(new Set());
+  const [manuallyVerified, setManuallyVerified] = useState<Set<number>>(
+    new Set(),
+  );
   const [adding, setAdding] = useState(false);
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const [phoneOnly, setPhoneOnly] = useState(initialFilters.phoneOnly);
-  const [googleFicheOnly, setGoogleFicheOnly] = useState(initialFilters.googleFicheOnly);
+  const [googleFicheOnly, setGoogleFicheOnly] = useState(
+    initialFilters.googleFicheOnly,
+  );
   const router = useRouter();
 
   const nafToLabel = useMemo(() => {
@@ -55,11 +76,20 @@ export function ProspectionView({
   }, [categories]);
 
   const displayedResults = useMemo(
-    () => results.map((r, i) => ({ r, i })).filter(({ r }) => (!phoneOnly || r.phone) && (!googleFicheOnly || r.placeId)),
+    () =>
+      results
+        .map((r, i) => ({ r, i }))
+        .filter(
+          ({ r }) => (!phoneOnly || r.phone) && (!googleFicheOnly || r.placeId),
+        ),
     [results, phoneOnly, googleFicheOnly],
   );
-  const primaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "primary");
-  const secondaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "secondary");
+  const primaryResults = displayedResults.filter(
+    ({ r }) => r.relevanceTier === "primary",
+  );
+  const secondaryResults = displayedResults.filter(
+    ({ r }) => r.relevanceTier === "secondary",
+  );
   const [showSecondary, setShowSecondary] = useState(false);
 
   function nafCodesForSelection(targetIds: string[]): string[] {
@@ -71,16 +101,37 @@ export function ProspectionView({
     return [...set];
   }
 
+  function clearSearchContext() {
+    requestVersion.current++;
+    setResults([]);
+    setChecked(new Set());
+    setManuallyVerified(new Set());
+    setHasSearched(false);
+    setStatus(null);
+    setSearching(false);
+    setShowSecondary(false);
+  }
+
   async function runSearch(params: WizardLaunchParams) {
+    const version = ++requestVersion.current;
+    setResults([]);
+    setHasSearched(false);
+    setManuallyVerified(new Set());
+    setShowSecondary(false);
     setPhoneOnly(params.filters.phoneOnly);
     setGoogleFicheOnly(params.filters.googleFicheOnly);
     setSearching(true);
-    setStatus({ kind: "info", text: "Recherche en cours — registre officiel, Google Places, analyse des sites…" });
+    setStatus({
+      kind: "info",
+      text: "Recherche en cours — registre officiel, Google Places, analyse des sites…",
+    });
     setChecked(new Set());
 
     const nafCodes = nafCodesForSelection(params.targetIds);
 
-    const result = await runProspectSearch(workspaceId, {
+    const result: SearchProspectsResult = await runProspectSearch(workspaceId, {
+      objectiveId: params.objectiveId,
+      targetCategoryIds: params.targetIds,
       lat: params.address.lat,
       lng: params.address.lng,
       radiusKm: params.radiusKm,
@@ -94,16 +145,28 @@ export function ProspectionView({
         needContact: params.filters.needContact,
         maxEstablishmentsPerSiren: params.filters.maxEstablishmentsPerSiren,
         webFilter: params.filters.webFilter,
+        phoneOnly: params.filters.phoneOnly,
+        googleFicheOnly: params.filters.googleFicheOnly,
       },
       ownCategorySlug: params.ownSlug,
       audience: params.audience,
       scoringProfileOverride: params.scoringProfileOverride,
-    });
+    }).catch(() => ({
+      ok: false,
+      error:
+        "La connexion a été interrompue. Vous pouvez relancer la recherche.",
+    }));
+
+    if (version !== requestVersion.current) return;
 
     setSearching(false);
 
     if (!result.ok) {
-      setStatus({ kind: "err", text: `Erreur : ${result.error}`, devDetail: result.devDetail });
+      setStatus({
+        kind: "err",
+        text: `Erreur : ${result.error}`,
+        devDetail: result.devDetail,
+      });
       return;
     }
 
@@ -122,11 +185,14 @@ export function ProspectionView({
     setManuallyVerified(new Set());
     setHasSearched(true);
 
-    const warningSuffix = data.warnings.length > 0 ? ` (${data.warnings.join(" ")})` : "";
+    const warningSuffix =
+      data.warnings.length > 0 ? ` (${data.warnings.join(" ")})` : "";
     setStatus({
       kind: "ok",
       text: `${data.registryFound} établissement(s) trouvé(s) dans le registre, ${data.displayed} affiché(s), ${data.googleVerified} vérifié(s) par Google${
-        data.googlePlacesConfigured ? "." : " — clé Google Places non configurée côté serveur : les entreprises restent affichées avec le statut « À vérifier »."
+        data.googlePlacesConfigured
+          ? "."
+          : " — vérification Google indisponible : les informations inconnues restent à vérifier."
       }${warningSuffix}`,
     });
   }
@@ -180,22 +246,36 @@ export function ProspectionView({
     const rows = [...checked].map((i) => results[i]);
     if (rows.length === 0) return;
     setAdding(true);
-    const result = await addProspectsToCrm(workspaceId, rows.map(toProspectInsert));
+    const result = await addProspectsToCrm(
+      workspaceId,
+      rows.map(toProspectInsert),
+    );
     setAdding(false);
     if (!result.ok) {
-      setStatus({ kind: "err", text: result.error ?? "Erreur à l'ajout au CRM." });
+      setStatus({
+        kind: "err",
+        text: result.error ?? "Erreur à l'ajout au CRM.",
+      });
     } else {
-      setStatus({ kind: "ok", text: `${result.addedCount} prospect(s) ajouté(s) au CRM.` });
+      setStatus({
+        kind: "ok",
+        text: `${result.addedCount} prospect(s) ajouté(s) au CRM.`,
+      });
       setChecked(new Set());
     }
   }
 
   async function viewDetail(i: number) {
     setViewingIndex(i);
-    const result = await addProspectsToCrm(workspaceId, [toProspectInsert(results[i])]);
+    const result = await addProspectsToCrm(workspaceId, [
+      toProspectInsert(results[i]),
+    ]);
     setViewingIndex(null);
     if (!result.ok || !result.ids?.[0]) {
-      setStatus({ kind: "err", text: result.error ?? "Impossible d'ouvrir la fiche pour l'instant." });
+      setStatus({
+        kind: "err",
+        text: result.error ?? "Impossible d'ouvrir la fiche pour l'instant.",
+      });
       return;
     }
     router.push(`/crm/${result.ids[0]}`);
@@ -206,8 +286,8 @@ export function ProspectionView({
       <div>
         <h1 className="font-display text-2xl font-extrabold">Prospection</h1>
         <p className="mt-1 text-[13px] text-muted">
-          ProspectFlow comprend ce que vous vendez avant de chercher qui que ce soit — décrivez votre objectif, nous
-          nous occupons de la stratégie.
+          Trouvez des clients potentiels pour votre offre, dans votre zone.
+          Chaque résultat explique pourquoi il peut vous intéresser.
         </p>
       </div>
 
@@ -221,6 +301,7 @@ export function ProspectionView({
         planLabel={planLabel}
         searching={searching}
         onLaunch={runSearch}
+        onContextChange={clearSearchContext}
       />
 
       {status && (
@@ -248,32 +329,44 @@ export function ProspectionView({
             {results.length > 0 && (
               <span className="font-sans font-normal text-faint">
                 ({displayedResults.length}
-                {displayedResults.length !== results.length ? ` sur ${results.length}` : ""})
+                {displayedResults.length !== results.length
+                  ? ` sur ${results.length}`
+                  : ""}
+                )
               </span>
             )}
           </h2>
           {results.length > 0 && (
-            <Button size="sm" onClick={addSelectedToCrm} disabled={checked.size === 0 || adding}>
-              {adding ? "Ajout…" : `Ajouter la sélection au CRM (${checked.size})`}
+            <Button
+              size="sm"
+              onClick={addSelectedToCrm}
+              disabled={checked.size === 0 || adding}
+            >
+              {adding
+                ? "Ajout…"
+                : `Ajouter la sélection au CRM (${checked.size})`}
             </Button>
           )}
         </div>
 
         {results.length === 0 ? (
-          <p className="mt-4 text-[13px] text-muted">
+          <p className="mt-4 rounded-xl border border-dashed border-line bg-soft p-6 text-[13px] text-muted">
             {hasSearched
-              ? "Aucune cible pertinente trouvée dans le registre pour cet objectif et cette zone — essayez d'élargir le rayon ou d'explorer d'autres secteurs."
+              ? "Aucun résultat ne satisfait les critères vérifiables de cette recherche. Consultez les informations de vérification ci-dessus, puis ajustez le rayon, les secteurs ou le filtre web."
               : "Choisissez un objectif ci-dessus, vérifiez la stratégie recommandée, puis lancez la recherche."}
           </p>
         ) : displayedResults.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">
-            Aucun résultat ne correspond aux filtres « Téléphone disponible » / « Fiche Google disponible ».
+            Aucun résultat ne correspond aux filtres « Téléphone disponible » /
+            « Fiche Google disponible ».
           </p>
         ) : primaryResults.length === 0 ? (
           <div className="mt-4 flex flex-col gap-3">
             <p className="rounded-lg bg-amber-bg px-3 py-2.5 text-[13px] text-amber-fg">
-              Aucune cible suffisamment pertinente trouvée pour cet objectif dans le registre — plutôt que d&apos;afficher
-              des résultats hors-cible, ils sont regroupés ci-dessous en résultats secondaires.
+              Aucune cible suffisamment pertinente trouvée pour cet objectif
+              dans le registre — plutôt que d&apos;afficher des résultats
+              hors-cible, ils sont regroupés ci-dessous en résultats
+              secondaires.
             </p>
             <SecondaryResultsSection
               results={secondaryResults}
@@ -296,7 +389,11 @@ export function ProspectionView({
                 <ResultCard
                   key={r.siret}
                   result={r}
-                  activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+                  activityLabel={
+                    r.nafCode
+                      ? (nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}`)
+                      : "Activité inconnue"
+                  }
                   scoreLabel={scoringProfileLabel}
                   checked={checked.has(i)}
                   onToggleCheck={() => toggleChecked(i)}
@@ -359,8 +456,13 @@ function SecondaryResultsSection({
   if (results.length === 0) return null;
   return (
     <div>
-      <button type="button" onClick={onToggle} className="text-[12.5px] font-semibold text-muted hover:text-ink">
-        {open ? "▾" : "▸"} Résultats secondaires ({results.length}) — pertinence incertaine par rapport à votre objectif
+      <button
+        type="button"
+        onClick={onToggle}
+        className="text-[12.5px] font-semibold text-muted hover:text-ink"
+      >
+        {open ? "▾" : "▸"} Résultats secondaires ({results.length}) — pertinence
+        incertaine par rapport à votre objectif
       </button>
       {open && (
         <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -368,7 +470,11 @@ function SecondaryResultsSection({
             <ResultCard
               key={r.siret}
               result={r}
-              activityLabel={r.nafCode ? nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}` : "Activité inconnue"}
+              activityLabel={
+                r.nafCode
+                  ? (nafToLabel.get(r.nafCode) ?? `Code NAF ${r.nafCode}`)
+                  : "Activité inconnue"
+              }
               scoreLabel={scoringProfileLabel}
               checked={checked.has(i)}
               onToggleCheck={() => toggleChecked(i)}

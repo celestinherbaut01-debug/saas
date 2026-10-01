@@ -55,9 +55,9 @@ export interface ProspectingObjective {
 const PROXIMITY_SIGNAL: SignalDef = { id: "proximity", label: "Proximité géographique", confidence: "confirmed" };
 const CONTACT_SIGNAL: SignalDef = { id: "contact", label: "Coordonnées disponibles (téléphone/fiche)", confidence: "confirmed" };
 const SIZE_SIGNAL: SignalDef = { id: "size", label: "Taille de la structure (si connue)", confidence: "unknown" };
-const MULTI_SITE_SIGNAL: SignalDef = { id: "multi_site", label: "Multi-établissements", confidence: "confirmed" };
+const MULTI_SITE_SIGNAL: SignalDef = { id: "multi_site", label: "Organisation multi-sites à vérifier", confidence: "unknown" };
 const ACTIVITY_VEHICLES_SIGNAL: SignalDef = { id: "activity_vehicles", label: "Activité impliquant probablement des déplacements/véhicules", confidence: "probable" };
-const ESTABLISHMENTS_SIGNAL: SignalDef = { id: "establishments", label: "Nombre d'établissements", confidence: "confirmed" };
+const ESTABLISHMENTS_SIGNAL: SignalDef = { id: "establishments", label: "Nombre d’établissements à vérifier", confidence: "unknown" };
 const ACTIVE_PRESENCE_SIGNAL: SignalDef = { id: "active_presence", label: "Présence Google active (avis récents)", confidence: "probable" };
 
 // --- Chips réutilisés tels quels par plusieurs objectifs (jamais redéfinis deux fois différemment) ---
@@ -163,7 +163,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "web_creation",
     label: "Création de site internet",
-    strategyExplanation: "Pour cette offre, l'absence de site (ou un site très faible) est le signal le plus pertinent — nous privilégions les commerces et artisans locaux.",
+    strategyExplanation: "Nous cherchons les commerces et artisans sans site renseigné sur leur fiche Google. Un résultat non vérifié reste inconnu : il ne prouve pas l'absence d'un site.",
     audience: "b2b",
     recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
@@ -181,7 +181,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "web_ecommerce",
     label: "E-commerce",
-    strategyExplanation: "Nous privilégions les commerces vendant des produits physiques, sans boutique en ligne détectée.",
+    strategyExplanation: "Nous ciblons les commerces vendant des produits physiques. La présence d’une boutique en ligne doit être vérifiée avant de proposer votre offre.",
     audience: "b2b",
     recommendations: [CHIP_LOCAL_SHOPS, CHIP_FOOD_SHOPS, CHIP_DECOR_SHOPS],
     signals: DIGITAL_SIGNALS,
@@ -208,7 +208,7 @@ const AGENCY_WEB_OBJECTIVES: ProspectingObjective[] = [
   {
     id: "web_digital_acquisition",
     label: "Acquisition digitale (SEA/social ads)",
-    strategyExplanation: "Nous privilégions les entreprises avec une présence en ligne existante mais peu de visibilité payante détectable.",
+    strategyExplanation: "Nous ciblons les entreprises avec un site existant. Leurs campagnes publicitaires et leur budget restent à qualifier.",
     audience: "b2b",
     recommendations: AGENCY_WEB_RECOMMENDATIONS,
     signals: DIGITAL_SIGNALS,
@@ -300,6 +300,21 @@ const CLEANING_OBJECTIVES: ProspectingObjective[] = [
     recommendations: [],
     signals: [],
     showWebSignal: false,
+  },
+];
+
+const SECURITY_OBJECTIVES: ProspectingObjective[] = [
+  {
+    id: "security_sites", label: "Sécurité de locaux professionnels", audience: "b2b",
+    strategyExplanation: "Nous ciblons les commerces, entrepôts et gestionnaires immobiliers. Le besoin en gardiennage ou surveillance reste à qualifier.",
+    recommendations: [CHIP_LOCAL_SHOPS, CHIP_SUPERMARKETS, CHIP_WAREHOUSES, CHIP_REALESTATE_PROS],
+    signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL], showWebSignal: false,
+  },
+  {
+    id: "security_events", label: "Sécurité événementielle", audience: "b2b",
+    strategyExplanation: "Nous recherchons les organisateurs d’événements et lieux d’accueil. Aucun événement ni contrat à venir n’est présumé.",
+    recommendations: [CHIP_EVENTS, CHIP_HOTELS],
+    signals: [PROXIMITY_SIGNAL, CONTACT_SIGNAL], showWebSignal: false,
   },
 ];
 
@@ -484,7 +499,7 @@ const OBJECTIVES_BY_LEAF_SLUG: Record<string, ProspectingObjective[]> = {
   marketing: MARKETING_OBJECTIVES,
   design: MARKETING_OBJECTIVES,
   cleaning: CLEANING_OBJECTIVES,
-  security: CLEANING_OBJECTIVES,
+  security: SECURITY_OBJECTIVES,
   realestate: REALESTATE_OBJECTIVES,
   wholesale: SUPPLIER_OBJECTIVES,
   autoparts: SUPPLIER_OBJECTIVES,
@@ -525,6 +540,8 @@ const CONTRACT_OBJECTIVE_IDS = new Set([
   "garage_pro_repair",
   "garage_pro_tyres",
   "garage_contract",
+  "security_sites",
+  "security_events",
   "cleaning_offices",
   "cleaning_commerce",
   "cleaning_hotels",

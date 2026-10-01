@@ -60,7 +60,7 @@ function independenceLabel(r: ProspectionResult): { text: string; cls: string } 
 
 function buildReasons(r: ProspectionResult): string[] {
   const reasons: string[] = [...r.relevanceReasons];
-  if (r.verificationSources.no_website) reasons.push("Aucun site confirmé");
+  if (r.verificationSources.no_website) reasons.push("Aucun site renseigné sur la fiche Google — à confirmer");
   else if (r.verificationSources.weak_website) reasons.push("Site à améliorer");
   if (r.verificationSources.google_operational) reasons.push("Fiche Google active");
   if (r.verificationSources.large_structure_opportunity) reasons.push("Structure de taille significative");

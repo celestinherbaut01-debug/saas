@@ -12,9 +12,11 @@ export interface ProspectionFilters {
   excludeLargeGroups: boolean;
   needContact: boolean;
   maxEstablishmentsPerSiren: number;
-  webFilter: "all" | "no_or_weak" | "none" | "weak" | "unknown";
+  webFilter: "all" | "no_or_weak" | "none" | "weak" | "unknown" | "existing";
   phoneOnly: boolean;
   googleFicheOnly: boolean;
+  objectiveId: string | null;
+  activityKey: string | null;
 }
 
 export const DEFAULT_PROSPECTION_FILTERS: ProspectionFilters = {
@@ -31,13 +33,28 @@ export const DEFAULT_PROSPECTION_FILTERS: ProspectionFilters = {
   webFilter: "all",
   phoneOnly: false,
   googleFicheOnly: false,
+  objectiveId: null,
+  activityKey: null,
 };
 
-const WEB_FILTER_VALUES: ProspectionFilters["webFilter"][] = ["all", "no_or_weak", "none", "weak", "unknown"];
+const WEB_FILTER_VALUES: ProspectionFilters["webFilter"][] = [
+  "all",
+  "no_or_weak",
+  "none",
+  "weak",
+  "unknown",
+  "existing",
+];
 
 export function normalizeProspectionFilters(raw: unknown): ProspectionFilters {
-  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const bool = (key: keyof ProspectionFilters) => (typeof r[key] === "boolean" ? (r[key] as boolean) : DEFAULT_PROSPECTION_FILTERS[key] as boolean);
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >;
+  const bool = (key: keyof ProspectionFilters) =>
+    typeof r[key] === "boolean"
+      ? (r[key] as boolean)
+      : (DEFAULT_PROSPECTION_FILTERS[key] as boolean);
   return {
     operationalOnly: bool("operationalOnly"),
     excludeTempClosed: bool("excludeTempClosed"),
@@ -46,13 +63,18 @@ export function normalizeProspectionFilters(raw: unknown): ProspectionFilters {
     excludeLargeGroups: bool("excludeLargeGroups"),
     needContact: bool("needContact"),
     maxEstablishmentsPerSiren:
-      typeof r.maxEstablishmentsPerSiren === "number" && r.maxEstablishmentsPerSiren > 0
+      typeof r.maxEstablishmentsPerSiren === "number" &&
+      r.maxEstablishmentsPerSiren > 0
         ? r.maxEstablishmentsPerSiren
         : DEFAULT_PROSPECTION_FILTERS.maxEstablishmentsPerSiren,
-    webFilter: WEB_FILTER_VALUES.includes(r.webFilter as ProspectionFilters["webFilter"])
+    webFilter: WEB_FILTER_VALUES.includes(
+      r.webFilter as ProspectionFilters["webFilter"],
+    )
       ? (r.webFilter as ProspectionFilters["webFilter"])
       : DEFAULT_PROSPECTION_FILTERS.webFilter,
     phoneOnly: bool("phoneOnly"),
     googleFicheOnly: bool("googleFicheOnly"),
+    objectiveId: typeof r.objectiveId === "string" ? r.objectiveId : null,
+    activityKey: typeof r.activityKey === "string" ? r.activityKey : null,
   };
 }
