@@ -58,16 +58,32 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings, opportunitiesResult, missions] = await checkedAll([
+  const [businessProfile, profile, automationSettings] = await checkedAll([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
-    getOpportunities(workspaceId),
-    listMissions(workspaceId),
   ]);
   const vertical = profile.vertical;
   const query=await searchParams;
   const propertyId=typeof query.propertyId === "string" ? query.propertyId : null;
+
+  // Teaser non essentiel (voir plus bas) : isolé du bloc critique ci-dessus
+  // pour la même raison que sur /dashboard — un souci de données sur ce
+  // teaser ne doit jamais bloquer toute la page Business OS.
+  let opportunitiesResult: Awaited<ReturnType<typeof getOpportunities>> = {
+    opportunities: [],
+    canSeeAcquisition: false,
+    canSeeBusinessOs: false,
+  };
+  let missions: Awaited<ReturnType<typeof listMissions>> = [];
+  try {
+    [opportunitiesResult, missions] = await Promise.all([getOpportunities(workspaceId), listMissions(workspaceId)]);
+  } catch (error) {
+    console.error(
+      "[business-os] opportunités NOVA / missions indisponibles (non bloquant pour le reste de la page) :",
+      error instanceof Error ? error.message : error,
+    );
+  }
 
   // Teaser compact plutôt que les trois blocs complets (GoalPicker +
   // MissionsPreview + NovaOpportunities) — la liste complète vit sur

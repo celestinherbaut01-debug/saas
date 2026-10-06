@@ -44,36 +44,49 @@ async function DashboardPageContent() {
     if (businessProfile?.product_mode === "business_os") redirect("/business-os");
   }
 
-  const [{ count: targetCount }, { data: statusRows }, { data: appointments }, { data: recentActivities }, opportunitiesResult, missions] =
-    workspaceId
-      ? await checkedAll([
-          supabase
-            .from("workspace_targets")
-            .select("category_id", { count: "exact", head: true })
-            .eq("workspace_id", workspaceId),
-          supabase.from("prospects").select("status").eq("workspace_id", workspaceId),
-          supabase
-            .from("appointments")
-            .select("id, title, starts_at")
-            .eq("workspace_id", workspaceId)
-            .order("starts_at"),
-          supabase
-            .from("activities")
-            .select("id, type, detail, created_at, prospect_id")
-            .eq("workspace_id", workspaceId)
-            .order("created_at", { ascending: false })
-            .limit(6),
-          getOpportunities(workspaceId),
-          listMissions(workspaceId),
-        ])
-      : [
-          { count: 0 },
-          { data: [] },
-          { data: [] },
-          { data: [] },
-          { opportunities: [], canSeeAcquisition: false, canSeeBusinessOs: false },
-          [],
-        ];
+  const [{ count: targetCount }, { data: statusRows }, { data: appointments }, { data: recentActivities }] = workspaceId
+    ? await checkedAll([
+        supabase
+          .from("workspace_targets")
+          .select("category_id", { count: "exact", head: true })
+          .eq("workspace_id", workspaceId),
+        supabase.from("prospects").select("status").eq("workspace_id", workspaceId),
+        supabase
+          .from("appointments")
+          .select("id, title, starts_at")
+          .eq("workspace_id", workspaceId)
+          .order("starts_at"),
+        supabase
+          .from("activities")
+          .select("id, type, detail, created_at, prospect_id")
+          .eq("workspace_id", workspaceId)
+          .order("created_at", { ascending: false })
+          .limit(6),
+      ])
+    : [{ count: 0 }, { data: [] }, { data: [] }, { data: [] }];
+
+  // Opportunités NOVA et missions actives : un simple teaser, pas une
+  // donnée essentielle du Dashboard (la liste complète vit sur /missions et
+  // /nova/actions). Isolé du bloc critique ci-dessus : si une verticale
+  // Business OS a un souci de données (ex. une table métier), le Dashboard
+  // reste utilisable — seul ce teaser disparaît, au lieu de bloquer toute
+  // la page avec un écran "CHARGEMENT INTERROMPU".
+  let opportunitiesResult: Awaited<ReturnType<typeof getOpportunities>> = {
+    opportunities: [],
+    canSeeAcquisition: false,
+    canSeeBusinessOs: false,
+  };
+  let missions: Awaited<ReturnType<typeof listMissions>> = [];
+  if (workspaceId) {
+    try {
+      [opportunitiesResult, missions] = await Promise.all([getOpportunities(workspaceId), listMissions(workspaceId)]);
+    } catch (error) {
+      console.error(
+        "[dashboard] opportunités NOVA / missions indisponibles (non bloquant pour le reste de la page) :",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
 
   const configured = businessProfileExists;
   const statuses = statusRows ?? [];
