@@ -21,6 +21,8 @@ import { analyseWebsiteQuality } from "../_shared/websiteQuality.ts";
 import { computeQualityScore, resolveScoringProfile, SCORING_PROFILE_LABEL } from "../_shared/scoring.ts";
 import { computeRelevance } from "../_shared/relevance.ts";
 import { matchesWebFilter, GOOGLE_DEPENDENT_WEB_FILTERS } from "../_shared/webFilter.ts";
+import { matchesRequestedNaf } from "../_shared/naf.ts";
+import { dedupeBySiret } from "../_shared/dedupe.ts";
 import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_shared/types.ts";
 
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
@@ -163,17 +165,28 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 4. Distance exacte + filtres registre (indépendance, statut).
+    // 4. NAF strict par établissement + déduplication SIRET + distance
+    // exacte + filtres registre (indépendance, statut).
+    //
+    // AUDIT (client réel : 87 "Boulangeries" jugées suspectes à 10km de
+    // Béthune) : `activite_principale` s'applique à l'UNITÉ LÉGALE côté API
+    // (recherche-entreprises.api.gouv.fr), pas à chaque établissement, et
+    // `matching_etablissements` peut donc contenir des établissements dont
+    // le NAF propre diffère du filtre demandé. Double sécurité : le filtre
+    // API reste envoyé (réduit le volume), ET ce post-filtrage strict sur
+    // le NAF réel de CHAQUE établissement (voir _shared/naf.ts) garantit
+    // que "Boulangeries" ne renvoie jamais un établissement d'un autre NAF.
     //
     // Logs détaillés à chaque étape — but explicite : pouvoir diagnostiquer
     // en une lecture un futur "X trouvés → 0 affichés" sans deviner à quelle
-    // étape les candidats ont disparu (cause réelle du bug "162 trouvés, 0
-    // affichés" : voir plus bas, le filtre webFilter — PAS cette section,
-    // qui s'est avérée saine à l'audit, mais gardée aussi détaillée pour la
-    // prochaine fois).
+    // étape les candidats ont disparu.
+    const legalUnitsCount = new Set(raw.map((e) => e.siren)).size;
+    const nafMatched = raw.filter((e) => matchesRequestedNaf(e.nafCode, nafCodes));
+    const deduped = dedupeBySiret(nafMatched);
+
     const perSirenCount = new Map<string, number>();
-    const geolocatedCount = raw.filter((e) => e.lat !== null && e.lng !== null).length;
-    let candidates = raw
+    const geolocatedCount = deduped.filter((e) => e.lat !== null && e.lng !== null).length;
+    let candidates = deduped
       .map((e) => {
         if (e.lat === null || e.lng === null) return null;
         const distanceKm = haversineKm(lat, lng, e.lat, e.lng);
@@ -209,9 +222,12 @@ Deno.serve(async (req) => {
     const totalMatched = candidates.length;
 
     // Stage 2/8 + 3/8 : chaque étape loguée séparément pour isoler
-    // immédiatement où des candidats disparaissent.
+    // immédiatement où des candidats disparaissent ou, à l'inverse, d'où
+    // vient un nombre inattendu de résultats.
     console.log(
-      `[search-prospects] registre : ${raw.length} bruts reçus → ${geolocatedCount} géolocalisés → ` +
+      `[search-prospects] registre : ${legalUnitsCount} unité(s) légale(s) reçue(s) → ${raw.length} ` +
+        `établissement(s) (matching_etablissements) reçu(s) → ${nafMatched.length} dont le NAF correspond ` +
+        `réellement aux codes demandés → ${deduped.length} SIRET unique(s) → ${geolocatedCount} géolocalisés → ` +
         `${inRadiusCount} dans le rayon de ${radiusKm}km → ${operationalFilteredCount} actifs → ` +
         `${totalMatched} après filtres indépendance (chaînes/associations/grands groupes/max-par-SIREN)`,
     );
@@ -410,7 +426,7 @@ Deno.serve(async (req) => {
         warnings.push(
           "Ce filtre (« Site à analyser » / « Fiche Google active ») nécessite une vérification Google Places réelle, " +
             "non configurée côté serveur — il peut légitimement renvoyer peu ou aucun résultat tant qu'elle ne l'est " +
-            "pas. Essayez « Aucun site détecté », « Site absent ou faible » ou « Tous les statuts ».",
+            "pas. Essayez « Site absent ou à vérifier », « Site absent ou faible » ou « Tous les statuts ».",
         );
       }
     }

@@ -39,6 +39,53 @@ test('all four command centers preserve object references and signal genuine blo
 import {nafCodesForSelection} from '../src/lib/prospecting-naf';
 import {matchesWebFilter} from '../../supabase/functions/_shared/webFilter';
 import {haversineKm} from '../../supabase/functions/_shared/haversine';
+import {normalizeNaf,matchesRequestedNaf} from '../../supabase/functions/_shared/naf';
+import {dedupeBySiret} from '../../supabase/functions/_shared/dedupe';
+
+// Audit confirmé (client réel : 87 "Boulangeries" jugées suspectes à 10km de
+// Béthune) : `activite_principale` s'applique à l'unité légale côté API
+// (recherche-entreprises.api.gouv.fr), pas à chaque établissement — ces
+// tests verrouillent le post-filtrage NAF strict et la normalisation de
+// format ("10.71C" vs "1071C" doivent être comparables).
+test('la normalisation NAF rend "10.71C" et "1071C" identiques', () => {
+  assert.equal(normalizeNaf('10.71C'), normalizeNaf('1071C'));
+  assert.equal(normalizeNaf('10.71C'), '1071C');
+  assert.equal(normalizeNaf(null), '');
+  assert.equal(normalizeNaf(undefined), '');
+});
+test('un établissement dont le NAF ne correspond à aucun code demandé est rejeté', () => {
+  assert.equal(matchesRequestedNaf('10.13A', ['10.71C']), false);
+  assert.equal(matchesRequestedNaf(null, ['10.71C']), false);
+});
+test('un établissement dont le NAF correspond, même avec un format différent, est accepté', () => {
+  assert.equal(matchesRequestedNaf('1071C', ['10.71C']), true);
+  assert.equal(matchesRequestedNaf('10.71C', ['1071C']), true);
+});
+test('sans filtre métier (aucun NAF demandé), tout établissement passe', () => {
+  assert.equal(matchesRequestedNaf('56.10A', []), true);
+  assert.equal(matchesRequestedNaf(null, []), true);
+});
+
+// Déduplication SIRET : un même établissement physique (même SIRET) revenu
+// plusieurs fois (pages, matching_etablissements en double...) ne doit
+// produire qu'une seule fiche ; le compteur final doit se baser sur ce
+// nombre de SIRET uniques, jamais sur le nombre brut de lignes API.
+test('la déduplication par SIRET ne garde qu\'une occurrence de chaque établissement', () => {
+  const items = [
+    { siret: '111', name: 'A' },
+    { siret: '222', name: 'B' },
+    { siret: '111', name: 'A (doublon)' },
+    { siret: '333', name: 'C' },
+    { siret: '222', name: 'B (doublon)' },
+  ];
+  const result = dedupeBySiret(items);
+  assert.deepEqual(result.map((r) => r.siret), ['111', '222', '333']);
+  assert.equal(result[0].name, 'A'); // garde la PREMIÈRE occurrence
+});
+test('la déduplication ne modifie rien quand tous les SIRET sont déjà uniques', () => {
+  const items = [{ siret: 'a' }, { siret: 'b' }, { siret: 'c' }];
+  assert.deepEqual(dedupeBySiret(items), items);
+});
 
 // Bug réel rapporté par un client (Prospection, "Boulangeries" autour de
 // Béthune) : "162 trouvé(s) dans le registre, 0 affiché(s)". Cause exacte :

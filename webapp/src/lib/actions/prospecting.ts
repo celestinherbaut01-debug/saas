@@ -42,6 +42,12 @@ export async function saveProspectingConfig(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Session expirée." };
 
+  // "Échec de l'enregistrement" sans détail (bug rapporté) : le message
+  // Postgrest réel était déjà renvoyé par cette fonction, mais jeté par
+  // l'appelant (voir ProspectionWizard, saveStatus ne gardait qu'un booléen
+  // "error"). Corrigé ici ET côté appelant — et loggé serveur dans tous les
+  // cas (code/message/détails/hint, jamais de clé/secret) pour diagnostiquer
+  // même quand l'UI du client n'est pas sous les yeux.
   const { error: profileError } = await supabase
     .from("business_profiles")
     .update({
@@ -60,16 +66,44 @@ export async function saveProspectingConfig(
       search_filters: input.filters as unknown as Record<string, unknown>,
     })
     .eq("workspace_id", workspaceId);
-  if (profileError) return { ok: false, error: profileError.message };
+  if (profileError) {
+    console.error("[saveProspectingConfig] échec UPDATE business_profiles", {
+      workspaceId,
+      code: profileError.code,
+      message: profileError.message,
+      details: profileError.details,
+      hint: profileError.hint,
+    });
+    return { ok: false, error: `Échec de l'enregistrement (profil) : ${profileError.message}` };
+  }
 
   const { error: deleteError } = await supabase.from("workspace_targets").delete().eq("workspace_id", workspaceId);
-  if (deleteError) return { ok: false, error: deleteError.message };
+  if (deleteError) {
+    console.error("[saveProspectingConfig] échec DELETE workspace_targets", {
+      workspaceId,
+      code: deleteError.code,
+      message: deleteError.message,
+      details: deleteError.details,
+      hint: deleteError.hint,
+    });
+    return { ok: false, error: `Échec de l'enregistrement (cibles) : ${deleteError.message}` };
+  }
 
   if (input.targetCategoryIds.length > 0) {
     const { error: insertError } = await supabase
       .from("workspace_targets")
       .insert(input.targetCategoryIds.map((category_id) => ({ workspace_id: workspaceId, category_id })));
-    if (insertError) return { ok: false, error: insertError.message };
+    if (insertError) {
+      console.error("[saveProspectingConfig] échec INSERT workspace_targets", {
+        workspaceId,
+        targetCategoryIds: input.targetCategoryIds,
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+      });
+      return { ok: false, error: `Échec de l'enregistrement (cibles) : ${insertError.message}` };
+    }
   }
 
   revalidatePath("/prospection");

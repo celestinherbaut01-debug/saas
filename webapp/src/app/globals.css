@@ -32,6 +32,10 @@
   --shadow-md: 0 8px 24px -8px rgba(16, 24, 40, 0.14), 0 2px 8px -2px rgba(16, 24, 40, 0.06);
   --shadow-lg: 0 24px 48px -12px rgba(16, 24, 40, 0.22), 0 8px 16px -4px rgba(16, 24, 40, 0.08);
   --glow-accent: 0 0 80px -20px color-mix(in srgb, var(--accent) 45%, transparent);
+  /* Accent secondaire optionnel (turquoise) — pour un futur badge/signal
+     distinct du violet, sans remplacer le dégradé signature existant déjà
+     utilisé par des dizaines de composants. */
+  --accent-turquoise: #0d9488;
 }
 
 @theme inline {
@@ -57,38 +61,23 @@
   --color-red-bg: var(--red-bg);
   --color-amber-fg: var(--amber-fg);
   --color-amber-bg: var(--amber-bg);
+  --color-accent-turquoise: var(--accent-turquoise);
   --font-display: var(--font-manrope);
   --font-sans: var(--font-plex-sans);
   --font-mono: var(--font-plex-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0c0e13;
-    --panel: #151821;
-    --soft: #1a1e27;
-    --line: #272c36;
-    --ink: #eef1f6;
-    --muted: #9aa3b5;
-    --faint: #6d7688;
-    --accent: #818cf8;
-    --accent-2: #a78bfa;
-    --accent-3: #60a5fa;
-    --accent-ink: #0b0d12;
-    --green-fg: #5fd8a0;
-    --green-bg: #123326;
-    --red-fg: #ff8f87;
-    --red-bg: #3a1917;
-    --amber-fg: #ffc978;
-    --amber-bg: #3a2c0d;
-    --gradient-signature: linear-gradient(120deg, var(--accent), var(--accent-2) 55%, var(--accent-3));
-    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.24), 0 1px 1px rgba(0, 0, 0, 0.18);
-    --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.4), 0 2px 8px -2px rgba(0, 0, 0, 0.24);
-    --shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.5), 0 8px 16px -4px rgba(0, 0, 0, 0.3);
-    --glow-accent: 0 0 80px -20px color-mix(in srgb, var(--accent) 55%, transparent);
-  }
-}
-
+/* Pas de bascule automatique sur `prefers-color-scheme: dark` : demande
+   produit explicite — la zone principale (fond, cartes, texte) doit rester
+   claire même quand le système de l'utilisateur est en mode sombre. Avant
+   ce changement, c'était la cause exacte du "fond bleu/noir partout" / "
+   cartes bleu nuit sur fond bleu nuit" rapporté : sans sélecteur de thème
+   dans l'app (aucun composant ne pose `data-theme`), le thème sombre
+   ci-dessous s'appliquait silencieusement dès que l'OS préférait le sombre.
+   La sidebar reste sombre dans tous les cas (tokens --sidebar-* séparés,
+   jamais affectés par ce bloc). `:root[data-theme="dark"]` reste disponible
+   si un vrai bouton de thème est ajouté plus tard — rien ne le déclenche
+   aujourd'hui. */
 :root[data-theme="dark"] {
   --bg: #0c0e13;
   --panel: #151821;

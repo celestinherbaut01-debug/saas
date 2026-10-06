@@ -54,7 +54,7 @@ function objectiveIcon(id: string): string {
 }
 
 const WEB_SIGNAL_CARDS: { id: string; icon: string; title: string; description: string; webFilter: ProspectionFilters["webFilter"] }[] = [
-  { id: "no_website", icon: "🌐", title: "Aucun site détecté", description: "Entreprises sans site confirmé — registre seul si Google Places n'est pas configuré.", webFilter: "none" },
+  { id: "no_website", icon: "🌐", title: "Site absent ou à vérifier", description: "Entreprises sans site confirmé — registre seul si Google Places n'est pas configuré. Ne signifie pas qu'aucun site n'existe, seulement qu'aucun n'est confirmé.", webFilter: "none" },
   { id: "weak_website", icon: "⚠️", title: "Site à analyser", description: "Nécessite Google Places : site confirmé faible ou non concluant.", webFilter: "weak" },
   { id: "gmb_no_site", icon: "📍", title: "Fiche Google active", description: "Nécessite Google Places : présence locale existante, site à compléter.", webFilter: "unknown" },
   { id: "all", icon: "✨", title: "Tous les statuts", description: "Ne filtrer sur aucun statut de site en particulier.", webFilter: "all" },
@@ -66,7 +66,7 @@ const WEB_SIGNAL_CARDS: { id: string; icon: string; title: string; description: 
 export const WEB_FILTER_LABEL: Record<ProspectionFilters["webFilter"], string> = {
   all: "Tous les statuts",
   no_or_weak: "Site absent ou faible",
-  none: "Aucun site détecté",
+  none: "Site absent ou à vérifier",
   weak: "Site à analyser",
   unknown: "Fiche Google active",
 };
@@ -118,13 +118,13 @@ export function ProspectingWizard({
   const objective = objectives.find((o) => o.id === objectiveId) ?? null;
 
   const [freeTextOffer, setFreeTextOffer] = useState(businessProfile?.offer_description ?? "");
-  // Chips recommandés SÉLECTIONNÉS pour l'objectif courant — tous cochés
-  // par défaut (voir offer-catalog.ts), désélectionnables individuellement.
-  // `null` = "tous" (évite de devoir lister tous les ids au choix de
-  // l'objectif).
-  const [selectedChipIds, setSelectedChipIds] = useState<Set<string> | null>(null);
   const [manualTargetIds, setManualTargetIds] = useState<string[] | null>(null);
-  const [exploreOpen, setExploreOpen] = useState(false);
+  // Sélecteur de métiers (CIBLE) : un vrai cycle ouvrir → chercher/cocher →
+  // "Valider" → fermer, jamais une sélection appliquée en direct sans que
+  // l'utilisateur sache qu'elle l'est déjà (point bloquant demandé) — voir
+  // openTargetPicker/commitTargetSelection.
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false);
+  const [draftTargetIds, setDraftTargetIds] = useState<string[]>([]);
   const [refineOpen, setRefineOpen] = useState(false);
   const [showAdvancedB2bSearch, setShowAdvancedB2bSearch] = useState(false);
 
@@ -133,16 +133,16 @@ export function ProspectingWizard({
     setOwnCategoryId(categoryId);
     setOwnCategoryLabel(label);
     setObjectiveId(null);
-    setSelectedChipIds(null);
     setManualTargetIds(null);
+    setTargetPickerOpen(false);
     setFreeTextOffer("");
     setShowAdvancedB2bSearch(false);
   }
 
   function selectObjective(id: string) {
     setObjectiveId(id);
-    setSelectedChipIds(null);
     setManualTargetIds(null);
+    setTargetPickerOpen(false);
     setShowAdvancedB2bSearch(false);
   }
 
@@ -192,15 +192,13 @@ export function ProspectingWizard({
     [objective, freeTextOffer, ownSlug, categories],
   );
 
-  const effectiveChipIds = useMemo(() => selectedChipIds ?? new Set(objective?.recommendations.map((c) => c.id) ?? []), [selectedChipIds, objective]);
-
   // Cibles recommandées — valeur DÉRIVÉE, jamais une pré-sélection large du
-  // catalogue stockée en state. Un ajustement manuel (Explorer d'autres
-  // secteurs) prend le dessus tant que l'objectif ne change pas.
+  // catalogue stockée en state. Un ajustement manuel (bouton "Modifier" du
+  // bloc CIBLE) prend le dessus tant que l'objectif ne change pas.
   const resolvedTargetIds = useMemo(() => {
     if (!objective || objective.audience !== "b2b") return [];
     if (objective.recommendations.length > 0) {
-      const slugs = resolveObjectiveTargetSlugs(objective, effectiveChipIds);
+      const slugs = resolveObjectiveTargetSlugs(objective);
       return categories.filter((c) => slugs.includes(c.slug)).map((c) => c.id);
     }
     if (genericRecommendation) {
@@ -208,19 +206,36 @@ export function ProspectingWizard({
       return categories.filter((c) => filteredSlugs.includes(c.slug)).map((c) => c.id);
     }
     return [];
-  }, [objective, effectiveChipIds, genericRecommendation, categories]);
+  }, [objective, genericRecommendation, categories]);
   const targetIds = manualTargetIds ?? resolvedTargetIds;
 
-  function toggleChip(chipId: string) {
-    setSelectedChipIds(new Set([...effectiveChipIds].includes(chipId) ? [...effectiveChipIds].filter((id) => id !== chipId) : [...effectiveChipIds, chipId]));
-    setManualTargetIds(null);
+  // Banniere "Recommandé pour votre activité" à l'intérieur du sélecteur
+  // (TargetCategoryPicker) — mêmes slugs que resolvedTargetIds, jamais une
+  // seconde liste divergente.
+  const recommendedSlugs = useMemo(() => {
+    if (objective && objective.recommendations.length > 0) return resolveObjectiveTargetSlugs(objective);
+    if (genericRecommendation) return genericRecommendation.slugs;
+    return undefined;
+  }, [objective, genericRecommendation]);
+
+  function openTargetPicker() {
+    setDraftTargetIds(targetIds);
+    setTargetPickerOpen(true);
+  }
+  function commitTargetSelection() {
+    setManualTargetIds(draftTargetIds);
+    setTargetPickerOpen(false);
   }
 
   // Sauvegarde automatique — même principe que l'ancienne page (jamais de
   // bouton "Enregistrer" à retenir de cliquer), déclenchée par tout
   // changement de la configuration finale (activité, objectif -> offre/
   // audience dérivées, cibles, zone, filtres).
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  // "Échec de l'enregistrement" sans aucun détail (bug rapporté) : le
+  // message Postgrest réel renvoyé par saveProspectingConfig était jeté ici
+  // — seul un booléen "error" était gardé. saveStatus porte désormais le
+  // message réel, affiché tel quel (jamais masqué) ci-dessous.
+  const [saveStatus, setSaveStatus] = useState<{ kind: "idle" | "saving" | "saved" | "error"; message?: string }>({ kind: "idle" });
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -229,7 +244,7 @@ export function ProspectingWizard({
     }
     if (!address || !objective) return;
     const timeout = setTimeout(() => {
-      setSaveStatus("saving");
+      setSaveStatus({ kind: "saving" });
       void saveProspectingConfig(workspaceId, {
         offerDescription: objective.label || freeTextOffer,
         audience: objective.audience,
@@ -241,7 +256,7 @@ export function ProspectingWizard({
         radiusKm,
         targetCategoryIds: targetIds,
         filters,
-      }).then((result) => setSaveStatus(result.ok ? "saved" : "error"));
+      }).then((result) => setSaveStatus(result.ok ? { kind: "saved" } : { kind: "error", message: result.error }));
     }, AUTOSAVE_DEBOUNCE_MS);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -362,48 +377,50 @@ export function ProspectingWizard({
 
           {showWebSignal && <WebSignalCards value={webFilter} onChange={setWebFilter} />}
 
-          {objective.recommendations.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">
-                ProspectFlow recommande — {objective.recommendations.length} secteur{objective.recommendations.length > 1 ? "s" : ""} pertinent
-                {objective.recommendations.length > 1 ? "s" : ""}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {objective.recommendations.map((chip) => {
-                  const isSelected = effectiveChipIds.has(chip.id);
-                  return (
-                    <button
-                      key={chip.id}
-                      type="button"
-                      onClick={() => toggleChip(chip.id)}
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition hover:-translate-y-0.5",
-                        isSelected
-                          ? "border-accent/40 bg-accent/10 text-ink shadow-[var(--shadow-sm)]"
-                          : "border-line bg-panel text-faint line-through opacity-60 hover:opacity-100",
-                      )}
-                    >
-                      <span>{chip.icon}</span>
-                      <span>{chip.label}</span>
-                      {isSelected && <span className="text-accent">✓</span>}
-                    </button>
-                  );
-                })}
+          <div className="mt-3">
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Cible</p>
+            {targetPickerOpen ? (
+              <div className="animate-fade-up mt-2 rounded-xl border border-line bg-soft p-3">
+                <TargetCategoryPicker categories={categories} value={draftTargetIds} onChange={setDraftTargetIds} recommendedSlugs={recommendedSlugs} />
+                <div className="mt-3 flex items-center gap-2 border-t border-line pt-3">
+                  <Button size="sm" onClick={commitTargetSelection}>
+                    Valider ({draftTargetIds.length} métier{draftTargetIds.length > 1 ? "s" : ""})
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setTargetPickerOpen(false)}>
+                    Annuler
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {targetIds.length === 0 ? (
+                  <span className="text-[12.5px] text-muted">Aucun métier sélectionné</span>
+                ) : (
+                  targetIds.map((id) => {
+                    const cat = categories.find((c) => c.id === id);
+                    if (!cat) return null;
+                    return (
+                      <span
+                        key={id}
+                        className="flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3 py-1.5 text-[12.5px] font-medium text-ink"
+                      >
+                        {cat.icon && <span aria-hidden>{cat.icon}</span>}
+                        {cat.name}
+                        <span className="text-accent">✓</span>
+                      </span>
+                    );
+                  })
+                )}
                 <button
                   type="button"
-                  onClick={() => setExploreOpen((v) => !v)}
-                  className="flex items-center gap-1 rounded-full border border-dashed border-line px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:border-accent/40 hover:bg-accent/5"
+                  onClick={openTargetPicker}
+                  className="rounded-full border border-dashed border-line px-3 py-1.5 text-[12.5px] font-semibold text-accent hover:border-accent/40 hover:bg-accent/5"
                 >
-                  {exploreOpen ? "▾" : "＋"} Explorer d&apos;autres secteurs
+                  Modifier
                 </button>
               </div>
-              {exploreOpen && (
-                <div className="animate-fade-up mt-3 rounded-xl border border-line bg-soft p-3">
-                  <TargetCategoryPicker categories={categories} value={targetIds} onChange={setManualTargetIds} />
-                </div>
-              )}
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="mt-3">
             <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Localisation</p>
@@ -493,26 +510,13 @@ export function ProspectingWizard({
                   className="mt-1 w-full rounded-lg border border-line bg-soft px-3 py-2 text-[13px]"
                 />
               </div>
-
-              {objective.recommendations.length === 0 && (
-                <div>
-                  <button type="button" onClick={() => setExploreOpen((v) => !v)} className="text-[12.5px] font-semibold text-accent hover:underline">
-                    {exploreOpen ? "▾" : "▸"} Explorer d&apos;autres secteurs
-                  </button>
-                  {exploreOpen && (
-                    <div className="mt-3">
-                      <TargetCategoryPicker categories={categories} value={targetIds} onChange={setManualTargetIds} />
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           )}
 
           <p className="mt-3 text-[10.5px] text-faint">
-            {saveStatus === "saving" && "Enregistrement…"}
-            {saveStatus === "saved" && "✓ Configuration enregistrée"}
-            {saveStatus === "error" && "⚠ Échec de l'enregistrement"}
+            {saveStatus.kind === "saving" && "Enregistrement…"}
+            {saveStatus.kind === "saved" && "✓ Configuration enregistrée"}
+            {saveStatus.kind === "error" && `⚠ ${saveStatus.message ?? "Échec de l'enregistrement"}`}
           </p>
         </Card>
       )}
