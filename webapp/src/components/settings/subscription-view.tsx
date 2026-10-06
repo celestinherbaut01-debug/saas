@@ -86,9 +86,14 @@ export function SubscriptionView({
 
   return (
     <div className="flex flex-col gap-5">
-      <div>
-        <h1 className="font-display text-2xl font-extrabold">Abonnement</h1>
-        <p className="mt-1 text-[13px] text-muted">Vos modules actifs, votre usage, et les modules disponibles.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-extrabold">Abonnement</h1>
+          <p className="mt-1 text-[13px] text-muted">Vos modules actifs, votre usage, et les modules disponibles.</p>
+        </div>
+        <Link href="/tarifs" className="shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+          Comparer toutes les offres →
+        </Link>
       </div>
 
       <Card className="bg-gradient-to-br from-panel to-soft">

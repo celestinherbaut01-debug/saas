@@ -5,6 +5,8 @@ import type { Customer, Project, ClientSite, Ticket, Task, TeamMember, BusinessD
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeAgencyAlerts } from "@/lib/agency";
+import { computeAgencyCommandCenter } from "@/lib/command-center";
+import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { TeamModule } from "@/components/business-os/team-module";
 import { DocumentsModule } from "@/components/business-os/documents-module";
@@ -15,9 +17,10 @@ import { TasksModule } from "@/components/business-os/agency/agency-tasks";
 import { PlanningModule } from "@/components/business-os/agency/agency-planning";
 import { AgencyDashboard } from "@/components/business-os/agency/agency-dashboard";
 
-type Tab = "dashboard" | "customers" | "projects" | "sites" | "tickets" | "tasks" | "planning" | "team" | "invoices";
+type Tab = "today" | "dashboard" | "customers" | "projects" | "sites" | "tickets" | "tasks" | "planning" | "team" | "invoices";
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "today", label: "Aujourd'hui" },
   { key: "dashboard", label: "Dashboard" },
   { key: "customers", label: "Clients" },
   { key: "projects", label: "Projets" },
@@ -51,7 +54,7 @@ export function AgencyView({
   initialDocuments: BusinessDocument[];
 }) {
   const supabase = createClient();
-  const [active, setActive] = useState<Tab>("dashboard");
+  const [active, setActive] = useState<Tab>("today");
 
   const [customers, setCustomers] = useState(initialCustomers);
   const [projects, setProjects] = useState(initialProjects);
@@ -62,6 +65,11 @@ export function AgencyView({
   const [documents, setDocuments] = useState(initialDocuments);
 
   const alerts = useMemo(() => computeAgencyAlerts({ sites, projects, tickets }, isAdvanced), [sites, projects, tickets, isAdvanced]);
+  const commandCenter = useMemo(() => computeAgencyCommandCenter({ sites, tickets, projects, documents }), [sites, tickets, projects, documents]);
+
+  function handleCommandCenterNavigate(tab: string) {
+    setActive(tab as Tab);
+  }
 
   async function createCustomer(input: { name: string; phone: string; email: string; notes: string }) {
     const { data, error } = await supabase.from("customers").insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() }).select("*").single();
@@ -210,6 +218,7 @@ export function AgencyView({
         ))}
       </div>
 
+      {active === "today" && <CommandCenter data={commandCenter} onNavigate={handleCommandCenterNavigate} entityName="agence" />}
       {active === "dashboard" && <AgencyDashboard sites={sites} projects={projects} tickets={tickets} alerts={alerts} />}
       {active === "customers" && (
         <CustomersModule workspaceId={workspaceId} initial={customers} label="Clients" controlled={{ rows: customers, onCreate: createCustomer, onUpdate: updateCustomer, onRemove: removeCustomer }} />

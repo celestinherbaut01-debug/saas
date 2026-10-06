@@ -5,6 +5,8 @@ import type { Customer, Site, Contract, Intervention, Incident, TeamMember, Inve
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeCleaningAlerts } from "@/lib/cleaning";
+import { computeCleaningCommandCenter } from "@/lib/command-center";
+import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
 import { TeamModule } from "@/components/business-os/team-module";
@@ -17,9 +19,10 @@ import { QualityModule } from "@/components/business-os/cleaning/cleaning-qualit
 import { IncidentsModule } from "@/components/business-os/cleaning/cleaning-incidents";
 import { CleaningDashboard } from "@/components/business-os/cleaning/cleaning-dashboard";
 
-type Tab = "dashboard" | "customers" | "sites" | "contracts" | "interventions" | "planning" | "quality" | "team" | "inventory" | "incidents" | "invoices";
+type Tab = "today" | "dashboard" | "customers" | "sites" | "contracts" | "interventions" | "planning" | "quality" | "team" | "inventory" | "incidents" | "invoices";
 
 const TABS: { key: Tab; label: string; advancedOnly?: boolean }[] = [
+  { key: "today", label: "Aujourd'hui" },
   { key: "dashboard", label: "Dashboard" },
   { key: "customers", label: "Clients" },
   { key: "sites", label: "Sites" },
@@ -57,7 +60,7 @@ export function CleaningView({
   initialDocuments: BusinessDocument[];
 }) {
   const supabase = createClient();
-  const [active, setActive] = useState<Tab>("dashboard");
+  const [active, setActive] = useState<Tab>("today");
 
   const [customers, setCustomers] = useState(initialCustomers);
   const [sites, setSites] = useState(initialSites);
@@ -69,6 +72,11 @@ export function CleaningView({
   const [documents, setDocuments] = useState(initialDocuments);
 
   const alerts = useMemo(() => computeCleaningAlerts({ contracts, interventions, incidents }, isAdvanced), [contracts, interventions, incidents, isAdvanced]);
+  const commandCenter = useMemo(() => computeCleaningCommandCenter({ interventions, incidents, contracts }), [interventions, incidents, contracts]);
+
+  function handleCommandCenterNavigate(tab: string) {
+    setActive(tab as Tab);
+  }
 
   async function createCustomer(input: { name: string; phone: string; email: string; notes: string }) {
     const { data, error } = await supabase.from("customers").insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() }).select("*").single();
@@ -239,6 +247,7 @@ export function CleaningView({
         ))}
       </div>
 
+      {active === "today" && <CommandCenter data={commandCenter} onNavigate={handleCommandCenterNavigate} entityName="activité de nettoyage" />}
       {active === "dashboard" && <CleaningDashboard contracts={contracts} interventions={interventions} incidents={incidents} inventory={inventory} alerts={alerts} />}
       {active === "customers" && (
         <CustomersModule workspaceId={workspaceId} initial={customers} label="Clients" controlled={{ rows: customers, onCreate: createCustomer, onUpdate: updateCustomer, onRemove: removeCustomer }} />

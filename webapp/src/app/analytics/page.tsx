@@ -63,10 +63,16 @@ export default async function AnalyticsPage() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <StatTile label="Prospects au total" value={String(total)} />
-              <StatTile label="Contactés" value={String(funnel[1].count)} sub={funnel[1].pctOfFirst != null ? `${funnel[1].pctOfFirst}%` : undefined} />
-              <StatTile label="RDV obtenus" value={String(funnel[2].count)} sub={funnel[2].pctOfFirst != null ? `${funnel[2].pctOfFirst}%` : undefined} />
-              <StatTile label="Clients gagnés" value={String(funnel[3].count)} sub={funnel[3].pctOfFirst != null ? `${funnel[3].pctOfFirst}%` : undefined} />
+              {[
+                { label: "Prospects au total", value: String(total), sub: undefined as string | undefined },
+                { label: "Contactés", value: String(funnel[1].count), sub: funnel[1].pctOfFirst != null ? `${funnel[1].pctOfFirst}%` : undefined },
+                { label: "RDV obtenus", value: String(funnel[2].count), sub: funnel[2].pctOfFirst != null ? `${funnel[2].pctOfFirst}%` : undefined },
+                { label: "Clients gagnés", value: String(funnel[3].count), sub: funnel[3].pctOfFirst != null ? `${funnel[3].pctOfFirst}%` : undefined },
+              ].map((tile, i) => (
+                <div key={tile.label} className="animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
+                  <StatTile label={tile.label} value={tile.value} sub={tile.sub} />
+                </div>
+              ))}
             </div>
 
             <Card>

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { STATUS_OPTIONS, isFollowupOverdue, type ProspectStatus } from "@/lib/crm-status";
+import { convertWonProspectToCustomer } from "@/lib/crm-conversion";
 
 // Pipeline visuel = le même statut que la fiche prospect (lib/crm-status.ts),
 // jamais une deuxième liste qui pourrait diverger. "do_not_contact" est une
@@ -86,11 +87,16 @@ function ProspectCard({
           )}
         </div>
       )}
+      {prospect.converted_customer_id && (
+        <span className="mt-0.5 inline-flex w-fit items-center gap-1 rounded-full bg-accent/10 px-1.5 py-0.5 text-[9.5px] font-bold text-accent">
+          ✓ Client Business OS
+        </span>
+      )}
     </div>
   );
 }
 
-export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) {
+export function CrmView({ initialProspects, canUseBusinessOs = false }: { initialProspects: Prospect[]; canUseBusinessOs?: boolean }) {
   const supabase = createClient();
   const [prospects, setProspects] = useState(initialProspects);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -115,6 +121,11 @@ export function CrmView({ initialProspects }: { initialProspects: Prospect[] }) 
       type: "status_change",
       detail: `${from} → ${to}`,
     });
+
+    if (status === "won" && canUseBusinessOs) {
+      const customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status });
+      if (customerId) setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, converted_customer_id: customerId } : p)));
+    }
   }
 
   const filtered = useMemo(() => {

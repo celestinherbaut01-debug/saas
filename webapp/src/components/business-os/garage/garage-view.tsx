@@ -14,6 +14,8 @@ import type {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeGarageAlerts, partsTotals } from "@/lib/garage";
+import { computeGarageCommandCenter } from "@/lib/command-center";
+import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { VehiclesModule } from "@/components/business-os/vehicles-module";
 import { RepairOrdersModule } from "@/components/business-os/garage/garage-repair-orders";
@@ -29,6 +31,7 @@ import { AlertsModule } from "@/components/business-os/garage/garage-alerts";
 import { GarageDashboard } from "@/components/business-os/garage/garage-dashboard";
 
 type Tab =
+  | "today"
   | "dashboard"
   | "customers"
   | "vehicles"
@@ -45,6 +48,7 @@ type Tab =
   | "alerts";
 
 const TABS: { key: Tab; label: string; advancedOnly?: boolean }[] = [
+  { key: "today", label: "Aujourd'hui" },
   { key: "dashboard", label: "Dashboard" },
   { key: "customers", label: "Clients" },
   { key: "vehicles", label: "Véhicules" },
@@ -95,7 +99,7 @@ export function GarageView({
   initialDocuments: BusinessDocument[];
 }) {
   const supabase = createClient();
-  const [active, setActive] = useState<Tab>("dashboard");
+  const [active, setActive] = useState<Tab>("today");
 
   const [customers, setCustomers] = useState(initialCustomers);
   const [vehicles, setVehicles] = useState(initialVehicles);
@@ -112,9 +116,19 @@ export function GarageView({
     [parts, repairOrders, documents, technicians, isAdvanced],
   );
 
+  const commandCenter = useMemo(
+    () => computeGarageCommandCenter({ repairOrders, documents, customers, vehicles }),
+    [repairOrders, documents, customers, vehicles],
+  );
+
   function openOrder(id: string) {
     setActive("repair_orders");
     setOpenDetailId(id);
+  }
+
+  function handleCommandCenterNavigate(tab: string, detailId?: string) {
+    setActive(tab as Tab);
+    if (detailId) setOpenDetailId(detailId);
   }
 
   // --- Clients / Véhicules (composants génériques, mode contrôlé) ---
@@ -377,6 +391,7 @@ export function GarageView({
         ))}
       </div>
 
+      {active === "today" && <CommandCenter data={commandCenter} onNavigate={handleCommandCenterNavigate} entityName="garage" />}
       {active === "dashboard" && (
         <GarageDashboard repairOrders={repairOrders} vehicles={vehicles} customers={customers} parts={parts} documents={documents} alerts={alerts} onOpenDetail={openOrder} />
       )}

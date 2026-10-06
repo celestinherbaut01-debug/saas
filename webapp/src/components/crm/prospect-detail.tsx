@@ -14,6 +14,7 @@ import { opportunityLevel } from "@/lib/opportunity-level";
 import { cn } from "@/lib/utils";
 import { STATUS_OPTIONS, isFollowupOverdue } from "@/lib/crm-status";
 import { ACTIVITY_LABEL } from "@/lib/activity-labels";
+import { convertWonProspectToCustomer } from "@/lib/crm-conversion";
 
 const WEBSITE_QUALITY_LABEL: Record<string, string> = {
   none: "Aucun site confirmé",
@@ -27,11 +28,13 @@ export function ProspectDetail({
   initialActivities,
   appointments,
   scoreLabel = "Score d'opportunité",
+  canUseBusinessOs = false,
 }: {
   prospect: Prospect;
   initialActivities: Activity[];
   appointments: Appointment[];
   scoreLabel?: string;
+  canUseBusinessOs?: boolean;
 }) {
   const supabase = createClient();
   const [prospect, setProspect] = useState(initialProspect);
@@ -64,6 +67,11 @@ export function ProspectDetail({
       const to = STATUS_OPTIONS.find(([v]) => v === status)?.[1];
       setProspect((p) => ({ ...p, status }));
       await logActivity("status_change", `${from} → ${to}`);
+
+      if (status === "won" && canUseBusinessOs) {
+        const customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status });
+        if (customerId) setProspect((p) => ({ ...p, converted_customer_id: customerId }));
+      }
     }
   }
 
@@ -131,6 +139,11 @@ export function ProspectDetail({
       {prospect.status === "do_not_contact" && (
         <div className="rounded-lg bg-red-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-red-fg">
           ⚠ Ne plus contacter — ce prospect ne doit recevoir aucun email ni relance.
+        </div>
+      )}
+      {prospect.converted_customer_id && (
+        <div className="rounded-lg bg-accent/10 px-3.5 py-2.5 text-[12.5px] font-semibold text-accent">
+          ✓ Client créé dans Business OS — retrouvez-le dans l&apos;onglet Clients.
         </div>
       )}
 

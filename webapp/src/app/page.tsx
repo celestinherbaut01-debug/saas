@@ -34,14 +34,14 @@ export default async function Home() {
             Business Twin · Acquisition · Studio · Business OS
           </span>
           <h1 className="relative max-w-3xl text-balance font-display text-4xl font-extrabold tracking-tight sm:text-6xl">
-            ProspectFlow comprend votre activité{" "}
-            <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">avant</span> de vous
-            proposer quoi que ce soit.
+            ProspectFlow trouve vos prochains clients et vous dit{" "}
+            <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">chaque jour</span> ce
+            qui mérite votre attention.
           </h1>
           <p className="relative max-w-xl text-pretty text-[15px] leading-relaxed text-muted">
-            Un objectif, une vraie analyse de vos données, des opportunités expliquées — jamais devinées — et des
-            actions prêtes à exécuter. Chaque entreprise affichée est vérifiée (registre officiel français + Google)
-            avant d&apos;être montrée.
+            Prospection vérifiée, CRM, et un centre opérationnel qui agrège vos devis en attente, votre stock bas et
+            vos factures en retard — depuis un seul endroit, sans rien inventer : chaque chiffre vient de vos vraies
+            données.
           </p>
           <div className="relative flex flex-wrap justify-center gap-3">
             <Link

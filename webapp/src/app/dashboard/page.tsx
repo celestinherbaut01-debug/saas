@@ -136,11 +136,17 @@ export default async function DashboardPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <StatTile label="Prospects trouvés" value={String(total)} />
-            <StatTile label="Contactés" value={String(contactedCount)} />
-            <StatTile label="RDV à venir" value={String(upcoming.length)} />
-            <StatTile label="Clients gagnés" value={String(wonCount)} />
-            <StatTile label="Taux de conversion" value={conversionRate !== null ? `${conversionRate}%` : "—"} />
+            {[
+              { label: "Prospects trouvés", value: String(total) },
+              { label: "Contactés", value: String(contactedCount) },
+              { label: "RDV à venir", value: String(upcoming.length) },
+              { label: "Clients gagnés", value: String(wonCount) },
+              { label: "Taux de conversion", value: conversionRate !== null ? `${conversionRate}%` : "—" },
+            ].map((tile, i) => (
+              <div key={tile.label} className="animate-fade-up" style={{ animationDelay: `${i * 50}ms` }}>
+                <StatTile label={tile.label} value={tile.value} />
+              </div>
+            ))}
           </div>
         )}
 

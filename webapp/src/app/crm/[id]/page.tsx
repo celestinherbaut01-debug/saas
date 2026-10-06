@@ -4,6 +4,8 @@ import { getCachedUser } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
 import { ProspectDetail } from "@/components/crm/prospect-detail";
 import { resolveScoringProfile, SCORING_PROFILE_LABEL } from "@/lib/scoring-profile";
+import { getWorkspacePlan } from "@/lib/plan";
+import { businessOsAtLeast } from "@/lib/entitlements";
 
 export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id]">) {
   const { id } = await params;
@@ -38,6 +40,8 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
       ).data?.slug ?? null
     : null;
   const scoreLabel = SCORING_PROFILE_LABEL[resolveScoringProfile(ownSlug, businessProfile?.audience ?? null)];
+  const plan = await getWorkspacePlan(prospect.workspace_id);
+  const canUseBusinessOs = businessOsAtLeast(plan, "standard");
 
   return (
     <AppShell>
@@ -46,6 +50,7 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
         initialActivities={activities ?? []}
         appointments={appointments ?? []}
         scoreLabel={scoreLabel}
+        canUseBusinessOs={canUseBusinessOs}
       />
     </AppShell>
   );

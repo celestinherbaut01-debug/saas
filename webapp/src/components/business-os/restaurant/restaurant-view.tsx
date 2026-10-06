@@ -16,6 +16,8 @@ import type {
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeRestaurantAlerts } from "@/lib/restaurant";
+import { computeRestaurantCommandCenter } from "@/lib/command-center";
+import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
 import { AppointmentsModule } from "@/components/business-os/appointments-module";
@@ -26,9 +28,10 @@ import { PurchaseOrdersModule } from "@/components/business-os/restaurant/restau
 import { RecipesModule } from "@/components/business-os/restaurant/restaurant-recipes";
 import { RestaurantDashboard } from "@/components/business-os/restaurant/restaurant-dashboard";
 
-type Tab = "dashboard" | "customers" | "inventory" | "suppliers" | "purchase_orders" | "waste" | "recipes" | "planning" | "team";
+type Tab = "today" | "dashboard" | "customers" | "inventory" | "suppliers" | "purchase_orders" | "waste" | "recipes" | "planning" | "team";
 
 const TABS: { key: Tab; label: string }[] = [
+  { key: "today", label: "Aujourd'hui" },
   { key: "dashboard", label: "Dashboard" },
   { key: "customers", label: "Clients" },
   { key: "inventory", label: "Stocks & Ingrédients" },
@@ -68,7 +71,7 @@ export function RestaurantView({
   initialTeamMembers: TeamMember[];
 }) {
   const supabase = createClient();
-  const [active, setActive] = useState<Tab>("dashboard");
+  const [active, setActive] = useState<Tab>("today");
 
   const [customers, setCustomers] = useState(initialCustomers);
   const [inventory, setInventory] = useState(initialInventory);
@@ -80,6 +83,14 @@ export function RestaurantView({
   const [teamMembers, setTeamMembers] = useState(initialTeamMembers);
 
   const alerts = useMemo(() => computeRestaurantAlerts({ purchaseOrders }, isAdvanced), [purchaseOrders, isAdvanced]);
+  const commandCenter = useMemo(
+    () => computeRestaurantCommandCenter({ appointments: initialAppointments, inventory, purchaseOrders }),
+    [initialAppointments, inventory, purchaseOrders],
+  );
+
+  function handleCommandCenterNavigate(tab: string) {
+    setActive(tab as Tab);
+  }
 
   async function createCustomer(input: { name: string; phone: string; email: string; notes: string }) {
     const { data, error } = await supabase.from("customers").insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() }).select("*").single();
@@ -227,6 +238,7 @@ export function RestaurantView({
         ))}
       </div>
 
+      {active === "today" && <CommandCenter data={commandCenter} onNavigate={handleCommandCenterNavigate} entityName="restaurant" />}
       {active === "dashboard" && (
         <RestaurantDashboard inventory={inventory} wasteLog={initialWasteLog} purchaseOrders={purchaseOrders} recipes={recipes} recipeIngredients={recipeIngredients} alerts={alerts} />
       )}

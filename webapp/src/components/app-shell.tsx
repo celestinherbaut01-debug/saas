@@ -139,6 +139,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           Passer à {ENTITLEMENTS[cheapestUpgrade].label}
         </Link>
       )}
+      <Link href="/tarifs" className="mt-1.5 block text-center text-[10.5px] font-semibold text-sidebar-ink-dim hover:text-white">
+        Voir tous les tarifs
+      </Link>
     </div>
   );
 

@@ -188,6 +188,7 @@ export interface Database {
           notes: string;
           next_followup_at: string | null;
           deal_value: number | null;
+          converted_customer_id: string | null;
           created_at: string;
           updated_at: string;
         };

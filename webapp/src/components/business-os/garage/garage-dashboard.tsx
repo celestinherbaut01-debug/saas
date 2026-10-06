@@ -58,14 +58,20 @@ export function GarageDashboard({
   return (
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Véhicules en atelier" value={String(vehiclesInShop)} />
-        <StatTile label="Réparations aujourd'hui" value={String(today.length)} />
-        <StatTile label="Réparations en retard" value={String(overdue.length)} />
-        <StatTile label="CA du mois" value={formatEUR(revenueThisMonth)} sub={`${invoicesThisMonth.length} facture(s)`} />
-        <StatTile label="Panier moyen" value={formatEUR(avgBasket)} />
-        <StatTile label="Pièces en stock faible" value={String(lowStock.length)} />
-        <StatTile label="Ordres actifs" value={String(active.length)} />
-        <StatTile label="Prochain RDV" value={upcoming[0] ? new Date(upcoming[0].scheduled_at!).toLocaleDateString("fr-FR") : "—"} />
+        {[
+          { label: "Véhicules en atelier", value: String(vehiclesInShop) },
+          { label: "Réparations aujourd'hui", value: String(today.length) },
+          { label: "Réparations en retard", value: String(overdue.length) },
+          { label: "CA du mois", value: formatEUR(revenueThisMonth), sub: `${invoicesThisMonth.length} facture(s)` },
+          { label: "Panier moyen", value: formatEUR(avgBasket) },
+          { label: "Pièces en stock faible", value: String(lowStock.length) },
+          { label: "Ordres actifs", value: String(active.length) },
+          { label: "Prochain RDV", value: upcoming[0] ? new Date(upcoming[0].scheduled_at!).toLocaleDateString("fr-FR") : "—" },
+        ].map((tile, i) => (
+          <div key={tile.label} className="animate-fade-up" style={{ animationDelay: `${i * 40}ms` }}>
+            <StatTile label={tile.label} value={tile.value} sub={tile.sub} />
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
