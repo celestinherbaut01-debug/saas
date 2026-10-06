@@ -13,6 +13,14 @@ import { setDevPlan } from "@/lib/actions/settings";
 // vrais prix des deux plans qui composent le bundle).
 const ACQUISITION_PLANS: Plan[] = ["acquisition_starter", "acquisition_pro"];
 const BUSINESS_OS_PLANS: Plan[] = ["business_os", "business_os_advanced"];
+const VALUE: Partial<Record<Plan,{outcome:string;upgrade:string}>>={
+ acquisition_starter:{outcome:"Trouver et suivre vos premiers prospects sans vous perdre dans des fichiers.",upgrade:"Pro ajoute les campagnes et relances automatiques, après connexion des services requis."},
+ acquisition_pro:{outcome:"Organiser une prospection régulière et suivre les réponses dans le CRM.",upgrade:"Complete relie les clients gagnés à votre gestion métier."},
+ business_os:{outcome:"Piloter votre atelier, vos projets, vos interventions ou vos biens au même endroit.",upgrade:"Advanced débloque les capacités avancées et les fonctionnalités d’équipe selon les limites du forfait."},
+ business_os_advanced:{outcome:"Coordonner la production et détecter les échéances qui protègent votre activité.",upgrade:"Complete ajoute Acquisition Pro et la continuité entre prospection et opérations."},
+ complete:{outcome:"Trouver un client, gagner l’affaire, puis réaliser et suivre la prestation : une seule chaîne.",upgrade:"Complete Max ajoute le centre d’actions NOVA et davantage de capacités pour l’équipe."},
+ complete_max:{outcome:"Faire travailler acquisition, opérations et recommandations dans un espace commun.",upgrade:"Le niveau le plus complet. Choisissez un module seul si vous n’avez besoin que d’une partie."},
+};
 const BUNDLE_PLANS: Plan[] = ["complete", "complete_max"];
 
 export function PricingTable({
@@ -66,7 +74,7 @@ export function PricingTable({
         className={cn(
           "relative flex flex-col rounded-3xl border p-7 transition-shadow",
           isPro
-            ? "border-accent/40 bg-panel shadow-[0_8px_40px_-12px_var(--accent)]"
+            ? "border-accent/40 bg-gradient-to-br from-accent/15 via-panel to-accent-3/10 shadow-[0_8px_40px_-12px_var(--accent)]"
             : "border-line bg-panel hover:shadow-md",
         )}
       >
@@ -82,6 +90,7 @@ export function PricingTable({
         )}
 
         <h3 className="font-display text-[17px] font-extrabold tracking-tight">{plan.label}</h3>
+        <p className="mt-3 text-[15px] font-semibold leading-relaxed">{VALUE[planId]?.outcome??plan.tagline}</p>
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted">{plan.tagline}</p>
         <p className="mt-1 text-[11.5px] leading-relaxed text-faint">{plan.targetAudience}</p>
 
@@ -102,6 +111,8 @@ export function PricingTable({
             <span className="mt-6 rounded-xl border border-line bg-soft px-4 py-2.5 text-center text-[13px] font-semibold text-faint">
               Plan actuel
             </span>
+          ) : !isDev ? (
+            <Link href="/abonnement" className="mt-6 rounded-xl border border-line px-4 py-2.5 text-center text-sm font-semibold">Consulter mon abonnement</Link>
           ) : (
             <button
               type="button"
@@ -150,6 +161,7 @@ export function PricingTable({
           ))}
         </ul>
 
+        {VALUE[planId] && <p className="mt-6 border-t border-line pt-4 text-xs leading-relaxed text-muted"><strong className="text-ink">Pour aller plus loin</strong><br/>{VALUE[planId]?.upgrade}</p>}
         <p className="mt-5 rounded-lg border border-dashed border-line bg-soft px-3 py-2 text-[11.5px] leading-relaxed text-muted">
           <span className="font-semibold text-ink">Limite à connaître —</span> {plan.notIncluded}
         </p>
@@ -159,6 +171,7 @@ export function PricingTable({
 
   return (
     <div className="flex w-full flex-col items-center gap-12">
+      {!isDev && <p className="text-center text-xs leading-relaxed text-muted">Le paiement en ligne n’est pas encore connecté. Ces tarifs décrivent les forfaits ; aucun paiement ne sera déclenché ici.</p>}
       <div className="flex items-center gap-1 rounded-full border border-line bg-panel p-1 text-[12.5px] font-semibold shadow-sm">
         <button
           type="button"
@@ -172,7 +185,7 @@ export function PricingTable({
           onClick={() => setYearly(true)}
           className={cn("rounded-full px-4 py-1.5 transition-colors", yearly ? "bg-accent text-accent-ink" : "text-muted hover:text-ink")}
         >
-          Annuel <span className="text-[10px] opacity-80">(2 mois offerts)</span>
+          Annuel <span className="text-[10px] opacity-80">(prix mensuel × 10)</span>
         </button>
       </div>
 

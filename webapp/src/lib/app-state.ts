@@ -1,3 +1,4 @@
+import { checkedAll } from "@/lib/data-state";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import type { Plan } from "@/lib/entitlements";
@@ -44,7 +45,7 @@ export async function getUserAppState(
   // (React `cache()`) : si AppShell ou la page ont déjà appelé ces mêmes
   // fonctions, ceci ne refait aucun aller-retour Supabase — voir
   // lib/session.ts et lib/plan.ts.
-  const [{ data: profile }, membership] = await Promise.all([
+  const [{ data: profile }, membership] = await checkedAll([
     supabase.from("profiles").select("onboarding_completed").eq("id", userId).maybeSingle(),
     getCachedMembership(userId),
   ]);
@@ -56,7 +57,7 @@ export async function getUserAppState(
   let ownCategoryId: string | null = null;
 
   if (workspaceId) {
-    const [planResult, { data: businessProfile }] = await Promise.all([
+    const [planResult, { data: businessProfile }] = await checkedAll([
       getWorkspacePlan(workspaceId),
       supabase.from("business_profiles").select("own_category_id").eq("workspace_id", workspaceId).maybeSingle(),
     ]);

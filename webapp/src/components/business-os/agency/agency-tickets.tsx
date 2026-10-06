@@ -22,6 +22,7 @@ interface TicketInput {
 }
 
 export function TicketsModule({
+  initialFocusId,
   rows,
   customers,
   sites,
@@ -29,6 +30,7 @@ export function TicketsModule({
   onUpdate,
   onRemove,
 }: {
+  initialFocusId?: string | null;
   rows: Ticket[];
   customers: Customer[];
   sites: ClientSite[];
@@ -37,7 +39,7 @@ export function TicketsModule({
   onRemove: (id: string) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Ticket | null>(null);
+  const [editing, setEditing] = useState<Ticket | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function customerName(id: string | null) {
     return id ? customers.find((c) => c.id === id)?.name ?? "—" : "—";

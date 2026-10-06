@@ -1,3 +1,5 @@
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
@@ -8,7 +10,7 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { ENTITLEMENTS } from "@/lib/entitlements";
 import { normalizeProspectionFilters } from "@/lib/prospecting-config";
 
-export default async function ProspectionPage() {
+async function ProspectionPageContent() {
   const user = await getCachedUser();
   if (!user) redirect("/login");
   const supabase = await createClient();
@@ -16,7 +18,7 @@ export default async function ProspectionPage() {
   const membership = await getCachedMembership(user.id);
   if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
-  const [{ data: categories }, { data: businessProfile }, { data: targets }] = await Promise.all([
+  const [{ data: categories }, { data: businessProfile }, { data: targets }] = await checkedAll([
     supabase.from("business_categories").select("*").order("sort_order"),
     supabase
       .from("business_profiles")
@@ -69,3 +71,5 @@ export default async function ProspectionPage() {
     </AppShell>
   );
 }
+
+export default async function ProspectionPage() { try { return await ProspectionPageContent(); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

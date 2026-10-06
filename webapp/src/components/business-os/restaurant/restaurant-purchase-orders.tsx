@@ -17,6 +17,7 @@ import { PURCHASE_ORDER_STATUS_LABEL, formatEUR } from "@/lib/restaurant";
 // fournisseur qui change de statut (commandé -> reçu), pas deux tables
 // couplées pour une seule réalité opérationnelle.
 export function PurchaseOrdersModule({
+  initialFocusId,
   rows,
   items,
   suppliers,
@@ -27,6 +28,7 @@ export function PurchaseOrdersModule({
   onRemoveItem,
   onRemove,
 }: {
+  initialFocusId?: string | null;
   rows: PurchaseOrder[];
   items: PurchaseOrderItem[];
   suppliers: Supplier[];
@@ -38,7 +40,7 @@ export function PurchaseOrdersModule({
   onRemove: (id: string) => void;
 }) {
   const [supplierId, setSupplierId] = useState("");
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(initialFocusId??null);
 
   function supplierName(id: string | null) {
     return id ? suppliers.find((s) => s.id === id)?.name ?? "—" : "—";

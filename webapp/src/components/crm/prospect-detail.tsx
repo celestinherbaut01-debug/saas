@@ -37,6 +37,7 @@ export function ProspectDetail({
   canUseBusinessOs?: boolean;
 }) {
   const supabase = createClient();
+  const [conversionError,setConversionError] = useState<string | null>(null);
   const [prospect, setProspect] = useState(initialProspect);
   const [activities, setActivities] = useState(initialActivities);
   const [notes, setNotes] = useState(prospect.notes);
@@ -69,7 +70,8 @@ export function ProspectDetail({
       await logActivity("status_change", `${from} → ${to}`);
 
       if (status === "won" && canUseBusinessOs) {
-        const customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status });
+        let customerId: string | null = null;
+      try { customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status }); setConversionError(null); } catch(error) { setConversionError(error instanceof Error ? error.message : "Conversion impossible. Réessayez le statut Gagné."); }
         if (customerId) setProspect((p) => ({ ...p, converted_customer_id: customerId }));
       }
     }
@@ -136,6 +138,7 @@ export function ProspectDetail({
 
   return (
     <div className="flex flex-col gap-5">
+      {conversionError && <p role="alert" className="rounded-xl bg-red-bg p-3 text-sm text-red-fg">{conversionError}</p>}
       {prospect.status === "do_not_contact" && (
         <div className="rounded-lg bg-red-bg px-3.5 py-2.5 text-[12.5px] font-semibold text-red-fg">
           ⚠ Ne plus contacter — ce prospect ne doit recevoir aucun email ni relance.
@@ -457,3 +460,4 @@ export function ProspectDetail({
     </div>
   );
 }
+

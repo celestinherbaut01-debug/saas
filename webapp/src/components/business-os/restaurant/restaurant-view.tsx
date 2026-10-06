@@ -1,5 +1,7 @@
 "use client";
 
+import { RestaurantKitchen } from "@/components/business-os/restaurant/restaurant-kitchen";
+
 import { useMemo, useState } from "react";
 import type {
   Customer,
@@ -28,10 +30,11 @@ import { PurchaseOrdersModule } from "@/components/business-os/restaurant/restau
 import { RecipesModule } from "@/components/business-os/restaurant/restaurant-recipes";
 import { RestaurantDashboard } from "@/components/business-os/restaurant/restaurant-dashboard";
 
-type Tab = "today" | "dashboard" | "customers" | "inventory" | "suppliers" | "purchase_orders" | "waste" | "recipes" | "planning" | "team";
+type Tab = "kitchen" | "today" | "dashboard" | "customers" | "inventory" | "suppliers" | "purchase_orders" | "waste" | "recipes" | "planning" | "team";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Aujourd'hui" },
+  { key: "kitchen", label: "Cuisine" },
   { key: "dashboard", label: "Dashboard" },
   { key: "customers", label: "Clients" },
   { key: "inventory", label: "Stocks & Ingrédients" },
@@ -71,8 +74,12 @@ export function RestaurantView({
   initialTeamMembers: TeamMember[];
 }) {
   const supabase = createClient();
+  const [mutationError,setMutationError]=useState<string|null>(null);
+  const [focusId,setFocusId]=useState<string|null>(null);
   const [active, setActive] = useState<Tab>("today");
 
+  const [appointments,setAppointments]=useState(initialAppointments);
+  const [waste,setWaste]=useState(initialWasteLog);
   const [customers, setCustomers] = useState(initialCustomers);
   const [inventory, setInventory] = useState(initialInventory);
   const [suppliers, setSuppliers] = useState(initialSuppliers);
@@ -84,20 +91,25 @@ export function RestaurantView({
 
   const alerts = useMemo(() => computeRestaurantAlerts({ purchaseOrders }, isAdvanced), [purchaseOrders, isAdvanced]);
   const commandCenter = useMemo(
-    () => computeRestaurantCommandCenter({ appointments: initialAppointments, inventory, purchaseOrders }),
-    [initialAppointments, inventory, purchaseOrders],
+    () => computeRestaurantCommandCenter({ appointments, inventory, purchaseOrders }),
+    [appointments, inventory, purchaseOrders],
   );
 
-  function handleCommandCenterNavigate(tab: string) {
+  function handleCommandCenterNavigate(tab: string, detailId?:string) {
+    setFocusId(detailId??null);
     setActive(tab as Tab);
   }
 
   async function createCustomer(input: { name: string; phone: string; email: string; notes: string }) {
     const { data, error } = await supabase.from("customers").insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() }).select("*").single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setCustomers((prev) => [data, ...prev]);
   }
   async function updateCustomer(id: string, patch: Partial<Customer>) {
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
   async function removeCustomer(id: string, mode: "archive" | "delete") {
@@ -105,6 +117,8 @@ export function RestaurantView({
       mode === "archive"
         ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("customers").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -114,10 +128,14 @@ export function RestaurantView({
       .insert({ workspace_id: workspaceId, name: input.name.trim(), quantity: Number(input.quantity) || 0, unit: input.unit.trim() || "unité", low_stock_threshold: input.lowStockThreshold ? Number(input.lowStockThreshold) : null, unit_cost: Number(input.unitCost) || 0, supplier_id: input.supplierId || null })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setInventory((prev) => [data, ...prev]);
   }
   async function updateInventoryItem(id: string, patch: Partial<InventoryItem>) {
     const { error } = await supabase.from("inventory_items").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setInventory((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
   }
   async function removeInventoryItem(id: string, mode: "archive" | "delete") {
@@ -125,15 +143,21 @@ export function RestaurantView({
       mode === "archive"
         ? await supabase.from("inventory_items").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("inventory_items").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setInventory((prev) => prev.filter((i) => i.id !== id));
   }
 
   async function createSupplier(input: { name: string; phone: string; email: string; notes: string }) {
     const { data, error } = await supabase.from("suppliers").insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() }).select("*").single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setSuppliers((prev) => [data, ...prev]);
   }
   async function updateSupplier(id: string, patch: Partial<Supplier>) {
     const { error } = await supabase.from("suppliers").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
   async function removeSupplier(id: string, mode: "archive" | "delete") {
@@ -141,11 +165,15 @@ export function RestaurantView({
       mode === "archive"
         ? await supabase.from("suppliers").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("suppliers").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setSuppliers((prev) => prev.filter((s) => s.id !== id));
   }
 
   async function createPurchaseOrder(supplierId: string) {
     const { data, error } = await supabase.from("purchase_orders").insert({ workspace_id: workspaceId, supplier_id: supplierId, status: "draft" }).select("*").single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setPurchaseOrders((prev) => [data, ...prev]);
   }
   async function setPurchaseOrderStatus(order: PurchaseOrder, status: PurchaseOrder["status"]) {
@@ -153,10 +181,14 @@ export function RestaurantView({
     if (status === "ordered" && !order.ordered_at) patch.ordered_at = new Date().toISOString().slice(0, 10);
     if (status === "received" && !order.received_at) patch.received_at = new Date().toISOString().slice(0, 10);
     const { error } = await supabase.from("purchase_orders").update(patch).eq("id", order.id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setPurchaseOrders((prev) => prev.map((p) => (p.id === order.id ? { ...p, ...patch } : p)));
   }
   async function removePurchaseOrder(id: string) {
     const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setPurchaseOrders((prev) => prev.filter((p) => p.id !== id));
   }
   async function addPurchaseOrderItem(orderId: string, input: { inventoryItemId: string; itemName: string; quantity: number; unitCost: number }) {
@@ -184,14 +216,20 @@ export function RestaurantView({
 
   async function createRecipe(input: { name: string; sellingPrice: string }) {
     const { data, error } = await supabase.from("recipes").insert({ workspace_id: workspaceId, name: input.name.trim(), selling_price: Number(input.sellingPrice) || 0 }).select("*").single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setRecipes((prev) => [data, ...prev]);
   }
   async function updateRecipe(id: string, patch: Partial<Recipe>) {
     const { error } = await supabase.from("recipes").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setRecipes((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
   async function removeRecipe(id: string) {
     const { error } = await supabase.from("recipes").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setRecipes((prev) => prev.filter((r) => r.id !== id));
   }
   async function addRecipeIngredient(recipeId: string, input: { inventoryItemId: string; itemName: string; quantity: number; unitCost: number }) {
@@ -200,19 +238,27 @@ export function RestaurantView({
       .insert({ workspace_id: workspaceId, recipe_id: recipeId, inventory_item_id: input.inventoryItemId || null, item_name: input.itemName, quantity: input.quantity, unit_cost: input.unitCost })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setRecipeIngredients((prev) => [...prev, data]);
   }
   async function removeRecipeIngredient(ingredient: RecipeIngredient) {
     const { error } = await supabase.from("recipe_ingredients").delete().eq("id", ingredient.id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setRecipeIngredients((prev) => prev.filter((i) => i.id !== ingredient.id));
   }
 
   async function createTeamMember(input: { name: string; role: string; phone: string; email: string }) {
     const { data, error } = await supabase.from("team_members").insert({ workspace_id: workspaceId, name: input.name.trim(), role: input.role.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null }).select("*").single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setTeamMembers((prev) => [...prev, data]);
   }
   async function updateTeamMember(id: string, patch: Partial<TeamMember>) {
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setTeamMembers((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
   async function removeTeamMember(id: string, mode: "archive" | "delete") {
@@ -220,17 +266,21 @@ export function RestaurantView({
       mode === "archive"
         ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("team_members").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setTeamMembers((prev) => prev.filter((t) => t.id !== id));
   }
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap gap-1.5 border-b border-line pb-1">
+      {mutationError && <p role="alert" className="rounded-xl bg-red-bg p-3 text-sm text-red-fg">{mutationError}</p>}
+      <div className="pf-tabs">
         {TABS.map((t) => (
           <button
             key={t.key}
             type="button"
-            onClick={() => setActive(t.key)}
+            onClick={() => {setFocusId(null);setActive(t.key);}}
+            aria-current={active===t.key?"page":undefined}
             className={cn("rounded-t-lg px-3 py-2 text-[12.5px] font-semibold transition-colors", active === t.key ? "bg-panel text-ink shadow-[0_1px_0_0_var(--panel)]" : "text-muted hover:text-ink")}
           >
             {t.label}
@@ -239,6 +289,7 @@ export function RestaurantView({
       </div>
 
       {active === "today" && <CommandCenter data={commandCenter} onNavigate={handleCommandCenterNavigate} entityName="restaurant" />}
+      {active === "kitchen" && <RestaurantKitchen inventory={inventory} recipes={recipes} ingredients={recipeIngredients} waste={waste} suppliers={suppliers} onNavigate={handleCommandCenterNavigate} />}
       {active === "dashboard" && (
         <RestaurantDashboard inventory={inventory} wasteLog={initialWasteLog} purchaseOrders={purchaseOrders} recipes={recipes} recipeIngredients={recipeIngredients} alerts={alerts} />
       )}
@@ -246,7 +297,7 @@ export function RestaurantView({
         <CustomersModule workspaceId={workspaceId} initial={customers} label="Clients" controlled={{ rows: customers, onCreate: createCustomer, onUpdate: updateCustomer, onRemove: removeCustomer }} />
       )}
       {active === "inventory" && (
-        <InventoryModule
+        <InventoryModule key={`${active}-${focusId}`} initialFocusId={focusId}
           workspaceId={workspaceId}
           initial={inventory}
           label="Stocks & Ingrédients"
@@ -256,7 +307,7 @@ export function RestaurantView({
       )}
       {active === "suppliers" && <SuppliersModule rows={suppliers} onCreate={createSupplier} onUpdate={updateSupplier} onRemove={removeSupplier} />}
       {active === "purchase_orders" && (
-        <PurchaseOrdersModule
+        <PurchaseOrdersModule key={`${active}-${focusId}`} initialFocusId={focusId}
           rows={purchaseOrders}
           items={purchaseOrderItems}
           suppliers={suppliers}
@@ -268,12 +319,13 @@ export function RestaurantView({
           onRemove={removePurchaseOrder}
         />
       )}
-      {active === "waste" && <WasteLogModule workspaceId={workspaceId} initial={initialWasteLog} />}
+      {active === "waste" && <WasteLogModule workspaceId={workspaceId} initial={waste} onRowsChange={setWaste} />}
       {active === "recipes" && (
-        <RecipesModule rows={recipes} ingredients={recipeIngredients} inventory={inventory} onCreate={createRecipe} onUpdate={updateRecipe} onRemove={removeRecipe} onAddIngredient={addRecipeIngredient} onRemoveIngredient={removeRecipeIngredient} />
+        <RecipesModule key={`${active}-${focusId}`} initialFocusId={focusId} rows={recipes} ingredients={recipeIngredients} inventory={inventory} onCreate={createRecipe} onUpdate={updateRecipe} onRemove={removeRecipe} onAddIngredient={addRecipeIngredient} onRemoveIngredient={removeRecipeIngredient} />
       )}
-      {active === "planning" && <AppointmentsModule workspaceId={workspaceId} initial={initialAppointments} label="Réservations" />}
+      {active === "planning" && <AppointmentsModule workspaceId={workspaceId} initial={appointments} onRowsChange={setAppointments} label="Réservations" />}
       {active === "team" && <TeamModule label="Équipe" rows={teamMembers} onCreate={createTeamMember} onUpdate={updateTeamMember} onRemove={removeTeamMember} />}
     </div>
   );
 }
+

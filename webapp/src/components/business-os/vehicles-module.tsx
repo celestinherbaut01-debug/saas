@@ -23,12 +23,14 @@ interface ControlledVehicles {
 }
 
 export function VehiclesModule({
+  initialFocusId,
   workspaceId,
   initial,
   customers,
   repairOrders = [],
   controlled,
 }: {
+  initialFocusId?:string|null;
   workspaceId: string;
   initial: Vehicle[];
   customers: Customer[];
@@ -38,7 +40,7 @@ export function VehiclesModule({
   const supabase = createClient();
   const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Vehicle | null>(null);
+  const [editing, setEditing] = useState<Vehicle | null>((controlled?.rows??initial).find(v=>v.id===initialFocusId)??null);
   const [search, setSearch] = useState("");
 
   const rows = controlled ? controlled.rows : localRows;

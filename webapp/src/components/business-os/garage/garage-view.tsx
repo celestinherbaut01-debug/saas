@@ -99,6 +99,8 @@ export function GarageView({
   initialDocuments: BusinessDocument[];
 }) {
   const supabase = createClient();
+  const [mutationError,setMutationError]=useState<string|null>(null);
+  const [focusId,setFocusId]=useState<string|null>(null);
   const [active, setActive] = useState<Tab>("today");
 
   const [customers, setCustomers] = useState(initialCustomers);
@@ -127,6 +129,7 @@ export function GarageView({
   }
 
   function handleCommandCenterNavigate(tab: string, detailId?: string) {
+    setFocusId(detailId??null);
     setActive(tab as Tab);
     if (detailId) setOpenDetailId(detailId);
   }
@@ -138,10 +141,14 @@ export function GarageView({
       .insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setCustomers((prev) => [data, ...prev]);
   }
   async function updateCustomer(id: string, patch: Partial<Customer>) {
     const { error } = await supabase.from("customers").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
   async function removeCustomer(id: string, mode: "archive" | "delete") {
@@ -149,6 +156,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("customers").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("customers").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setCustomers((prev) => prev.filter((c) => c.id !== id));
   }
 
@@ -167,10 +176,14 @@ export function GarageView({
       })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setVehicles((prev) => [data, ...prev]);
   }
   async function updateVehicle(id: string, patch: Partial<Vehicle>) {
     const { error } = await supabase.from("vehicles").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, ...patch } : v)));
   }
   async function removeVehicle(id: string, mode: "archive" | "delete") {
@@ -178,6 +191,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("vehicles").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("vehicles").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setVehicles((prev) => prev.filter((v) => v.id !== id));
   }
 
@@ -188,10 +203,14 @@ export function GarageView({
       .insert({ workspace_id: workspaceId, name: input.name.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null, notes: input.notes.trim() })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setSuppliers((prev) => [data, ...prev]);
   }
   async function updateSupplier(id: string, patch: Partial<Supplier>) {
     const { error } = await supabase.from("suppliers").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setSuppliers((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
   async function removeSupplier(id: string, mode: "archive" | "delete") {
@@ -199,6 +218,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("suppliers").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("suppliers").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setSuppliers((prev) => prev.filter((s) => s.id !== id));
   }
 
@@ -218,10 +239,14 @@ export function GarageView({
       })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setParts((prev) => [data, ...prev]);
   }
   async function updatePart(id: string, patch: Partial<Part>) {
     const { error } = await supabase.from("parts").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setParts((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
   }
   async function removePart(id: string, mode: "archive" | "delete") {
@@ -229,6 +254,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("parts").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("parts").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setParts((prev) => prev.filter((p) => p.id !== id));
   }
   async function adjustPartQuantity(id: string, delta: number) {
@@ -245,6 +272,8 @@ export function GarageView({
       .insert({ workspace_id: workspaceId, name: input.name.trim(), role: input.role.trim(), phone: input.phone.trim() || null, email: input.email.trim() || null })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return null;}
+    setMutationError(null);
     if (!error && data) {
       setTechnicians((prev) => [...prev, data]);
       return data.id;
@@ -253,6 +282,8 @@ export function GarageView({
   }
   async function updateTechnician(id: string, patch: Partial<TeamMember>) {
     const { error } = await supabase.from("team_members").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setTechnicians((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   }
   async function removeTechnician(id: string, mode: "archive" | "delete") {
@@ -260,6 +291,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("team_members").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("team_members").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setTechnicians((prev) => prev.filter((t) => t.id !== id));
   }
 
@@ -277,6 +310,8 @@ export function GarageView({
       })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) {
       setRepairOrders((prev) => [data, ...prev]);
       setOpenDetailId(data.id);
@@ -285,6 +320,8 @@ export function GarageView({
 
   async function patchOrder(id: string, patch: Partial<RepairOrder>) {
     const { error } = await supabase.from("repair_orders").update(patch).eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) setRepairOrders((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
@@ -300,6 +337,8 @@ export function GarageView({
       mode === "archive"
         ? await supabase.from("repair_orders").update({ archived_at: new Date().toISOString() }).eq("id", id)
         : await supabase.from("repair_orders").delete().eq("id", id);
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error) {
       setRepairOrders((prev) => prev.filter((r) => r.id !== id));
       setOpenDetailId((cur) => (cur === id ? null : cur));
@@ -320,7 +359,7 @@ export function GarageView({
       })
       .select("*")
       .single();
-    if (error || !data) return;
+    if (error || !data) {setMutationError(error?.message??"Enregistrement impossible.");return;}
     setLines((prev) => [...prev, data]);
 
     if (input.partId) {
@@ -356,6 +395,8 @@ export function GarageView({
       .insert({ workspace_id: workspaceId, doc_type: docType, repair_order_id: order.id, customer_id: order.customer_id, number, total_ht: total, total_ttc: total, status: "draft" })
       .select("*")
       .single();
+    if(error) {setMutationError(error.message);return;}
+    setMutationError(null);
     if (!error && data) setDocuments((prev) => [data, ...prev]);
   }
 
@@ -375,12 +416,14 @@ export function GarageView({
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap gap-1.5 border-b border-line pb-1">
+      {mutationError && <p role="alert" className="rounded-xl bg-red-bg p-3 text-sm text-red-fg">{mutationError}</p>}
+      <div className="pf-tabs">
         {visibleTabs.map((t) => (
           <button
             key={t.key}
             type="button"
-            onClick={() => setActive(t.key)}
+            onClick={() => {setFocusId(null);setActive(t.key);}}
+            aria-current={active===t.key?"page":undefined}
             className={cn(
               "rounded-t-lg px-3 py-2 text-[12.5px] font-semibold transition-colors",
               active === t.key ? "bg-panel text-ink shadow-[0_1px_0_0_var(--panel)]" : "text-muted hover:text-ink",
@@ -404,7 +447,7 @@ export function GarageView({
         />
       )}
       {active === "vehicles" && (
-        <VehiclesModule
+        <VehiclesModule key={`${active}-${focusId}`} initialFocusId={focusId}
           workspaceId={workspaceId}
           initial={vehicles}
           customers={customers}
@@ -413,7 +456,7 @@ export function GarageView({
         />
       )}
       {active === "workshop" && isAdvanced && (
-        <WorkshopModule rows={repairOrders} vehicles={vehicles} customers={customers} technicians={technicians} onAdvance={(o, s) => setOrderStatus(o, s)} onOpenDetail={openOrder} />
+        <WorkshopModule onUpdateVehicle={updateVehicle} rows={repairOrders} vehicles={vehicles} customers={customers} technicians={technicians} onAdvance={(o, s) => setOrderStatus(o, s)} onOpenDetail={openOrder} />
       )}
       {active === "repair_orders" && (
         <RepairOrdersModule
@@ -443,7 +486,7 @@ export function GarageView({
       {active === "stock" && <StockModule rows={parts} onAdjust={adjustPartQuantity} />}
       {active === "suppliers" && <SuppliersModule rows={suppliers} onCreate={createSupplier} onUpdate={updateSupplier} onRemove={removeSupplier} />}
       {active === "quotes" && (
-        <DocumentsModule
+        <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="quote"
           rows={documents}
           customers={customers}
@@ -453,7 +496,7 @@ export function GarageView({
         />
       )}
       {active === "invoices" && (
-        <DocumentsModule
+        <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="invoice"
           rows={documents}
           customers={customers}
@@ -470,3 +513,4 @@ export function GarageView({
     </div>
   );
 }
+

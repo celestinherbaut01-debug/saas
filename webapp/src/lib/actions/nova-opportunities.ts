@@ -1,4 +1,7 @@
 "use server";
+import { checkedAll } from "@/lib/data-state";
+import { DataLoadError } from "@/lib/data-state";
+
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -80,10 +83,11 @@ export async function getOpportunities(workspaceId: string): Promise<Opportuniti
     return { opportunities: [], canSeeAcquisition: ent.canSeeAcquisitionOpportunities, canSeeBusinessOs: ent.canSeeBusinessOsOpportunities };
   }
 
-  const { data: logRows } = await supabase
+  const { data: logRows , error: queryError1 } = await supabase
     .from("nova_action_log")
     .select("opportunity_key, status, updated_at")
     .eq("workspace_id", workspaceId);
+  if(queryError1) throw new DataLoadError(queryError1);
   const log = new Map<string, ActionLogEntry>(
     (logRows ?? []).map((r) => [r.opportunity_key, { status: r.status, updatedAt: r.updated_at }]),
   );
@@ -128,6 +132,17 @@ async function collectBusinessOsOpportunities(
     "Devis & factures",
   );
   if (decline) opportunities.push(decline);
+
+  if(vertical === "realestate") {
+    const [properties,mandates]=await checkedAll([
+      supabase.from("properties").select("*").eq("workspace_id",workspaceId),
+      supabase.from("property_mandates").select("*").eq("workspace_id",workspaceId),
+    ]);
+    for(const p of (properties.data??[]).filter(p=>["mandate","to_publish"].includes(p.status))) opportunities.push({key:`property-communication-${p.id}`,icon:"⌂",title:`Préparer la communication de ${p.title}`,reason:`Le bien est à l’étape ${p.status === "mandate" ? "mandat" : "à publier"}.`,impact:"Préparer les contenus pour les canaux de votre agence",priority:"medium",source:"Immobilier",actionLabel:"Créer la communication",actionHref:`/studio?propertyId=${p.id}`,dismissible:true});
+    const limit=new Date(Date.now()+30*86400000).toISOString().slice(0,10);
+    for(const m of (mandates.data??[]).filter(m=>m.status==="active"&&m.expires_on&&m.expires_on<=limit)) opportunities.push({key:`mandate-renewal-${m.id}`,icon:"⌂",title:"Préparer le renouvellement du mandat",reason:`Expiration renseignée : ${m.expires_on}.`,impact:"Protéger la continuité de commercialisation du bien",priority:"high",source:"Immobilier",actionLabel:"Ouvrir le bien",actionHref:`/business-os?propertyId=${m.property_id}`,dismissible:true});
+    return;
+  }
 
   if (vertical === "garage") {
     const [parts, repairOrders] = await Promise.all([loadParts(supabase, workspaceId), loadRepairOrders(supabase, workspaceId)]);
@@ -217,12 +232,13 @@ export async function setOpportunityStatus(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Session expirée." };
 
-  const { data: membership } = await supabase
+  const { data: membership , error: queryError2 } = await supabase
     .from("workspace_members")
     .select("workspace_id")
     .eq("workspace_id", workspaceId)
     .eq("user_id", user.id)
     .maybeSingle();
+  if(queryError2) throw new DataLoadError(queryError2);
   if (!membership) return { ok: false, error: "Vous n'êtes pas membre de ce workspace." };
 
   const { error } = await supabase

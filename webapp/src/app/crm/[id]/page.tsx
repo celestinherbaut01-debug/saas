@@ -1,3 +1,5 @@
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser } from "@/lib/session";
@@ -7,7 +9,7 @@ import { resolveScoringProfile, SCORING_PROFILE_LABEL } from "@/lib/scoring-prof
 import { getWorkspacePlan } from "@/lib/plan";
 import { businessOsAtLeast } from "@/lib/entitlements";
 
-export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id]">) {
+async function ProspectDetailPageContent({ params }: PageProps<"/crm/[id]">) {
   const { id } = await params;
   const user = await getCachedUser();
   if (!user) redirect("/login");
@@ -15,7 +17,7 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
 
   // Les trois requêtes ne dépendent que de `id` (pas l'une de l'autre) :
   // parallélisées plutôt qu'attendues l'une après l'autre.
-  const [{ data: prospect }, { data: activities }, { data: appointments }] = await Promise.all([
+  const [{ data: prospect }, { data: activities }, { data: appointments }] = await checkedAll([
     supabase.from("prospects").select("*").eq("id", id).maybeSingle(),
     supabase.from("activities").select("*").eq("prospect_id", id).order("created_at", { ascending: false }),
     supabase.from("appointments").select("*").eq("prospect_id", id).order("starts_at", { ascending: false }),
@@ -25,11 +27,12 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
   // Même logique que la recherche (search-prospects) pour que le libellé du
   // score affiché sur la fiche corresponde à ce qui a été calculé à l'ajout
   // — voir lib/scoring-profile.ts, miroir exact de la version edge function.
-  const { data: businessProfile } = await supabase
+  const { data: businessProfile , error: queryError1 } = await supabase
     .from("business_profiles")
     .select("own_category_id, audience")
     .eq("workspace_id", prospect.workspace_id)
     .maybeSingle();
+  if(queryError1) throw new DataLoadError(queryError1);
   const ownSlug = businessProfile?.own_category_id
     ? (
         await supabase
@@ -55,3 +58,6 @@ export default async function ProspectDetailPage({ params }: PageProps<"/crm/[id
     </AppShell>
   );
 }
+
+
+export default async function ProspectDetailPage(props: Parameters<typeof ProspectDetailPageContent>[0]) { try { return await ProspectDetailPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

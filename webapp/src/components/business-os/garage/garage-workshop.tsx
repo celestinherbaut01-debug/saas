@@ -1,105 +1,20 @@
 "use client";
-
+import { useState } from "react";
 import type { RepairOrder, Vehicle, Customer, TeamMember } from "@/lib/supabase/types";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Button } from "@/components/ui/button";
+import { GARAGE_NEXT_STATUS, garageWorkshopStage } from "@/lib/garage-workflow";
 import { REPAIR_STATUS_LABEL } from "@/lib/garage";
+const COLUMNS=[ ["upcoming","À venir"],["diagnostic","Diagnostic"],["quote","Devis en attente"],["accepted","Validé · à lancer"],["waiting_parts","En attente de pièces"],["in_progress","En intervention"],["done","Prêt"],["delivered","Terminé"] ] as const;
 
-// Colonnes actives seulement — "Livré" quitte l'atelier, il vit dans
-// Historique. Vue Kanban en lecture + avancement rapide (pas de
-// glisser-déposer, mais un vrai changement de statut réel en un clic).
-const WORKSHOP_COLUMNS: RepairOrder["status"][] = ["diagnostic", "quote", "accepted", "in_progress", "waiting_parts", "done"];
+export function WorkshopModule({rows,vehicles,customers,technicians,onAdvance,onOpenDetail,onUpdateVehicle}:{rows:RepairOrder[];vehicles:Vehicle[];customers:Customer[];technicians:TeamMember[];onAdvance:(order:RepairOrder,next:RepairOrder["status"])=>void|Promise<void>;onOpenDetail:(id:string)=>void;onUpdateVehicle?:(id:string,patch:Partial<Vehicle>)=>Promise<void>}){
+ const [busy,setBusy]=useState<string|null>(null);
 
-const NEXT_STATUS: Partial<Record<RepairOrder["status"], RepairOrder["status"]>> = {
-  diagnostic: "quote",
-  quote: "accepted",
-  accepted: "in_progress",
-  in_progress: "done",
-  waiting_parts: "in_progress",
-  done: "delivered",
-};
-
-export function WorkshopModule({
-  rows,
-  vehicles,
-  customers,
-  technicians,
-  onAdvance,
-  onOpenDetail,
-}: {
-  rows: RepairOrder[];
-  vehicles: Vehicle[];
-  customers: Customer[];
-  technicians: TeamMember[];
-  onAdvance: (order: RepairOrder, next: RepairOrder["status"]) => void;
-  onOpenDetail: (id: string) => void;
-}) {
-  const active = rows.filter((r) => r.status !== "delivered");
-
-  function vehicleOf(id: string | null) {
-    return id ? vehicles.find((v) => v.id === id) ?? null : null;
-  }
-  function customerOf(id: string | null) {
-    return id ? customers.find((c) => c.id === id) ?? null : null;
-  }
-  function technicianOf(id: string | null) {
-    return id ? technicians.find((t) => t.id === id) ?? null : null;
-  }
-
-  if (active.length === 0) {
-    return (
-      <Card>
-        <h2 className="font-display text-sm font-bold">Atelier</h2>
-        <div className="mt-4">
-          <EmptyState icon="🏭" title="Atelier vide" description="Les ordres de réparation actifs apparaîtront ici, organisés par étape." />
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <h2 className="font-display text-sm font-bold">Atelier</h2>
-      <p className="mt-1 text-[11.5px] text-muted">Vue d&apos;ensemble en temps réel des véhicules dans l&apos;atelier, par étape.</p>
-      <div className="mt-4 grid grid-cols-1 gap-3 overflow-x-auto sm:grid-cols-3 lg:grid-cols-6">
-        {WORKSHOP_COLUMNS.map((status) => {
-          const items = active.filter((r) => r.status === status);
-          const next = NEXT_STATUS[status];
-          return (
-            <div key={status} className="flex min-w-[180px] flex-col gap-2 rounded-xl bg-soft p-2.5">
-              <div className="flex items-center justify-between px-0.5">
-                <Badge tone={REPAIR_STATUS_LABEL[status].tone}>{REPAIR_STATUS_LABEL[status].text}</Badge>
-                <span className="text-[10.5px] font-bold text-faint">{items.length}</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {items.map((r) => {
-                  const v = vehicleOf(r.vehicle_id);
-                  const t = technicianOf(r.technician_id);
-                  return (
-                    <div key={r.id} className="rounded-lg border border-line bg-panel p-2.5 text-[11.5px] shadow-sm">
-                      <button type="button" onClick={() => onOpenDetail(r.id)} className="text-left font-semibold text-ink hover:text-accent">
-                        {r.title}
-                      </button>
-                      <p className="mt-0.5 text-faint">{v ? `${v.registration}` : customerOf(r.customer_id)?.name ?? "—"}</p>
-                      {t && <p className="text-faint">{t.name}</p>}
-                      {next && (
-                        <button
-                          type="button"
-                          onClick={() => onAdvance(r, next)}
-                          className="mt-1.5 w-full rounded-md border border-line bg-soft px-2 py-1 text-[10.5px] font-bold text-muted hover:bg-accent/10 hover:text-accent"
-                        >
-                          → {REPAIR_STATUS_LABEL[next].text}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
+ async function advance(r:RepairOrder,status:RepairOrder["status"]){if(busy)return;setBusy(r.id);try{await onAdvance(r,status);}finally{setBusy(null);}}
+ return <section className="pf-workflow"><p className="pf-eyebrow">ATELIER EN DIRECT</p><h2 className="mt-2 text-2xl font-bold">Chaque véhicule, à sa place.</h2><p className="mt-2 text-sm text-muted">Ouvrez un dossier pour relier diagnostic, pièces, technicien, devis et facture.</p><div className="pf-board">{COLUMNS.map(([stage,label])=>{
+ const items=rows.filter(r=>garageWorkshopStage(r)===stage),visible=stage==="delivered"?items.slice(0,20):items;
+ return <div className="pf-lane" key={stage}><h3>{label}<span>{items.length}</span></h3>{visible.map(r=>{
+ const v=vehicles.find(v=>v.id===r.vehicle_id),c=customers.find(c=>c.id===r.customer_id),t=technicians.find(t=>t.id===r.technician_id),next=GARAGE_NEXT_STATUS[r.status];
+ return <article className="pf-property" key={r.id}><button type="button" className="text-left" onClick={()=>onOpenDetail(r.id)}><strong>{v?.registration??r.title} ↗</strong></button><span>{r.title}</span><span>{c?.name??"Client à renseigner"}</span>{r.scheduled_at&&<span>{new Date(r.scheduled_at).toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"})}</span>}<span>{t?.name??"Technicien non affecté"}</span>{next&&stage!=="upcoming"&&<Button size="sm" disabled={busy!==null} onClick={()=>void advance(r,next)}>→ {REPAIR_STATUS_LABEL[next].text}</Button>}{stage==="upcoming"&&<Button size="sm" variant="outline" onClick={()=>onOpenDetail(r.id)}>Accueillir / replanifier</Button>}{["accepted","in_progress"].includes(r.status)&&<Button size="sm" variant="outline" disabled={busy!==null} onClick={()=>void advance(r,"waiting_parts")}>Pièce manquante</Button>}{v && ["done","delivered"].includes(r.status) && <label className="text-xs text-muted">Prochain entretien<input aria-label={`Prochain entretien ${v.registration}`} type="date" className="mt-1 w-full rounded-lg border border-line bg-soft p-2" value={v.next_maintenance_on??""} onChange={e=>void onUpdateVehicle?.(v.id,{next_maintenance_on:e.target.value||null})}/></label>}{r.status==="done"&&<Button size="sm" variant="ghost" onClick={()=>onOpenDetail(r.id)}>Facturer / prévenir le client →</Button>}</article>;
+ })}{!items.length&&<p className="pf-lane-empty">Aucun véhicule à cette étape</p>}</div>;
+ })}</div></section>;
 }

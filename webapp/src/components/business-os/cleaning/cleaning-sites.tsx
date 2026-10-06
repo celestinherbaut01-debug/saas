@@ -19,12 +19,14 @@ interface SiteInput {
 }
 
 export function SitesModule({
+  initialFocusId,
   rows,
   customers,
   onCreate,
   onUpdate,
   onRemove,
 }: {
+  initialFocusId?:string|null;
   rows: Site[];
   customers: Customer[];
   onCreate: (input: SiteInput) => void;
@@ -32,7 +34,7 @@ export function SitesModule({
   onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Site | null>(null);
+  const [editing, setEditing] = useState<Site | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function customerName(id: string | null) {
     return id ? customers.find((c) => c.id === id)?.name ?? "—" : "—";

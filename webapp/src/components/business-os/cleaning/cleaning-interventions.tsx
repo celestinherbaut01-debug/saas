@@ -21,6 +21,7 @@ interface InterventionInput {
 }
 
 export function InterventionsModule({
+  initialFocusId,
   rows,
   contracts,
   sites,
@@ -29,6 +30,7 @@ export function InterventionsModule({
   onUpdate,
   onRemove,
 }: {
+  initialFocusId?: string | null;
   rows: Intervention[];
   contracts: Contract[];
   sites: Site[];
@@ -38,7 +40,7 @@ export function InterventionsModule({
   onRemove: (id: string) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Intervention | null>(null);
+  const [editing, setEditing] = useState<Intervention | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function siteName(id: string | null) {
     return id ? sites.find((s) => s.id === id)?.name ?? "—" : "—";

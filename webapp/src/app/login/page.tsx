@@ -1,3 +1,5 @@
+import { DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import Link from "next/link";
 import { AuthLayout } from "@/components/auth-layout";
 import { GoogleButton } from "@/components/google-button";
@@ -7,7 +9,7 @@ import { SessionGate } from "@/components/session-gate";
 import { signInWithPassword } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+async function LoginPageContent({ searchParams }: PageProps<"/login">) {
   const params = await searchParams;
   const next = typeof params.next === "string" ? params.next : undefined;
 
@@ -65,3 +67,5 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     </AuthLayout>
   );
 }
+
+export default async function LoginPage(props: Parameters<typeof LoginPageContent>[0]) { try { return await LoginPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

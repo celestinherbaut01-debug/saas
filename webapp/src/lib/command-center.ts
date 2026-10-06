@@ -24,12 +24,16 @@ export interface CommandCenterAction {
   text: string;
   tab: string;
   detailId?: string;
+  reason?: string;
+  priority?: number;
 }
 
 export interface CommandCenterData {
   today: string[];
   actions: CommandCenterAction[];
   opportunities: CommandCenterAction[];
+  blockers?: CommandCenterAction[];
+  planning?: CommandCenterAction[];
 }
 
 function startOfDay(d: Date): Date {
@@ -85,7 +89,7 @@ export function computeGarageCommandCenter({
   repairOrders: RepairOrder[];
   documents: BusinessDocument[];
   customers: GarageCustomer[];
-  vehicles: { id: string; registration: string; customer_id: string | null }[];
+  vehicles: { id: string; registration: string; customer_id: string | null; next_maintenance_on?:string|null }[];
 }): CommandCenterData {
   const now = new Date();
   const active = repairOrders.filter((r) => !["done", "delivered"].includes(r.status));
@@ -111,17 +115,18 @@ export function computeGarageCommandCenter({
   const customerName = (id: string | null) => customers.find((c) => c.id === id)?.name ?? null;
 
   const actions: CommandCenterAction[] = [];
+  for(const v of vehicles.filter(v=>v.next_maintenance_on && new Date(v.next_maintenance_on)<=new Date(now.getTime()+30*86400000))) actions.push({text:`Rappeler l’entretien de ${v.registration}`,tab:"vehicles",detailId:v.id,reason:`Date renseignée : ${v.next_maintenance_on}`});
   for (const r of waitingParts.slice(0, 5)) {
     actions.push({ text: `Commander la pièce manquante pour ${vehicleLabel(r.vehicle_id) ?? r.title}`, tab: "repair_orders", detailId: r.id });
   }
   for (const d of pendingQuotes.filter((d) => daysBetween(new Date(d.issued_at), now) >= 3).slice(0, 5)) {
-    actions.push({ text: `Relancer le devis de ${customerName(d.customer_id) ?? d.number}`, tab: "quotes" });
+    actions.push({ text: `Relancer le devis de ${customerName(d.customer_id) ?? d.number}`, tab: "quotes", detailId:d.id });
   }
   for (const r of readyNotDelivered.slice(0, 5)) {
     actions.push({ text: `Prévenir ${customerName(r.customer_id) ?? "le client"} que le véhicule est prêt`, tab: "repair_orders", detailId: r.id });
   }
   for (const d of overdueInvoices.slice(0, 5)) {
-    actions.push({ text: `Relancer la facture ${d.number} (${customerName(d.customer_id) ?? "client"})`, tab: "invoices" });
+    actions.push({ text: `Relancer la facture ${d.number} (${customerName(d.customer_id) ?? "client"})`, tab: "invoices", detailId:d.id });
   }
 
   const opportunities: CommandCenterAction[] = [];
@@ -139,9 +144,11 @@ export function computeGarageCommandCenter({
     opportunities.push({ text: `${dormant.length} ancien${plural(dormant.length, "", "s")} client${plural(dormant.length, "", "s")} n'${plural(dormant.length, "a", "ont")} pas eu de passage depuis plus de 6 mois`, tab: "customers" });
   }
   const quietDay = emptiestUpcomingDay(active.filter((r) => r.scheduled_at).map((r) => r.scheduled_at as string));
-  if (quietDay) opportunities.push({ text: `Le planning de ${quietDay.label} est libre — bon moment pour relancer d'anciens clients`, tab: "planning" });
+  if (quietDay) opportunities.push({ text: `Le planning de ${quietDay.label} ne contient aucune entrée enregistrée — vérifiez la disponibilité avant de relancer d'anciens clients`, tab: "planning" });
 
-  return { today, actions, opportunities };
+  return { today, actions, opportunities,
+ blockers: waitingParts.map(r=>({text:`${vehicleLabel(r.vehicle_id)??r.title} : pièces attendues`,tab:"repair_orders",detailId:r.id,reason:"Ordre en attente de pièces",priority:3})),
+ planning: active.filter(r=>r.scheduled_at && new Date(r.scheduled_at)>=startOfDay(now)).sort((a,b)=>a.scheduled_at!.localeCompare(b.scheduled_at!)).slice(0,8).map(r=>({text:`${r.title} · ${new Date(r.scheduled_at!).toLocaleString("fr-FR")}`,tab:"repair_orders",detailId:r.id})) };
 }
 
 // ---------------------------------------------------------------------------
@@ -161,7 +168,7 @@ export function computeCleaningCommandCenter({
   const overduePlanned = interventions.filter((i) => i.status === "planned" && new Date(i.scheduled_at) < now);
   const openIncidents = incidents.filter((i) => i.status === "open");
   const criticalIncidents = openIncidents.filter((i) => i.severity === "high");
-  const renewing = contracts.filter((c) => c.status === "ending_soon");
+  const renewing = contracts.filter((c) => c.status === "ending_soon" || c.status === "active" && c.renewal_date && new Date(c.renewal_date).getTime() <= now.getTime()+30*86400000);
 
   const today: string[] = [];
   if (today_.length > 0) today.push(`${today_.length} intervention${plural(today_.length, "", "s")} prévue${plural(today_.length, "", "s")} aujourd'hui`);
@@ -172,18 +179,18 @@ export function computeCleaningCommandCenter({
 
   const actions: CommandCenterAction[] = [];
   for (const i of overduePlanned.slice(0, 5)) {
-    actions.push({ text: `Reprogrammer l'intervention du ${new Date(i.scheduled_at).toLocaleDateString("fr-FR")}`, tab: "interventions" });
+    actions.push({ text: `Reprogrammer l'intervention du ${new Date(i.scheduled_at).toLocaleDateString("fr-FR")}`, tab: "interventions", detailId:i.id });
   }
   for (const i of criticalIncidents.slice(0, 5)) {
-    actions.push({ text: `Traiter l'incident grave : ${i.title}`, tab: "incidents" });
+    actions.push({ text: `Traiter l'incident grave : ${i.title}`, tab: "incidents", detailId:i.id });
   }
   for (const c of renewing.slice(0, 5)) {
-    actions.push({ text: `Relancer le renouvellement du contrat ${c.site_name}`, tab: "contracts" });
+    actions.push({ text: `Relancer le renouvellement du contrat ${c.site_name}`, tab: "contracts", detailId:c.id });
   }
 
   const opportunities: CommandCenterAction[] = [];
   const quietDay = emptiestUpcomingDay(interventions.filter((i) => i.status === "planned").map((i) => i.scheduled_at));
-  if (quietDay) opportunities.push({ text: `Le planning de ${quietDay.label} est libre — bon moment pour une intervention supplémentaire`, tab: "planning" });
+  if (quietDay) opportunities.push({ text: `Le planning de ${quietDay.label} ne contient aucune entrée enregistrée — vérifiez la disponibilité avant de une intervention supplémentaire`, tab: "planning" });
   const activeNoUpcoming = contracts.filter(
     (c) => c.status === "active" && !interventions.some((i) => i.contract_id === c.id && i.status === "planned" && new Date(i.scheduled_at) >= now),
   );
@@ -191,7 +198,9 @@ export function computeCleaningCommandCenter({
     opportunities.push({ text: `${activeNoUpcoming.length} contrat${plural(activeNoUpcoming.length, "", "s")} actif${plural(activeNoUpcoming.length, "", "s")} sans intervention planifiée à venir`, tab: "contracts" });
   }
 
-  return { today, actions, opportunities };
+  return { today, actions, opportunities,
+ blockers: interventions.filter(i=>i.status === "planned" && !i.team_member_id).map(i=>({text:`Intervention non couverte · ${new Date(i.scheduled_at).toLocaleString("fr-FR")}`,tab:"interventions",detailId:i.id,reason:"Aucun membre d’équipe affecté",priority:3})),
+ planning: interventions.filter(i=>i.status === "planned" && new Date(i.scheduled_at)>=startOfDay(now)).sort((a,b)=>a.scheduled_at.localeCompare(b.scheduled_at)).slice(0,8).map(i=>({text:`Intervention · ${new Date(i.scheduled_at).toLocaleString("fr-FR")}`,tab:"interventions",detailId:i.id})) };
 }
 
 // ---------------------------------------------------------------------------
@@ -202,9 +211,11 @@ export function computeAgencyCommandCenter({
   tickets,
   projects,
   documents,
+  tasks = [],
 }: {
   sites: ClientSite[];
   tickets: Ticket[];
+  tasks?: import("@/lib/supabase/types").Task[];
   projects: Project[];
   documents: BusinessDocument[];
 }): CommandCenterData {
@@ -229,12 +240,14 @@ export function computeAgencyCommandCenter({
 
   const siteLabel = (s: ClientSite) => s.domain_name || s.id.slice(0, 8);
   const actions: CommandCenterAction[] = [];
-  for (const s of domainsExpiring.slice(0, 3)) actions.push({ text: `Renouveler le domaine ${siteLabel(s)}`, tab: "sites" });
-  for (const s of hostingExpiring.slice(0, 3)) actions.push({ text: `Renouveler l'hébergement de ${siteLabel(s)}`, tab: "sites" });
-  for (const p of overdueProjects.slice(0, 5)) actions.push({ text: `Relancer le projet ${p.name}`, tab: "projects" });
-  for (const t of urgentTickets.slice(0, 5)) actions.push({ text: `Traiter le ticket prioritaire : ${t.title}`, tab: "tickets" });
-  for (const d of overdueInvoices.slice(0, 5)) actions.push({ text: `Relancer la facture ${d.number}`, tab: "invoices" });
+  for (const s of domainsExpiring.slice(0, 3)) actions.push({ text: `Renouveler le domaine ${siteLabel(s)}`, tab: "sites", detailId:s.id });
+  for (const s of hostingExpiring.slice(0, 3)) actions.push({ text: `Renouveler l'hébergement de ${siteLabel(s)}`, tab: "sites", detailId:s.id });
+  for (const p of overdueProjects.slice(0, 5)) actions.push({ text: `Relancer le projet ${p.name}`, tab: "projects", detailId:p.id });
+  for (const t of urgentTickets.slice(0, 5)) actions.push({ text: `Traiter le ticket prioritaire : ${t.title}`, tab: "tickets", detailId:t.id });
+  for (const d of overdueInvoices.slice(0, 5)) actions.push({ text: `Relancer la facture ${d.number}`, tab: "invoices", detailId:d.id });
 
+  for(const task of tasks.filter(t=>t.blocked && !t.done)) actions.unshift({text:`Débloquer la tâche : ${task.title}`,tab:"production",reason:"Blocage signalé sur cette tâche",priority:3});
+  for(const site of sites.filter(s=>s.next_maintenance_at && new Date(s.next_maintenance_at)<=in30Days)) actions.push({text:`Préparer la maintenance de ${siteLabel(site)}`,tab:"sites",detailId:site.id,reason:`Échéance : ${site.next_maintenance_at}`});
   const opportunities: CommandCenterAction[] = [];
   const staleSites = sites.filter((s) => s.status === "active" && !s.next_maintenance_at);
   if (staleSites.length > 0) {
@@ -243,7 +256,9 @@ export function computeAgencyCommandCenter({
   const quietDay = emptiestUpcomingDay(projects.filter((p) => p.deadline).map((p) => p.deadline as string));
   if (quietDay) opportunities.push({ text: `Aucune échéance prévue ${quietDay.label} — bon créneau pour avancer sur un projet en retard`, tab: "projects" });
 
-  return { today, actions, opportunities };
+  return { today, actions, opportunities,
+ blockers: overdueProjects.map(p=>({text:`Projet en retard : ${p.name}`,tab:"projects",detailId:p.id,reason:`Échéance enregistrée : ${p.deadline}`,priority:2})),
+ planning: projects.filter(p=>p.deadline && p.status!=="done").sort((a,b)=>a.deadline!.localeCompare(b.deadline!)).slice(0,8).map(p=>({text:`${p.name} · ${p.deadline}`,tab:"projects",detailId:p.id})) };
 }
 
 // ---------------------------------------------------------------------------
@@ -271,16 +286,19 @@ export function computeRestaurantCommandCenter({
   if (today.length === 0) today.push("Rien d'urgent côté stock ou réservations aujourd'hui");
 
   const actions: CommandCenterAction[] = [];
-  for (const p of staleOrders.slice(0, 5)) actions.push({ text: `Relancer la commande fournisseur passée le ${new Date(p.ordered_at!).toLocaleDateString("fr-FR")}`, tab: "purchase_orders" });
-  for (const i of lowStock.slice(0, 5)) actions.push({ text: `Commander ${i.name} (${i.quantity} ${i.unit} restant${plural(i.quantity, "", "s")})`, tab: "inventory" });
+  for (const p of staleOrders.slice(0, 5)) actions.push({ text: `Relancer la commande fournisseur passée le ${new Date(p.ordered_at!).toLocaleDateString("fr-FR")}`, tab: "purchase_orders", detailId:p.id });
+  for (const i of lowStock.slice(0, 5)) actions.push({ text: `Commander ${i.name} (${i.quantity} ${i.unit} restant${plural(i.quantity, "", "s")})`, tab: "inventory", detailId:i.id });
 
   const opportunities: CommandCenterAction[] = [];
   const quietDay = emptiestUpcomingDay(appointments.map((a) => a.starts_at));
-  if (quietDay) opportunities.push({ text: `Service de ${quietDay.label} peu rempli — bon moment pour une offre spéciale`, tab: "planning" });
+  if (quietDay) opportunities.push({ text: `Service de ${quietDay.label} sans réservation enregistrée — vérifiez le remplissage avant de une offre spéciale`, tab: "planning" });
 
-  return { today, actions, opportunities };
+  return { today, actions, opportunities,
+ blockers: lowStock.map(i=>({text:`${i.name} : ${i.quantity} ${i.unit}`,tab:"inventory",detailId:i.id,reason:`Au seuil ou sous le seuil de ${i.low_stock_threshold} ${i.unit}`,priority:3})),
+ planning: appointments.filter(a=>new Date(a.starts_at)>=startOfDay(now)).sort((a,b)=>a.starts_at.localeCompare(b.starts_at)).slice(0,8).map(a=>({text:`${a.title} · ${new Date(a.starts_at).toLocaleString("fr-FR")}`,tab:"planning",detailId:a.id})) };
 }
 
 export function hasAnythingToShow(data: CommandCenterData): boolean {
   return data.today.length > 0 || data.actions.length > 0 || data.opportunities.length > 0;
 }
+

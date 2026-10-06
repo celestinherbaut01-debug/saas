@@ -98,6 +98,7 @@ function ProspectCard({
 
 export function CrmView({ initialProspects, canUseBusinessOs = false }: { initialProspects: Prospect[]; canUseBusinessOs?: boolean }) {
   const supabase = createClient();
+  const [conversionError,setConversionError] = useState<string | null>(null);
   const [prospects, setProspects] = useState(initialProspects);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ProspectStatus | null>(null);
@@ -123,7 +124,8 @@ export function CrmView({ initialProspects, canUseBusinessOs = false }: { initia
     });
 
     if (status === "won" && canUseBusinessOs) {
-      const customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status });
+      let customerId: string | null = null;
+      try { customerId = await convertWonProspectToCustomer(supabase, { ...prospect, status }); setConversionError(null); } catch(error) { setConversionError(error instanceof Error ? error.message : "Conversion impossible. Réessayez le statut Gagné."); }
       if (customerId) setProspects((prev) => prev.map((p) => (p.id === id ? { ...p, converted_customer_id: customerId } : p)));
     }
   }
@@ -143,6 +145,7 @@ export function CrmView({ initialProspects, canUseBusinessOs = false }: { initia
 
   return (
     <div className="flex flex-col gap-4">
+      {conversionError && <p role="alert" className="rounded-xl bg-red-bg p-3 text-sm text-red-fg">{conversionError}</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-extrabold">CRM</h1>
@@ -235,3 +238,4 @@ export function CrmView({ initialProspects, canUseBusinessOs = false }: { initia
     </div>
   );
 }
+

@@ -21,12 +21,14 @@ interface IncidentInput {
 }
 
 export function IncidentsModule({
+  initialFocusId,
   rows,
   sites,
   onCreate,
   onUpdate,
   onRemove,
 }: {
+  initialFocusId?: string | null;
   rows: Incident[];
   sites: Site[];
   onCreate: (input: IncidentInput) => void;
@@ -34,7 +36,7 @@ export function IncidentsModule({
   onRemove: (id: string) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Incident | null>(null);
+  const [editing, setEditing] = useState<Incident | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function siteName(id: string | null) {
     return id ? sites.find((s) => s.id === id)?.name ?? "—" : "—";

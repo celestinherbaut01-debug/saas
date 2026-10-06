@@ -1,3 +1,4 @@
+import { checkedAll } from "@/lib/data-state";
 import { redirect } from "next/navigation";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
@@ -13,7 +14,7 @@ export default async function AgentPage({ searchParams }: PageProps<"/agent">) {
   const membership = await getCachedMembership(user.id);
   if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
-  const [configured, plan] = await Promise.all([isNovaConfigured(), getWorkspacePlan(membership.workspace_id)]);
+  const [configured, plan] = await checkedAll([isNovaConfigured(), getWorkspacePlan(membership.workspace_id)]);
   const contexts = novaContexts(plan);
   const params = await searchParams;
   const initialPrompt = typeof params.prompt === "string" ? params.prompt : undefined;

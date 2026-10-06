@@ -14,7 +14,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-2xl border border-line bg-panel p-5 shadow-[var(--shadow-sm)] transition-[box-shadow,transform,border-color] duration-200",
+        "pf-card rounded-2xl border border-line bg-panel p-5 shadow-[var(--shadow-sm)] transition-[box-shadow,transform,border-color] duration-200",
         interactive && "cursor-pointer hover:-translate-y-0.5 hover:border-accent/30 hover:shadow-[var(--shadow-md)]",
         className,
       )}

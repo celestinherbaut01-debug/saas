@@ -1,3 +1,7 @@
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
+import { propertyToStudioInput } from "@/lib/realestate";
+import { parsePhotos } from "@/lib/studio/photos";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
@@ -6,7 +10,7 @@ import { StudioView } from "@/components/studio/studio-view";
 import { resolveStudioVertical } from "@/lib/studio/vertical";
 import { DEFAULT_BRAND_KIT, type BrandKit } from "@/lib/studio/types";
 
-export default async function StudioPage({ searchParams }: PageProps<"/studio">) {
+async function StudioPageContent({ searchParams }: PageProps<"/studio">) {
   const params = await searchParams;
   const user = await getCachedUser();
   if (!user) redirect("/login");
@@ -15,7 +19,7 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
   const workspaceId = membership.workspace_id;
 
   const supabase = await createClient();
-  const [{ data: businessProfile }, { data: categories }, { data: creations }, { data: brandKitRow }] = await Promise.all([
+  const [{ data: businessProfile }, { data: categories }, { data: creations }, { data: brandKitRow }] = await checkedAll([
     supabase.from("business_profiles").select("own_category_id, company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
     supabase.from("business_categories").select("id, slug, parent_id"),
     supabase.from("studio_creations").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
@@ -35,7 +39,7 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
   // (voir MissionActionItem) — jamais un nouveau texte inventé côté page,
   // seulement ce que le plan avait déjà préparé.
   const asString = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-  const prefill =
+  let prefill: import("@/components/studio/studio-view").StudioPrefill | null =
     asString(params.new) === "1"
       ? {
           title: asString(params.title) ?? "",
@@ -44,11 +48,17 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
         }
       : null;
 
+  const propertyId = asString(params.propertyId);
+  if(propertyId) {
+    const [result] = await checkedAll([supabase.from("properties").select("*").eq("workspace_id",workspaceId).eq("id",propertyId).single()]);
+    const property=result.data;
+    if(property) prefill={title:property.title,description:property.description,sourceMissionId:null,sourcePropertyId:property.id,input:propertyToStudioInput(property),photos:parsePhotos(property.photos),offerType:"bien"};
+  }
   return (
     <AppShell>
-      <StudioView
+      <StudioView key={propertyId??asString(params.sourceMissionId)??"studio-library"}
         workspaceId={workspaceId}
-        vertical={vertical}
+        vertical={propertyId ? "realestate" : vertical}
         initialCreations={creations ?? []}
         brandKit={brandKit}
         prefill={prefill}
@@ -58,3 +68,5 @@ export default async function StudioPage({ searchParams }: PageProps<"/studio">)
     </AppShell>
   );
 }
+
+export default async function StudioPage(props: Parameters<typeof StudioPageContent>[0]) { try { return await StudioPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

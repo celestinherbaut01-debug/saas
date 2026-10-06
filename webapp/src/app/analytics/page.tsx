@@ -1,3 +1,6 @@
+import { OperationalAnalytics } from "@/components/analytics/operational-analytics";
+import { DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
@@ -13,7 +16,7 @@ import { FunnelChart, PipelineChart, TrendChart, EmptyChartNote } from "@/compon
 // business). Chaque donnée vient du statut RÉEL des prospects ; ce qui
 // n'est pas mesurable aujourd'hui (campagnes Studio, autres sources) est
 // affiché comme tel, jamais inventé.
-export default async function AnalyticsPage() {
+async function AnalyticsPageContent() {
   const user = await getCachedUser();
   if (!user) redirect("/login");
   const supabase = await createClient();
@@ -26,7 +29,7 @@ export default async function AnalyticsPage() {
   const { data: prospects } = await supabase
     .from("prospects")
     .select("status, created_at")
-    .eq("workspace_id", workspaceId);
+    .eq("workspace_id", workspaceId).throwOnError();
 
   const rows = prospects ?? [];
   const total = rows.length;
@@ -40,6 +43,7 @@ export default async function AnalyticsPage() {
     8,
   );
 
+  const operationalAnalytics=await OperationalAnalytics({workspaceId});
   return (
     <AppShell>
       <div className="flex flex-col gap-5">
@@ -117,7 +121,11 @@ export default async function AnalyticsPage() {
             n&apos;est affiché ici plutôt que d&apos;inventer un taux de performance.
           </EmptyChartNote>
         </Card>
+        {operationalAnalytics}
       </div>
     </AppShell>
   );
 }
+
+
+export default async function AnalyticsPage() { try { return await AnalyticsPageContent(); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

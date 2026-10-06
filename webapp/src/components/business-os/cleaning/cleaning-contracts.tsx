@@ -25,6 +25,7 @@ interface ContractInput {
 }
 
 export function ContractsModule({
+  initialFocusId,
   rows,
   sites,
   customers,
@@ -34,6 +35,7 @@ export function ContractsModule({
   onRemove,
   onCreateInvoice,
 }: {
+  initialFocusId?: string | null;
   rows: Contract[];
   sites: Site[];
   customers: Customer[];
@@ -45,7 +47,7 @@ export function ContractsModule({
   onCreateInvoice?: (contract: Contract) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Contract | null>(null);
+  const [editing, setEditing] = useState<Contract | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function siteName(c: Contract) {
     if (c.site_id) return sites.find((s) => s.id === c.site_id)?.name ?? c.site_name;

@@ -9,16 +9,22 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
 export function AppointmentsModule({
+  onRowsChange,
   workspaceId,
   initial,
   label,
 }: {
+  onRowsChange?: (rows: Appointment[])=>void;
   workspaceId: string;
   initial: Appointment[];
   label: string;
 }) {
   const supabase = createClient();
-  const [rows, setRows] = useState(initial);
+  const [rows, setLocalRows] = useState(initial);
+  function setRows(update: React.SetStateAction<Appointment[]>) {
+    const next=typeof update === "function" ? update(rows) : update;
+    setLocalRows(next);onRowsChange?.(next);
+  }
   const [title, setTitle] = useState("");
   const [startsAt, setStartsAt] = useState("");
   const [saving, setSaving] = useState(false);

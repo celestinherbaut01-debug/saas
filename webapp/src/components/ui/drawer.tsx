@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,13 +26,24 @@ export function Drawer({
   footer?: React.ReactNode;
   width?: "sm" | "md" | "lg";
 }) {
+  const panelRef=useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
+    const previous=document.activeElement as HTMLElement|null;
+    const panel=panelRef.current;
+    panel?.focus();
     function onKey(e: KeyboardEvent) {
+      if(e.key==="Tab" && panel) {
+        const nodes=Array.from(panel.querySelectorAll<HTMLElement>('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href],[tabindex="0"]'));
+        const first=nodes[0],last=nodes[nodes.length-1];
+        if(!first){e.preventDefault();return;}
+        if(e.shiftKey && (document.activeElement===first||document.activeElement===panel)){e.preventDefault();last.focus();}
+        else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+      }
       if (e.key === "Escape") onClose();
     }
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {document.removeEventListener("keydown", onKey);previous?.focus();};
   }, [open, onClose]);
 
   if (!open) return null;
@@ -48,6 +59,7 @@ export function Drawer({
         className="absolute inset-0 bg-ink/40 backdrop-blur-[1px]"
       />
       <div
+        ref={panelRef} role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
         className={cn(
           "relative flex h-full w-full flex-col overflow-y-auto border-l border-line bg-panel shadow-2xl",
           widthCls,

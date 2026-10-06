@@ -1,3 +1,5 @@
+import { DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -38,7 +40,7 @@ const SIGNAL_CATEGORY_LABEL: Record<string, string> = {
   marketing: "Marketing",
 };
 
-export default async function SimulatePage({ params }: PageProps<"/missions/simulate/[scenarioRunId]">) {
+async function SimulatePageContent({ params }: PageProps<"/missions/simulate/[scenarioRunId]">) {
   const { scenarioRunId } = await params;
   const user = await getCachedUser();
   if (!user) redirect("/login");
@@ -52,7 +54,7 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
     .select("id, goal_type, prompt, mission_id, applied")
     .eq("id", scenarioRunId)
     .eq("workspace_id", workspaceId)
-    .maybeSingle();
+    .maybeSingle().throwOnError();
   if (!run) notFound();
 
   // `mission_id` est déjà rempli pour un run d'AJUSTEMENT dès sa création
@@ -64,10 +66,10 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
     .from("scenario_results")
     .select("*")
     .eq("scenario_run_id", scenarioRunId)
-    .order("created_at");
+    .order("created_at").throwOnError();
   const resultIds = (results ?? []).map((r) => r.id);
   const { data: assumptions } =
-    resultIds.length > 0 ? await supabase.from("scenario_assumptions").select("*").in("scenario_result_id", resultIds) : { data: [] };
+    resultIds.length > 0 ? await supabase.from("scenario_assumptions").select("*").in("scenario_result_id", resultIds).throwOnError() : { data: [] };
 
   const template = goalTemplate(run.goal_type);
 
@@ -173,3 +175,5 @@ export default async function SimulatePage({ params }: PageProps<"/missions/simu
     </AppShell>
   );
 }
+
+export default async function SimulatePage(props: Parameters<typeof SimulatePageContent>[0]) { try { return await SimulatePageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

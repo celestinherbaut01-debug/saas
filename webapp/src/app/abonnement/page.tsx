@@ -1,3 +1,4 @@
+import { checkedAll } from "@/lib/data-state";
 import { redirect } from "next/navigation";
 import { getCachedUser, getCachedMembership, getCachedBusinessOsProfile } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
@@ -15,12 +16,12 @@ export default async function AbonnementPage() {
   if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
   const workspaceId = membership.workspace_id;
-  const [plan, profile] = await Promise.all([
+  const [plan, profile] = await checkedAll([
     getWorkspacePlan(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
   ]);
 
-  const [nova, prospects, searches] = await Promise.all([
+  const [nova, prospects, searches] = await checkedAll([
     getUsage(workspaceId, "nova_requests", plan),
     getUsage(workspaceId, "prospects_added", plan),
     getUsage(workspaceId, "searches", plan),

@@ -1,3 +1,5 @@
+import { DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PublicNav } from "@/components/public-nav";
@@ -6,7 +8,7 @@ import { PersonaSelector } from "@/components/persona-selector";
 import { Reveal } from "@/components/reveal";
 import { cn } from "@/lib/utils";
 
-export default async function Home() {
+async function HomeContent() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -261,3 +263,6 @@ function Faq({ q, a }: { q: string; a: string }) {
     </div>
   );
 }
+
+
+export default async function Home() { try { return await HomeContent(); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

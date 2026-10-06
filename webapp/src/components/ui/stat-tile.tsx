@@ -41,10 +41,11 @@ function useCountUp(value: string, durationMs = 500): string {
 export function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   const display = useCountUp(value);
   return (
-    <Card className="p-4 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
+    <Card className="pf-stat p-4 transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-md)]">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-faint">{label}</p>
       <p className="mt-1 bg-[image:var(--gradient-signature)] bg-clip-text font-display text-xl font-extrabold text-transparent">{display}</p>
       {sub && <p className="mt-0.5 text-[11px] text-muted">{sub}</p>}
     </Card>
   );
 }
+

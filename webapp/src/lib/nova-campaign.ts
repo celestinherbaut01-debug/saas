@@ -25,6 +25,7 @@ export interface CampaignTemplate {
 }
 
 const VISUAL_IDEA: Record<BusinessOsVertical, string> = {
+  realestate: "Les photos enregistrées du bien, accompagnées de ses caractéristiques réelles.",
   garage: "Photo d'un véhicule en atelier ou de l'équipe au travail, avec le créneau disponible en gros texte.",
   cleaning: "Photo avant/après d'une prestation récente, avec la zone couverte en texte.",
   agency: "Visuel épuré avec votre logo + celui d'un client existant (avec son accord), et l'offre en une phrase.",
@@ -33,6 +34,7 @@ const VISUAL_IDEA: Record<BusinessOsVertical, string> = {
 };
 
 const AUDIENCE_LABEL: Record<BusinessOsVertical, string> = {
+  realestate: "les acquéreurs ayant exprimé un intérêt pour vos biens",
   garage: "vos clients passés et les automobilistes de votre zone",
   cleaning: "les entreprises et copropriétés de votre zone qui n'ont pas encore de contrat récurrent",
   agency: "les entreprises de votre zone dont le site ou la présence en ligne est daté",

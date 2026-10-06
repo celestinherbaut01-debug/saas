@@ -29,6 +29,7 @@ interface SiteInput {
 // consolidés en un seul module réel : ce sont les 5 facettes du même objet
 // (un site web géré pour un client), pas 5 entités indépendantes.
 export function SitesModule({
+  initialFocusId,
   rows,
   customers,
   projects,
@@ -36,6 +37,7 @@ export function SitesModule({
   onUpdate,
   onRemove,
 }: {
+  initialFocusId?: string | null;
   rows: ClientSite[];
   customers: Customer[];
   projects: Project[];
@@ -44,7 +46,7 @@ export function SitesModule({
   onRemove: (id: string, mode: "archive" | "delete") => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<ClientSite | null>(null);
+  const [editing, setEditing] = useState<ClientSite | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function customerName(id: string | null) {
     return id ? customers.find((c) => c.id === id)?.name ?? "—" : "—";

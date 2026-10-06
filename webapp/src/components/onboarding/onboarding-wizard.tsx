@@ -1,4 +1,5 @@
 "use client";
+import { BUSINESS_OS_REGISTRY } from "@/lib/business-os-registry";
 
 import { useMemo, useState, useTransition } from "react";
 import type { BusinessCategory } from "@/lib/supabase/types";
@@ -251,6 +252,7 @@ export function OnboardingWizard({ categories }: { categories: BusinessCategory[
                     {PRODUCT_MODE_OPTIONS.find((o) => o.value === productMode)?.label}
                   </span>
                 </div>
+                <p className="rounded-xl border border-line bg-soft p-3 text-xs leading-relaxed text-muted">{BUSINESS_OS_REGISTRY[businessOsProfile.vertical].workflow.join(" → ")}</p>
                 {needsTargets && (
                   <div className="flex items-start justify-between gap-3">
                     <span className="shrink-0 text-faint">Acquisition recommandée</span>

@@ -1,0 +1,78 @@
+"use client";
+import type { Customer } from "@/lib/supabase/types";
+import { useState, useTransition } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Drawer } from "@/components/ui/drawer";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CommandCenter } from "@/components/business-os/command-center";
+import { saveEstateEntity, uploadPropertyPhoto } from "@/lib/actions/realestate";
+import { PROPERTY_STAGES, estateAttention, type EstateEntity, type RealEstateData, type Property } from "@/lib/realestate";
+import { photoPublicUrl } from "@/lib/studio/photos";
+const LABELS:Record<EstateEntity,string>={owners:"Propriétaires",properties:"Biens",mandates:"Mandats",buyers:"Acquéreurs",visits:"Visites",offers:"Offres"};
+type Field={key:string;label:string;type?:string;required?:boolean;options?:[string,string][]};
+export function RealEstateView({workspaceId,initial,initialPropertyId,customers=[]}: {workspaceId:string;initial:RealEstateData;initialPropertyId?:string|null;customers?:Customer[]}) {
+ const [data,setData]=useState(initial),[tab,setTab]=useState<EstateEntity|"today"|"pipeline">("today");
+ const [entity,setEntity]=useState<EstateEntity|null>(null),[editingId,setEditingId]=useState<string|null>(null);
+ const [draft,setDraft]=useState<Record<string,unknown>>({}),[selected,setSelected]=useState<string|null>(initialPropertyId??null);
+ const [pending,startTransition]=useTransition(),[error,setError]=useState<string|null>(null);
+ const attention=estateAttention(data),property=data.properties.find(p=>p.id===selected);
+ const propertyOptions=data.properties.map(p=>[p.id,p.title] as [string,string]);
+ const owners=data.owners.map(p=>[p.id,p.name] as [string,string]); const buyers=data.buyers.map(p=>[p.id,p.name] as [string,string]);
+ const fields:Record<EstateEntity,Field[]>={
+ owners:[{key:"customer_id",label:"Reprendre un client existant (optionnel)",options:customers.map(c=>[c.id,c.name])},{key:"name",label:"Nom",required:true},{key:"email",label:"Email",type:"email"},{key:"phone",label:"Téléphone"},{key:"notes",label:"Notes",type:"textarea"}],
+ properties:[{key:"title",label:"Titre du bien",required:true},{key:"owner_id",label:"Propriétaire",options:owners},{key:"property_type",label:"Type de bien"},{key:"address",label:"Adresse"},{key:"city",label:"Ville"},{key:"transaction_type",label:"Transaction",options:[["sale","Vente"],["rent","Location"]]},{key:"surface_m2",label:"Surface (m²)",type:"number"},{key:"rooms",label:"Pièces",type:"number"},{key:"bedrooms",label:"Chambres",type:"number"},{key:"price",label:"Prix (€)",type:"number"},{key:"dpe",label:"DPE",options:["A","B","C","D","E","F","G"].map(v=>[v,v])},{key:"description",label:"Description",type:"textarea"},{key:"features",label:"Caractéristiques (une par ligne)",type:"textarea"},{key:"status",label:"Étape",options:PROPERTY_STAGES.map(([v,l])=>[v,l])}],
+ mandates:[{key:"property_id",label:"Bien",options:propertyOptions,required:true},{key:"owner_id",label:"Propriétaire",options:owners,required:true},{key:"mandate_type",label:"Type",options:[["simple","Simple"],["exclusive","Exclusif"]],required:true},{key:"starts_on",label:"Date du mandat",type:"date",required:true},{key:"expires_on",label:"Expiration",type:"date"},{key:"status",label:"Statut",options:[["active","Actif"],["expired","Expiré"],["closed","Clos"]]}],
+ buyers:[{key:"name",label:"Nom",required:true},{key:"email",label:"Email",type:"email"},{key:"phone",label:"Téléphone"},{key:"budget",label:"Budget (€)",type:"number"},{key:"criteria",label:"Critères",type:"textarea"},{key:"interested_property_ids",label:"Biens intéressants",options:propertyOptions,type:"multiple"}],
+ visits:[{key:"property_id",label:"Bien",options:propertyOptions,required:true},{key:"buyer_id",label:"Acquéreur",options:buyers,required:true},{key:"starts_at",label:"Date et heure",type:"datetime-local",required:true},{key:"status",label:"Statut",options:[["planned","Planifiée"],["completed","Réalisée"],["canceled","Annulée"]]},{key:"report",label:"Compte rendu",type:"textarea"}],
+ offers:[{key:"property_id",label:"Bien",options:propertyOptions,required:true},{key:"buyer_id",label:"Acquéreur",options:buyers,required:true},{key:"amount",label:"Montant (€)",type:"number",required:true},{key:"status",label:"Statut",options:[["pending","En attente"],["accepted","Acceptée"],["rejected","Refusée"]]},{key:"notes",label:"Notes",type:"textarea"}],
+ };
+ function open(key:EstateEntity,row?:Record<string,unknown>,prefill:Record<string,unknown>={}) {
+  setEntity(key);setEditingId(row?.id as string ?? null);setDraft({...row,...prefill});setError(null);
+ }
+ function save() {
+  if(!entity) return;setError(null);
+  const input={...draft};if(entity==="properties" && typeof input.features==="string") input.features=input.features.split("\n").map(s=>s.trim()).filter(Boolean);
+  if(entity==="visits" && input.starts_at) input.starts_at=new Date(String(input.starts_at)).toISOString();
+  startTransition(async()=>{
+   const result=await saveEstateEntity(workspaceId,entity,editingId,input);
+   if(!result.ok || !result.row){setError(result.error??"Enregistrement impossible.");return;}
+   setData(prev=>({...prev,...(result.property?{properties:prev.properties.map(p=>p.id===result.property?.id?result.property:p)}:{}),[entity]:editingId ? prev[entity].map(r=>r.id===editingId ? result.row : r) : [...prev[entity],result.row]} as RealEstateData));
+   setEntity(null);
+  });
+ }
+ function navigate(destination:string,id?:string) {setTab(destination as EstateEntity); if(id && destination==="properties") setSelected(id);else if(id) {const row=data[destination as EstateEntity]?.find(r=>r.id===id);if(row)open(destination as EstateEntity,row as unknown as Record<string,unknown>);}}
+ function move(p:Property,status:Property["status"]) {
+  setError(null);startTransition(async()=>{const result=await saveEstateEntity(workspaceId,"properties",p.id,{status});if(!result.ok){setError(result.error??"Étape non enregistrée.");return;}setData(prev=>({...prev,properties:prev.properties.map(r=>r.id===p.id?{...r,status}:r)}));});
+ }
+ const center={today:[`${attention.visits.length} visite(s) aujourd’hui`,`${attention.newBuyers.length} nouvel acquéreur aujourd’hui`,`${attention.pending.length} offre(s) en attente`],
+ actions:[...attention.expiring.map(m=>({text:`Mandat à renouveler : ${data.properties.find(p=>p.id===m.property_id)?.title ?? "Bien"} — ${m.expires_on}`,tab:"mandates",detailId:m.id})),...attention.pending.map(o=>({text:`Examiner l’offre de ${o.amount.toLocaleString("fr-FR")} €`,tab:"offers",detailId:o.id}))],
+ opportunities:attention.unpublished.map(p=>({text:`Préparer la communication de ${p.title}`,tab:"properties",detailId:p.id})),
+ planning:attention.visits.map(v=>({text:`${new Date(v.starts_at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})} · ${data.properties.find(p=>p.id===v.property_id)?.title??"Visite"}`,tab:"visits",detailId:v.id}))};
+ return <div className="space-y-5">
+  <div className="pf-tabs" role="navigation" aria-label="Immobilier">{(["today","pipeline",...Object.keys(LABELS)] as const).map(key=><button type="button" key={key} onClick={()=>setTab(key as typeof tab)} aria-current={tab===key?"page":undefined}>{key==="today"?"Aujourd’hui":key==="pipeline"?"Commercialisation":LABELS[key as EstateEntity]}</button>)}</div>
+  {error && <p role="alert" className="rounded-xl bg-red-bg p-3 text-red-fg">{error}</p>}
+  {tab==="today" && <><CommandCenter data={center} onNavigate={navigate} entityName="agence immobilière"/><div className="pf-inline-start"><div><h3>Un nouveau bien à commercialiser ?</h3><p>Son dossier suivra chaque étape, du mandat à la vente.</p></div><Button onClick={()=>open("properties")}>Ajouter un bien</Button></div></>}
+  {tab==="pipeline" && <section className="pf-workflow"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="pf-eyebrow">COMMERCIALISATION</p><h2 className="text-2xl font-bold">Du mandat aux clés remises.</h2></div><Button onClick={()=>open("properties")}>+ Bien</Button></div><div className="pf-board">{PROPERTY_STAGES.map(([stage,label])=><div className="pf-lane" key={stage}><h3>{label}<span>{data.properties.filter(p=>p.status===stage).length}</span></h3>{data.properties.filter(p=>p.status===stage).map(p=><button type="button" className="pf-property" key={p.id} onClick={()=>setSelected(p.id)}>{p.photos[0] && <Image unoptimized width={640} height={420} alt={p.title} src={photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL??"",p.photos[0].path)}/>}<strong>{p.title}</strong><span>{[p.city,p.surface_m2!=null?`${p.surface_m2} m²`:null].filter(Boolean).join(" · ") || "À compléter"}</span><b>{p.price!=null?`${p.price.toLocaleString("fr-FR")} €`:"Prix non renseigné"}</b></button>)}<p className="pf-lane-empty">{!data.properties.some(p=>p.status===stage)&&"Aucun bien à cette étape"}</p></div>)}</div></section>}
+  {tab!=="today" && tab!=="pipeline" && <section className="pf-register"><div className="flex items-center justify-between gap-3"><h2 className="text-xl font-bold">{LABELS[tab]}</h2><Button onClick={()=>open(tab)}>+ Ajouter</Button></div>{data[tab].length===0?<EmptyState icon="⌂" title={`Aucun enregistrement dans ${LABELS[tab].toLowerCase()}`} description="Commencez par un propriétaire et son bien, puis organisez la commercialisation." action={<Button onClick={()=>open(tab)}>Créer</Button>}/>:<div className={tab==="properties"?"grid gap-4 sm:grid-cols-2 lg:grid-cols-3":"divide-y divide-line"}>{data[tab].map(row=>{
+   const r=row as unknown as Record<string,unknown>;const name=String(r.title??r.name??data.properties.find(p=>p.id===r.property_id)?.title??"Dossier");
+   return <button type="button" key={row.id} className={tab==="properties"?"pf-property":"pf-record"} onClick={()=>tab==="properties"?setSelected(row.id):open(tab,r)}>{tab==="properties" && (row as Property).photos[0] && <Image unoptimized width={640} height={420} alt={name} src={photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL??"",(row as Property).photos[0].path)}/>}<strong>{name}</strong><span>{String(r.email??r.city??r.starts_at??r.expires_on??r.phone??"")}</span><span>{r.amount!=null?`${Number(r.amount).toLocaleString("fr-FR")} €`:String(r.status??"")}</span><span>Ouvrir →</span></button>;
+  })}</div>}</section>}
+  <Drawer open={!!property} onClose={()=>setSelected(null)} title={property?.title??"Bien"} width="lg">{property && <div className="space-y-5"><p>{property.address} {property.city}</p><p className="text-3xl font-bold">{property.price!=null?`${property.price.toLocaleString("fr-FR")} €`:"Prix non renseigné"}</p><p>{[property.property_type,property.surface_m2!=null?`${property.surface_m2} m²`:null,property.rooms!=null?`${property.rooms} pièces`:null,property.bedrooms!=null?`${property.bedrooms} chambres`:null].filter(Boolean).join(" · ")}</p><p>{property.description}</p><ul>{property.features.map(f=><li key={f}>• {f}</li>)}</ul><p>Propriétaire : {data.owners.find(o=>o.id===property.owner_id)?.name??"À renseigner"}</p>
+   <label className="block text-sm font-semibold">Étape de commercialisation<Select className="mt-2 w-full" value={property.status} disabled={pending} onChange={e=>move(property,e.target.value as Property["status"])}>{PROPERTY_STAGES.map(([v,l])=><option key={v} value={v}>{l}</option>)}</Select></label>
+   <div className="flex flex-wrap gap-2"><Button onClick={()=>open("properties",property as unknown as Record<string,unknown>)}>Modifier</Button><Link className="pf-studio-link" href={`/studio?propertyId=${property.id}`}>✦ Créer la communication</Link></div>
+   <div className="grid grid-cols-3 gap-2">{property.photos.map(p=><Image unoptimized width={640} height={420} className="aspect-square rounded-xl object-cover" alt={property.title} key={p.path} src={photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL??"",p.path)}/>)}</div><label className="block text-sm">Ajouter une photo<Input type="file" accept="image/jpeg,image/png,image/webp" disabled={pending} onChange={e=>{const file=e.target.files?.[0];if(!file)return;startTransition(async()=>{const r=await uploadPropertyPhoto(workspaceId,property.id,file);if(!r.ok){setError(r.error??"Photo non enregistrée.");return;}setData(prev=>({...prev,properties:prev.properties.map(p=>p.id===property.id?{...p,photos:r.photos??[]}:p)}));});}}/></label>
+   {(["mandates","visits","offers"] as const).map(key=><section className="border-t border-line pt-4" key={key}><div className="flex justify-between"><h3 className="font-bold">{LABELS[key]}</h3><Button size="sm" variant="ghost" onClick={()=>open(key,undefined,{property_id:property.id,...(key==="mandates"?{owner_id:property.owner_id}: {})})}>Ajouter</Button></div>{data[key].filter(r=>r.property_id===property.id).map(r=><button type="button" className="pf-record" key={r.id} onClick={()=>open(key,r as unknown as Record<string,unknown>)}>{"starts_at" in r?new Date(r.starts_at).toLocaleString("fr-FR"):"amount" in r?`${r.amount.toLocaleString("fr-FR")} €`:r.mandate_type} · {r.status} →</button>)}</section>)}
+  </div>}</Drawer>
+  <Drawer open={!!entity} onClose={()=>!pending&&setEntity(null)} title={`${editingId?"Modifier":"Créer"} · ${entity?LABELS[entity]:""}`} footer={<div className="flex gap-2"><Button type="submit" form="estate-form" disabled={pending}>{pending?"Enregistrement…":"Enregistrer"}</Button><Button variant="ghost" disabled={pending} onClick={()=>setEntity(null)}>Annuler</Button></div>}>
+   <form id="estate-form" onSubmit={e=>{e.preventDefault();save();}} className="space-y-4">{entity && fields[entity].map(f=>{
+    let value=draft[f.key]??"";if(Array.isArray(value) && f.type!=="multiple") value=value.join("\n");if(f.type==="datetime-local" && value) {const d=new Date(String(value));if(!Number.isNaN(d.getTime()))value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+    const onChange=(v:unknown)=>{const customer=f.key==="customer_id"?customers.find(c=>c.id===v):null;setDraft(prev=>({...prev,[f.key]:v,...(customer?{name:customer.name,email:customer.email,phone:customer.phone}: {})}));};
+    return <label className="block text-sm font-semibold" key={f.key}>{f.label}{f.required?" *":""}{f.options?<Select className="mt-1 w-full" required={f.required} multiple={f.type==="multiple"} value={f.type==="multiple"?(Array.isArray(value)?value:[]):String(value)} onChange={e=>onChange(f.type==="multiple"?Array.from(e.target.selectedOptions).map(o=>o.value):e.target.value)}>{f.type!=="multiple"&&<option value="">Choisir…</option>}{f.options.map(([v,l])=><option key={v} value={v}>{l}</option>)}</Select>:f.type==="textarea"?<textarea className="mt-1 w-full rounded-xl border border-line bg-soft p-3 font-normal" rows={4} value={String(value)} onChange={e=>onChange(e.target.value)}/>:<Input className="mt-1 w-full" required={f.required} type={f.type??"text"} min={f.type==="number"?0:undefined} step={f.type==="number"?(f.key==="rooms"||f.key==="bedrooms"?1:"any"):undefined} value={String(value)} onChange={e=>onChange(e.target.value)}/>}</label>;
+   })}{entity==="owners" && editingId && <section className="border-t border-line pt-4"><h3 className="font-bold">Biens associés</h3>{data.properties.filter(p=>p.owner_id===editingId).map(p=><button type="button" className="pf-record" key={p.id} onClick={()=>{setEntity(null);setSelected(p.id);}}>{p.title} →</button>)}</section>}{error && <p role="alert" className="text-red-fg">{error}</p>}</form>
+  </Drawer>
+ </div>;
+}

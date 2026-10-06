@@ -1,3 +1,4 @@
+import { checkedAll } from "@/lib/data-state";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCachedUser, getCachedMembership } from "@/lib/session";
@@ -45,7 +46,7 @@ export default async function MissionsPage() {
   if (!membership) redirect("/dashboard");
   const workspaceId = membership.workspace_id;
 
-  const [missions, status] = await Promise.all([listMissions(workspaceId), getBusinessTwinStatus(workspaceId)]);
+  const [missions, status] = await checkedAll([listMissions(workspaceId), getBusinessTwinStatus(workspaceId)]);
 
   const atRisk = missions.filter((m) => m.status === "active" && m.risk.status === "at_risk");
   const active = missions.filter((m) => m.status === "active" && m.risk.status !== "at_risk");

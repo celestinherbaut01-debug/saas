@@ -1,3 +1,7 @@
+import { BUSINESS_OS_REGISTRY } from "@/lib/business-os-registry";
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
+import { RealEstateView } from "@/components/business-os/realestate-view";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -22,7 +26,7 @@ import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
 import { AgencyView } from "@/components/business-os/agency/agency-view";
 import { RestaurantView } from "@/components/business-os/restaurant/restaurant-view";
 
-export default async function BusinessOsPage() {
+async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
   const user = await getCachedUser();
   if (!user) redirect("/login");
   const supabase = await createClient();
@@ -54,7 +58,7 @@ export default async function BusinessOsPage() {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings, opportunitiesResult, missions] = await Promise.all([
+  const [businessProfile, profile, automationSettings, opportunitiesResult, missions] = await checkedAll([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
@@ -62,6 +66,8 @@ export default async function BusinessOsPage() {
     listMissions(workspaceId),
   ]);
   const vertical = profile.vertical;
+  const query=await searchParams;
+  const propertyId=typeof query.propertyId === "string" ? query.propertyId : null;
 
   // Teaser compact plutôt que les trois blocs complets (GoalPicker +
   // MissionsPreview + NovaOpportunities) — la liste complète vit sur
@@ -99,7 +105,7 @@ export default async function BusinessOsPage() {
           {profile.icon} {profile.osName}
         </h1>
         <p className="mt-1 text-[13px] text-muted">
-          Modules réels adaptés à votre métier — données réelles de votre workspace, jamais de chiffre inventé.
+          {BUSINESS_OS_REGISTRY[vertical].scope}.
         </p>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-1.5">
@@ -115,6 +121,19 @@ export default async function BusinessOsPage() {
     </div>
   );
 
+  if (vertical === "realestate") {
+    const [owners, properties, mandates, buyers, visits, offers, customers] = await checkedAll([
+      supabase.from("property_owners").select("*").eq("workspace_id",workspaceId).order("name"),
+      supabase.from("properties").select("*").eq("workspace_id",workspaceId).order("created_at",{ascending:false}),
+      supabase.from("property_mandates").select("*").eq("workspace_id",workspaceId),
+      supabase.from("property_buyers").select("*").eq("workspace_id",workspaceId),
+      supabase.from("property_visits").select("*").eq("workspace_id",workspaceId).order("starts_at"),
+      supabase.from("property_offers").select("*").eq("workspace_id",workspaceId),
+      supabase.from("customers").select("*").eq("workspace_id",workspaceId).is("archived_at",null),
+    ]);
+    return <AppShell><div className="space-y-6">{header}{opportunitiesBlock}<RealEstateView customers={customers.data??[]} key={propertyId??"estate"} initialPropertyId={propertyId} workspaceId={workspaceId} initial={{owners:owners.data??[],properties:properties.data??[],mandates:mandates.data??[],buyers:buyers.data??[],visits:visits.data??[],offers:offers.data??[]}}/></div></AppShell>;
+  }
+
   // Garage a sa propre vue dédiée (bien plus riche que les 3 modules
   // génériques) : toutes les tables garage sont chargées ici en une seule
   // fois et confiées à GarageView, seul propriétaire de cet état côté client.
@@ -128,7 +147,7 @@ export default async function BusinessOsPage() {
       { data: repairOrders },
       { data: lines },
       { data: documents },
-    ] = await Promise.all([
+    ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -183,7 +202,7 @@ export default async function BusinessOsPage() {
       { data: teamMembers },
       { data: inventory },
       { data: documents },
-    ] = await Promise.all([
+    ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("sites").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("contracts").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -234,7 +253,7 @@ export default async function BusinessOsPage() {
       { data: tasks },
       { data: teamMembers },
       { data: documents },
-    ] = await Promise.all([
+    ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("projects").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("client_sites").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -289,7 +308,7 @@ export default async function BusinessOsPage() {
       { data: wasteLog },
       { data: appointments },
       { data: teamMembers },
-    ] = await Promise.all([
+    ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
       supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -335,7 +354,7 @@ export default async function BusinessOsPage() {
   }
 
   // Métier générique (aucune verticale dédiée) : les 3 modules communs.
-  const [{ data: customers }, { data: inventory }, { data: appointments }] = await Promise.all([
+  const [{ data: customers }, { data: inventory }, { data: appointments }] = await checkedAll([
     supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
     supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
     supabase.from("appointments").select("*").eq("workspace_id", workspaceId).order("starts_at"),
@@ -380,3 +399,6 @@ export default async function BusinessOsPage() {
     </AppShell>
   );
 }
+
+
+export default async function BusinessOsPage(props:PageProps<"/business-os">) { try { return await BusinessOsPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

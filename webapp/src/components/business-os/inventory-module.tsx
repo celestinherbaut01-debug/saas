@@ -36,12 +36,14 @@ interface ControlledInventory {
 // mode `controlled` sont utilisés par Restaurant (le sélecteur de
 // fournisseur d'un ingrédient doit voir les fournisseurs à jour).
 export function InventoryModule({
+  initialFocusId,
   workspaceId,
   initial,
   label,
   suppliers = [],
   controlled,
 }: {
+  initialFocusId?: string | null;
   workspaceId: string;
   initial: InventoryItem[];
   label: string;
@@ -51,7 +53,7 @@ export function InventoryModule({
   const supabase = createClient();
   const [localRows, setLocalRows] = useState(initial);
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<InventoryItem | null>(null);
+  const [editing, setEditing] = useState<InventoryItem | null>((controlled?.rows??initial).find(r=>r.id===initialFocusId)??null);
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
 

@@ -23,6 +23,7 @@ interface ProjectInput {
 }
 
 export function ProjectsModule({
+  initialFocusId,
   rows,
   customers,
   documents = [],
@@ -31,6 +32,7 @@ export function ProjectsModule({
   onRemove,
   onCreateInvoice,
 }: {
+  initialFocusId?: string | null;
   rows: Project[];
   customers: Customer[];
   documents?: BusinessDocument[];
@@ -40,7 +42,7 @@ export function ProjectsModule({
   onCreateInvoice?: (project: Project) => void;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Project | null>(null);
+  const [editing, setEditing] = useState<Project | null>(rows.find(r=>r.id===initialFocusId)??null);
 
   function customerName(id: string | null) {
     return id ? customers.find((c) => c.id === id)?.name ?? "—" : "—";

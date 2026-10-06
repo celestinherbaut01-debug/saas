@@ -8,9 +8,15 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/ui/confirm-delete-button";
 
-export function WasteLogModule({ workspaceId, initial }: { workspaceId: string; initial: WasteLogEntry[] }) {
+export function WasteLogModule({
+  onRowsChange, workspaceId, initial }: {
+  onRowsChange?: (rows: WasteLogEntry[])=>void; workspaceId: string; initial: WasteLogEntry[] }) {
   const supabase = createClient();
-  const [rows, setRows] = useState(initial);
+  const [rows, setLocalRows] = useState(initial);
+  function setRows(update: React.SetStateAction<WasteLogEntry[]>) {
+    const next=typeof update === "function" ? update(rows) : update;
+    setLocalRows(next);onRowsChange?.(next);
+  }
   const [itemName, setItemName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [reason, setReason] = useState("");

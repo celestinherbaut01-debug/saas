@@ -241,7 +241,7 @@ export const ENTITLEMENTS: Record<Plan, PlanEntitlements> = {
   },
   business_os: {
     id: "business_os",
-    label: "Business OS",
+    label: "Business OS Standard",
     tagline: "Le logiciel de gestion de votre métier — sans prospection.",
     targetAudience: "TPE et indépendants qui gèrent déjà leurs clients, sans besoin de prospecter.",
     notIncluded: "Pas de prospection — ajoutez le module Acquisition séparément si besoin.",

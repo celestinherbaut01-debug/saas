@@ -1,4 +1,7 @@
 "use server";
+import { checkedAll } from "@/lib/data-state";
+import { DataLoadError } from "@/lib/data-state";
+
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -41,12 +44,13 @@ async function assertMember(supabase: SupabaseServerClient, workspaceId: string)
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Session expirée." };
-  const { data: membership } = await supabase
+  const { data: membership , error: queryError1 } = await supabase
     .from("workspace_members")
     .select("workspace_id")
     .eq("workspace_id", workspaceId)
     .eq("user_id", user.id)
     .maybeSingle();
+  if(queryError1) throw new DataLoadError(queryError1);
   if (!membership) return { error: "Vous n'êtes pas membre de ce workspace." };
   return null;
 }
@@ -79,7 +83,7 @@ async function loadRawContext(supabase: SupabaseServerClient, workspaceId: strin
   const profile = await getCachedBusinessOsProfile(workspaceId);
   const vertical = profile.vertical;
 
-  const [{ data: bizProfile }, customerRows, documentRows, prospectRows] = await Promise.all([
+  const [{ data: bizProfile }, customerRows, documentRows, prospectRows] = await checkedAll([
     supabase.from("business_profiles").select("company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
     loadCustomers(supabase, workspaceId),
     loadDocuments(supabase, workspaceId),
@@ -112,12 +116,12 @@ async function loadRawContext(supabase: SupabaseServerClient, workspaceId: strin
   let renewalDates: { date: string }[] = [];
 
   if (vertical === "garage") {
-    const [parts, repairOrders] = await Promise.all([loadParts(supabase, workspaceId), loadRepairOrders(supabase, workspaceId)]);
+    const [parts, repairOrders] = await checkedAll([loadParts(supabase, workspaceId), loadRepairOrders(supabase, workspaceId)]);
     lowStockItems = parts.map((p) => ({ quantity: p.quantity, low_stock_threshold: p.low_stock_threshold }));
     const activeStatuses = new Set(["diagnostic", "quote", "accepted", "in_progress", "waiting_parts"]);
     scheduledDates = repairOrders.filter((r) => r.scheduled_at && activeStatuses.has(r.status)).map((r) => r.scheduled_at as string);
   } else if (vertical === "cleaning") {
-    const [inventory, interventions, contracts] = await Promise.all([
+    const [inventory, interventions, contracts] = await checkedAll([
       loadInventoryItems(supabase, workspaceId),
       loadInterventions(supabase, workspaceId),
       loadContracts(supabase, workspaceId),
@@ -132,10 +136,17 @@ async function loadRawContext(supabase: SupabaseServerClient, workspaceId: strin
       if (s.hosting_renewal_date) renewalDates.push({ date: s.hosting_renewal_date });
     }
   } else if (vertical === "restaurant") {
-    const [inventory, appointments] = await Promise.all([loadInventoryItems(supabase, workspaceId), loadAppointments(supabase, workspaceId)]);
+    const [inventory, appointments] = await checkedAll([loadInventoryItems(supabase, workspaceId), loadAppointments(supabase, workspaceId)]);
     lowStockItems = inventory.map((i) => ({ quantity: i.quantity, low_stock_threshold: i.low_stock_threshold }));
     scheduledDates = appointments.map((a) => a.starts_at);
     void loadPurchaseOrders; // réservé pour l'objectif "écouler un stock" — pas encore de règle déterministe (voir scenarios.ts)
+  } else if(vertical === "realestate") {
+    const [visits,mandates]=await checkedAll([
+      supabase.from("property_visits").select("starts_at,status").eq("workspace_id",workspaceId),
+      supabase.from("property_mandates").select("expires_on,status").eq("workspace_id",workspaceId),
+    ]);
+    scheduledDates=(visits.data??[]).filter(v=>v.status==="planned").map(v=>v.starts_at);
+    renewalDates=(mandates.data??[]).filter(m=>m.status==="active"&&m.expires_on).map(m=>({date:m.expires_on!}));
   } else {
     const inventory = await loadInventoryItems(supabase, workspaceId);
     lowStockItems = inventory.map((i) => ({ quantity: i.quantity, low_stock_threshold: i.low_stock_threshold }));
@@ -173,7 +184,7 @@ export async function getBusinessTwinStatus(workspaceId: string): Promise<Busine
   const plan = await getWorkspacePlan(workspaceId);
   const ent = getEntitlements(plan);
 
-  const [{ count: activeMissionsCount }, scenarioUsage] = await Promise.all([
+  const [{ count: activeMissionsCount }, scenarioUsage] = await checkedAll([
     supabase.from("missions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "active"),
     getUsage(workspaceId, "scenario_runs", plan),
   ]);
@@ -209,12 +220,13 @@ async function registerFingerprint(
   lever: string,
   label: string,
 ): Promise<{ isRepeat: boolean; firstSeenAt: string }> {
-  const { data: existing } = await supabase
+  const { data: existing , error: queryError2 } = await supabase
     .from("recommendation_fingerprints")
     .select("first_seen_at, times_seen")
     .eq("workspace_id", workspaceId)
     .eq("fingerprint", fingerprint)
     .maybeSingle();
+  if(queryError2) throw new DataLoadError(queryError2);
 
   const now = new Date().toISOString();
   if (existing) {
@@ -383,7 +395,8 @@ export async function runAdjustmentSimulation(workspaceId: string, missionId: st
   const memberError = await assertMember(supabase, workspaceId);
   if (memberError) return memberError;
 
-  const { data: mission } = await supabase.from("missions").select("goal_type, goal_label").eq("id", missionId).eq("workspace_id", workspaceId).maybeSingle();
+  const { data: mission , error: queryError3 } = await supabase.from("missions").select("goal_type, goal_label").eq("id", missionId).eq("workspace_id", workspaceId).maybeSingle();
+  if(queryError3) throw new DataLoadError(queryError3);
   if (!mission) return { error: "Mission introuvable." };
 
   const plan = await getWorkspacePlan(workspaceId);
@@ -435,12 +448,14 @@ export async function createMissionFromScenario(
   if (ent.businessTwinMaxActiveMissions === 0) {
     return { error: "Les missions persistantes ne sont pas incluses sur votre plan — passez à un plan payant pour créer une mission." };
   }
-  const { count: activeCount } = await supabase.from("missions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "active");
+  const { count: activeCount , error: queryError4 } = await supabase.from("missions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "active");
+  if(queryError4) throw new DataLoadError(queryError4);
   if ((activeCount ?? 0) >= ent.businessTwinMaxActiveMissions) {
     return { error: `Limite de ${ent.businessTwinMaxActiveMissions} mission(s) active(s) atteinte pour votre plan — terminez ou abandonnez une mission avant d'en créer une nouvelle.` };
   }
 
-  const { data: runRow } = await supabase.from("scenario_runs").select("snapshot_id").eq("id", params.scenarioRunId).eq("workspace_id", workspaceId).maybeSingle();
+  const { data: runRow , error: queryError5 } = await supabase.from("scenario_runs").select("snapshot_id").eq("id", params.scenarioRunId).eq("workspace_id", workspaceId).maybeSingle();
+  if(queryError5) throw new DataLoadError(queryError5);
 
   const { data: missionRow, error: missionError } = await supabase
     .from("missions")
@@ -518,21 +533,24 @@ export async function addScenarioToMission(
   const memberError = await assertMember(supabase, workspaceId);
   if (memberError) return { error: memberError.error };
 
-  const { data: mission } = await supabase.from("missions").select("id, goal_type").eq("id", params.missionId).eq("workspace_id", workspaceId).maybeSingle();
+  const { data: mission , error: queryError6 } = await supabase.from("missions").select("id, goal_type").eq("id", params.missionId).eq("workspace_id", workspaceId).maybeSingle();
+  if(queryError6) throw new DataLoadError(queryError6);
   if (!mission) return { error: "Mission introuvable." };
 
-  const { data: runRow } = await supabase
+  const { data: runRow , error: queryError7 } = await supabase
     .from("scenario_runs")
     .select("id, snapshot_id, mission_id")
     .eq("id", params.scenarioRunId)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if(queryError7) throw new DataLoadError(queryError7);
   if (!runRow || runRow.mission_id !== params.missionId) return { error: "Cette simulation ne correspond pas à cette mission." };
 
   const plan = await getWorkspacePlan(workspaceId);
   const ent = getEntitlements(plan);
 
-  const { count: existingCount } = await supabase.from("mission_actions").select("id", { count: "exact", head: true }).eq("mission_id", params.missionId);
+  const { count: existingCount , error: queryError8 } = await supabase.from("mission_actions").select("id", { count: "exact", head: true }).eq("mission_id", params.missionId);
+  if(queryError8) throw new DataLoadError(queryError8);
   const startOrder = existingCount ?? 0;
 
   const raw = await loadRawContext(supabase, workspaceId, ent.canSeeAcquisitionOpportunities);
@@ -564,7 +582,7 @@ export async function addScenarioToMission(
     );
   }
 
-  await Promise.all([
+  await checkedAll([
     supabase.from("missions").update({ snapshot_id: runRow.snapshot_id, chosen_scenario_result_id: params.scenarioResultId }).eq("id", params.missionId),
     supabase.from("scenario_runs").update({ applied: true }).eq("id", params.scenarioRunId),
     supabase.from("mission_events").insert([
@@ -591,20 +609,22 @@ export interface MissionSummary {
 
 export async function listMissions(workspaceId: string): Promise<MissionSummary[]> {
   const supabase = await createClient();
-  const { data: missions } = await supabase
+  const { data: missions , error: queryError9 } = await supabase
     .from("missions")
     .select("id, goal_label, goal_type, status, deadline")
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false });
+  if(queryError9) throw new DataLoadError(queryError9);
   if (!missions || missions.length === 0) return [];
 
-  const { data: actions } = await supabase
+  const { data: actions , error: queryError10 } = await supabase
     .from("mission_actions")
     .select("mission_id, status")
     .in(
       "mission_id",
       missions.map((m) => m.id),
     );
+  if(queryError10) throw new DataLoadError(queryError10);
 
   return missions.map((m) => {
     const missionActions = (actions ?? []).filter((a) => a.mission_id === m.id);
@@ -649,10 +669,11 @@ export interface MissionDetail {
 
 export async function getMissionDetail(workspaceId: string, missionId: string): Promise<MissionDetail | { error: string }> {
   const supabase = await createClient();
-  const { data: mission } = await supabase.from("missions").select("*").eq("id", missionId).eq("workspace_id", workspaceId).maybeSingle();
+  const { data: mission , error: queryError11 } = await supabase.from("missions").select("*").eq("id", missionId).eq("workspace_id", workspaceId).maybeSingle();
+  if(queryError11) throw new DataLoadError(queryError11);
   if (!mission) return { error: "Mission introuvable." };
 
-  const [{ data: actions }, { data: events }, { data: snapshot }] = await Promise.all([
+  const [{ data: actions }, { data: events }, { data: snapshot }] = await checkedAll([
     supabase.from("mission_actions").select("*").eq("mission_id", missionId).order("step_order"),
     supabase.from("mission_events").select("event_type, detail, created_at").eq("mission_id", missionId).order("created_at", { ascending: false }),
     mission.snapshot_id ? supabase.from("business_twin_snapshots").select("metrics").eq("id", mission.snapshot_id).maybeSingle() : Promise.resolve({ data: null }),
@@ -711,7 +732,7 @@ export async function setMissionActionStatus(
   const { error: updateError } = await supabase.from("mission_actions").update({ status }).eq("id", actionId);
   if (updateError) return { ok: false, error: updateError.message };
 
-  await Promise.all([
+  await checkedAll([
     supabase.from("action_outcomes").insert({
       workspace_id: workspaceId,
       mission_action_id: actionId,

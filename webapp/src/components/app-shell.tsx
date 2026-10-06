@@ -1,3 +1,4 @@
+import { WorkspaceIntro } from "@/components/workspace-intro";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
@@ -165,7 +166,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="flex min-h-screen flex-col md:grid md:grid-cols-[auto_1fr]">
+    <div className="pf-app flex min-h-screen flex-col md:grid md:grid-cols-[auto_1fr]">
       {/* Desktop : sidebar fixe repliable en mode icônes (voir SidebarShell). Cachée sous md, remplacée par le menu déroulant mobile ci-dessous. */}
       <SidebarShell
         logo={logo}
@@ -199,8 +200,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           <span className="font-display text-[13px] font-extrabold">{workspace?.name ?? "—"}</span>
           <span className="text-[12px] text-muted">{user.email}</span>
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8"><WorkspaceIntro />{children}</main>
       </div>
     </div>
   );
 }
+

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { recipeCost, foodCostPercent, formatEUR } from "@/lib/restaurant";
 
 export function RecipesModule({
+  initialFocusId,
   rows,
   ingredients,
   inventory,
@@ -24,6 +25,7 @@ export function RecipesModule({
   onAddIngredient,
   onRemoveIngredient,
 }: {
+  initialFocusId?: string | null;
   rows: Recipe[];
   ingredients: RecipeIngredient[];
   inventory: InventoryItem[];
@@ -36,7 +38,7 @@ export function RecipesModule({
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState("");
   const [sellingPrice, setSellingPrice] = useState("");
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(initialFocusId??null);
 
   function ingredientsOf(recipeId: string) {
     return ingredients.filter((i) => i.recipe_id === recipeId);

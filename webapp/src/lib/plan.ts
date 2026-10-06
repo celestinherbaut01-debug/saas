@@ -1,3 +1,4 @@
+import { DataLoadError } from "@/lib/data-state";
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { planAtLeast, resolvePlan, type Plan } from "@/lib/entitlements";
@@ -9,7 +10,7 @@ export const PLAN_LABEL: Record<Plan, string> = {
   free: "Free",
   acquisition_starter: "Acquisition Starter",
   acquisition_pro: "Acquisition Pro",
-  business_os: "Business OS",
+  business_os: "Business OS Standard",
   business_os_advanced: "Business OS Advanced",
   complete: "Complete",
   complete_max: "Complete Max",
@@ -27,11 +28,12 @@ export const PLAN_LABEL: Record<Plan, string> = {
  */
 export const getWorkspacePlan = cache(async (workspaceId: string): Promise<Plan> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("subscriptions")
     .select("plan, status")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if(error) throw new DataLoadError(error);
 
   if (!data || data.status === "canceled" || data.status === "past_due") return "free";
   // `data.plan` est typé `Plan` par le générique Database, mais ce type ne

@@ -13,6 +13,7 @@ import { formatEUR } from "@/lib/format";
 // seule chose qui change entre verticales : le nom de ce à quoi le
 // devis/la facture est rattaché.
 export function DocumentsModule({
+  initialFocusId,
   docType,
   rows,
   customers,
@@ -20,6 +21,7 @@ export function DocumentsModule({
   emptyHint,
   onSetStatus,
 }: {
+  initialFocusId?:string|null;
   docType: "quote" | "invoice";
   rows: BusinessDocument[];
   customers: Customer[];
@@ -64,7 +66,7 @@ export function DocumentsModule({
               </Thead>
               <tbody>
                 {docs.map((d) => (
-                  <Tr key={d.id}>
+                  <Tr key={d.id} className={initialFocusId===d.id?"outline outline-2 outline-accent bg-accent/10":undefined}>
                     <Td className="font-semibold text-ink">{d.number || "—"}</Td>
                     <Td className="text-muted">{customerName(d.customer_id)}</Td>
                     <Td className="text-muted">{resolveLinkedLabel(d)}</Td>

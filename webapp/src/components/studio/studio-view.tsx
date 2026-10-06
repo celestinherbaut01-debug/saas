@@ -54,6 +54,10 @@ export interface StudioPrefill {
   title: string;
   description: string;
   sourceMissionId: string | null;
+  sourcePropertyId?: string | null;
+  input?: StudioInput;
+  offerType?: OfferType;
+  photos?: import("@/lib/studio/photos").StudioPhoto[];
 }
 
 export function StudioView({
@@ -82,12 +86,15 @@ export function StudioView({
   const [copiedChannel, setCopiedChannel] = useState<string | null>(null);
   const [activeChannel, setActiveChannel] = useState<(typeof CHANNEL_TABS)[number]["key"]>("instagram");
   const [editing, setEditing] = useState(false);
-  const [prefillSourceMissionId] = useState<string | null>(prefill?.sourceMissionId ?? null);
+  const [prefillSourceMissionId,setPrefillSourceMissionId] = useState<string | null>(prefill?.sourceMissionId ?? null);
+
+  const [formSourcePropertyId,setFormSourcePropertyId]=useState(prefill?.sourcePropertyId??null);
+  const [formPhotos,setFormPhotos]=useState(prefill?.photos??[]);
 
   const availableOfferTypes = useMemo(() => offerTypesForVertical(vertical), [vertical]);
-  const [formOfferType, setFormOfferType] = useState<OfferType>(prefill ? "promotion" : availableOfferTypes[0]);
+  const [formOfferType, setFormOfferType] = useState<OfferType>(prefill?.offerType ?? (prefill ? "promotion" : availableOfferTypes[0]));
   const [formInput, setFormInput] = useState<StudioInput>(
-    prefill ? { ...EMPTY_STUDIO_INPUT, title: prefill.title, description: prefill.description } : EMPTY_STUDIO_INPUT,
+    prefill?.input ?? (prefill ? { ...EMPTY_STUDIO_INPUT, title: prefill.title, description: prefill.description } : EMPTY_STUDIO_INPUT),
   );
 
   const active = creations.find((c) => c.id === activeId) ?? null;
@@ -109,6 +116,7 @@ export function StudioView({
   const filtered = creations.filter((c) => c.status === statusFilter);
 
   function openNewForm() {
+    setFormSourcePropertyId(null);setFormPhotos([]);setPrefillSourceMissionId(null);
     setFormOfferType(availableOfferTypes[0]);
     setFormInput(EMPTY_STUDIO_INPUT);
     setError(null);
@@ -118,7 +126,7 @@ export function StudioView({
   function submitNewCreation() {
     setError(null);
     startTransition(async () => {
-      const result = await createStudioCreation(workspaceId, { vertical, offerType: formOfferType, input: formInput, sourceMissionId: prefillSourceMissionId });
+      const result = await createStudioCreation(workspaceId, { vertical, offerType: formOfferType, input: formInput, sourceMissionId: prefillSourceMissionId, sourcePropertyId: formSourcePropertyId });
       if (!result.ok) {
         setError(result.error);
         return;
@@ -129,9 +137,10 @@ export function StudioView({
         vertical,
         offer_type: formOfferType,
         title: formInput.title.trim(),
-        input_data: formInput as unknown as Record<string, unknown>,
+        input_data: result.input as unknown as Record<string, unknown>,
         generated_content: result.content as unknown as Record<string, unknown>,
-        photos: [],
+        photos: result.photos ?? [],
+        source_property_id: formSourcePropertyId,
         status: "draft",
         source_mission_id: prefillSourceMissionId,
         created_at: new Date().toISOString(),
@@ -222,6 +231,7 @@ export function StudioView({
           <Card>
             <h2 className="font-display text-sm font-bold">1. Informations</h2>
             <div className="mt-3 flex flex-col gap-3">
+              {formSourcePropertyId && <p className="rounded-xl bg-accent/10 p-3 text-sm text-accent">Bien prérempli : caractéristiques et photos seront reprises dans votre création. Pour les modifier, mettez d’abord à jour le bien dans Business OS.</p>}
               {prefillSourceMissionId && (
                 <p className="rounded-lg bg-accent/10 px-3 py-2 text-[11.5px] font-medium text-accent">
                   🧭 Pré-rempli depuis une action de votre mission Business Twin — vérifiez et complétez avant de générer.
@@ -229,7 +239,7 @@ export function StudioView({
               )}
               <div>
                 <Label htmlFor="studio-offer-type">Type d&apos;offre</Label>
-                <Select id="studio-offer-type" value={formOfferType} onChange={(e) => setFormOfferType(e.target.value as OfferType)} className="mt-1 w-full">
+                <Select id="studio-offer-type" disabled={!!formSourcePropertyId} value={formOfferType} onChange={(e) => setFormOfferType(e.target.value as OfferType)} className="mt-1 w-full">
                   {availableOfferTypes.map((t) => (
                     <option key={t} value={t}>
                       {OFFER_TYPE_LABEL[t]}
@@ -240,12 +250,12 @@ export function StudioView({
                   Verticale détectée : {STUDIO_VERTICAL_LABEL[vertical]} — les types d&apos;offre proposés sont adaptés à votre métier.
                 </p>
               </div>
-              <OfferForm offerType={formOfferType} value={formInput} onChange={setFormInput} />
+              <fieldset disabled={!!formSourcePropertyId}><OfferForm offerType={formOfferType} value={formInput} onChange={setFormInput} /></fieldset>
               {error && <p className="text-[12px] font-medium text-red-fg">{error}</p>}
               <Button onClick={submitNewCreation} disabled={pending || !formInput.title.trim()}>
                 {pending ? "Génération…" : "Générer le contenu"}
               </Button>
-              <p className="text-[10.5px] text-faint">Les photos s&apos;ajoutent à l&apos;étape suivante, une fois la création enregistrée.</p>
+              <p className="text-[10.5px] text-faint">Les photos du bien sont reprises automatiquement. Vous pouvez ajouter d’autres photos après enregistrement.</p>
             </div>
           </Card>
 
@@ -268,7 +278,7 @@ export function StudioView({
             </div>
             <div className="mt-4">
               {formInput.title.trim() ? (
-                <ChannelPreview channel={formActiveChannel} content={liveContent} companyName={companyName} photoUrl={null} />
+                <ChannelPreview channel={formActiveChannel} content={liveContent} companyName={companyName} photoUrl={formPhotos[0] ? photoPublicUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",formPhotos[0].path) : null} />
               ) : (
                 <p className="py-10 text-center text-[12.5px] text-faint">Commencez à remplir le titre pour voir l&apos;aperçu.</p>
               )}

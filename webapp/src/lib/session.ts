@@ -1,3 +1,4 @@
+import { DataLoadError } from "@/lib/data-state";
 import { cache } from "react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -14,8 +15,9 @@ import { getBusinessOsProfile, type BusinessOsProfile } from "@/lib/business-os"
 export const getCachedUser = cache(async (): Promise<User | null> => {
   const supabase = await createClient();
   const {
-    data: { user },
+    data: { user }, error,
   } = await supabase.auth.getUser();
+  if(error && error.name !== "AuthSessionMissingError" && error.code !== "session_not_found") throw new DataLoadError(error);
   return user;
 });
 
@@ -25,12 +27,13 @@ export interface Membership {
 
 export const getCachedMembership = cache(async (userId: string): Promise<Membership | null> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("workspace_members")
     .select("workspace_id")
     .eq("user_id", userId)
     .limit(1)
     .maybeSingle();
+  if(error) throw new DataLoadError(error);
   return data;
 });
 
@@ -48,11 +51,12 @@ export interface CachedBusinessProfile {
  */
 export const getCachedBusinessProfile = cache(async (workspaceId: string): Promise<CachedBusinessProfile | null> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("business_profiles")
     .select("own_category_id, offer_description, audience, product_mode")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if(error) throw new DataLoadError(error);
   return data;
 });
 
@@ -81,11 +85,12 @@ const DEFAULT_AUTOMATION_SETTINGS: AutomationSettings = {
 /** Lu par la page Automatisations ET par chaque page Business OS (insights NOVA) — mémorisé par requête. */
 export const getCachedAutomationSettings = cache(async (workspaceId: string): Promise<AutomationSettings> => {
   const supabase = await createClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("automation_settings")
     .select("appointment_reminder_24h, appointment_reminder_2h, custom_reminder_hours_before, low_stock_alert, renewal_alert")
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if(error) throw new DataLoadError(error);
   return data ?? DEFAULT_AUTOMATION_SETTINGS;
 });
 
@@ -103,18 +108,20 @@ export const getCachedBusinessOsProfile = cache(async (workspaceId: string): Pro
   let parentSlug: string | null = null;
   let leafSlug: string | null = null;
   if (businessProfile?.own_category_id) {
-    const { data: ownCategory } = await supabase
+    const { data : ownCategory, error } = await supabase
       .from("business_categories")
       .select("slug, parent_id")
       .eq("id", businessProfile.own_category_id)
       .maybeSingle();
+  if(error) throw new DataLoadError(error);
     leafSlug = ownCategory?.slug ?? null;
     if (ownCategory?.parent_id) {
-      const { data: parent } = await supabase
+      const { data : parent, error } = await supabase
         .from("business_categories")
         .select("slug")
         .eq("id", ownCategory.parent_id)
         .maybeSingle();
+  if(error) throw new DataLoadError(error);
       parentSlug = parent?.slug ?? null;
     }
   }

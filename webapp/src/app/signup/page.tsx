@@ -1,3 +1,5 @@
+import { DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import Link from "next/link";
 import { AuthLayout } from "@/components/auth-layout";
 import { GoogleButton } from "@/components/google-button";
@@ -9,7 +11,7 @@ import { PlanIntentCapture } from "@/components/plan-intent";
 import { ENTITLEMENTS, isValidPlan } from "@/lib/entitlements";
 import { createClient } from "@/lib/supabase/server";
 
-export default async function SignupPage({
+async function SignupPageContent({
   searchParams,
 }: PageProps<"/signup">) {
   const params = await searchParams;
@@ -78,3 +80,5 @@ export default async function SignupPage({
     </AuthLayout>
   );
 }
+
+export default async function SignupPage(props: Parameters<typeof SignupPageContent>[0]) { try { return await SignupPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

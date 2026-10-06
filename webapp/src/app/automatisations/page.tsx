@@ -1,3 +1,4 @@
+import { checkedAll } from "@/lib/data-state";
 import { redirect } from "next/navigation";
 import { getCachedUser, getCachedMembership, getCachedAutomationSettings, getCachedBusinessOsProfile } from "@/lib/session";
 import { AppShell } from "@/components/app-shell";
@@ -35,7 +36,7 @@ export default async function AutomatisationsPage() {
     );
   }
 
-  const [settings, profile] = await Promise.all([
+  const [settings, profile] = await checkedAll([
     getCachedAutomationSettings(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
   ]);

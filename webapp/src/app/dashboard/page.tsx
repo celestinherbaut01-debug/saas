@@ -1,3 +1,5 @@
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -22,7 +24,7 @@ import { listMissions } from "@/lib/actions/business-twin";
 // donnait l'impression de pages qui se répètent.
 const CONTACTED_OR_LATER: ProspectStatus[] = ["contacted", "replied", "interested", "rdv", "quote", "won", "lost"];
 
-export default async function DashboardPage() {
+async function DashboardPageContent() {
   const user = await getCachedUser();
   if (!user) redirect("/login");
   const supabase = await createClient();
@@ -44,7 +46,7 @@ export default async function DashboardPage() {
 
   const [{ count: targetCount }, { data: statusRows }, { data: appointments }, { data: recentActivities }, opportunitiesResult, missions] =
     workspaceId
-      ? await Promise.all([
+      ? await checkedAll([
           supabase
             .from("workspace_targets")
             .select("category_id", { count: "exact", head: true })
@@ -228,3 +230,6 @@ export default async function DashboardPage() {
     </AppShell>
   );
 }
+
+
+export default async function DashboardPage() { try { return await DashboardPageContent(); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

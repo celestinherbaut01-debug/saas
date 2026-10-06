@@ -31,6 +31,7 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 }
 
 const APPOINTMENT_COPY: Record<BusinessOsVertical, { title: string; desc: string }> = {
+  realestate: {title:"Rappels de visites",desc:"Retrouvez les visites à venir de vos biens."},
   garage: { title: "Rappels de rendez-vous atelier", desc: "NOVA vous signale les véhicules attendus bientôt en atelier." },
   cleaning: { title: "Rappels d'interventions", desc: "NOVA vous signale les interventions planifiées bientôt." },
   restaurant: { title: "Rappels de rendez-vous", desc: "NOVA vous signale les rendez-vous à venir." },

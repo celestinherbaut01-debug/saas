@@ -1,3 +1,4 @@
+import type { PropertyOwner, Property, PropertyMandate, PropertyBuyer, PropertyVisit, PropertyOffer } from "@/lib/realestate";
 // Types manuels reflétant supabase/migrations/*.sql (Phase 1).
 // À remplacer plus tard par `supabase gen types typescript` une fois un
 // projet Supabase réel lié — voir README pour la commande.
@@ -16,9 +17,17 @@ interface Relationship {
   referencedColumns: string[];
 }
 
+type EstateTable<Row extends { id: string; workspace_id: string; created_at: string; updated_at: string }> = { Row: { [K in keyof Row]: Row[K] }; Insert: Omit<Row, "id" | "created_at" | "updated_at"> & Partial<Pick<Row, "id" | "created_at" | "updated_at">>; Update: Partial<Row>; Relationships: [] };
+
 export interface Database {
   public: {
     Tables: {
+      property_owners: EstateTable<PropertyOwner>;
+      properties: EstateTable<Property>;
+      property_mandates: EstateTable<PropertyMandate>;
+      property_buyers: EstateTable<PropertyBuyer>;
+      property_visits: EstateTable<PropertyVisit>;
+      property_offers: EstateTable<PropertyOffer>;
       profiles: {
         Row: {
           id: string;
@@ -282,6 +291,7 @@ export interface Database {
       };
       vehicles: {
         Row: {
+          next_maintenance_on: string | null;
           id: string;
           workspace_id: string;
           customer_id: string | null;
@@ -480,6 +490,7 @@ export interface Database {
       };
       tasks: {
         Row: {
+          blocked: boolean;
           id: string;
           workspace_id: string;
           project_id: string | null;
@@ -765,14 +776,14 @@ export interface Database {
         Row: {
           id: string;
           workspace_id: string;
-          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "generic";
+          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "realestate" | "generic";
           captured_at: string;
           metrics: Record<string, unknown>;
           created_at: string;
         };
         Insert: Partial<Database["public"]["Tables"]["business_twin_snapshots"]["Row"]> & {
           workspace_id: string;
-          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "generic";
+          vertical: "garage" | "cleaning" | "agency" | "restaurant" | "realestate" | "generic";
         };
         Update: Partial<Database["public"]["Tables"]["business_twin_snapshots"]["Row"]>;
         Relationships: [];
@@ -899,6 +910,7 @@ export interface Database {
       };
       studio_creations: {
         Row: {
+          source_property_id: string | null;
           id: string;
           workspace_id: string;
           vertical: string;
@@ -1024,6 +1036,7 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      convert_won_prospect: { Args: { p_prospect_id: string }; Returns: string };
       increment_usage: {
         Args: { p_workspace_id: string; p_period_key: string; p_metric: string; p_amount?: number };
         Returns: number;
@@ -1092,3 +1105,4 @@ export type PurchaseOrder = Database["public"]["Tables"]["purchase_orders"]["Row
 export type PurchaseOrderItem = Database["public"]["Tables"]["purchase_order_items"]["Row"];
 export type Recipe = Database["public"]["Tables"]["recipes"]["Row"];
 export type RecipeIngredient = Database["public"]["Tables"]["recipe_ingredients"]["Row"];
+

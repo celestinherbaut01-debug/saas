@@ -1,3 +1,5 @@
+import { checkedAll, DataLoadError, classifyDataError } from "@/lib/data-state";
+import { DataLoadErrorView } from "@/components/data-load-error";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedUser, getCachedMembership, getCachedBusinessOsProfile } from "@/lib/session";
@@ -34,7 +36,7 @@ function isRiskKey(key: string): boolean {
   return key === "overdue_invoices" || key === "low_stock" || key === "unanswered_quotes" || key.startsWith("activity_decline");
 }
 
-export default async function NovaActionsPage({ searchParams }: PageProps<"/nova/actions">) {
+async function NovaActionsPageContent({ searchParams }: PageProps<"/nova/actions">) {
   const user = await getCachedUser();
   if (!user) redirect("/login");
 
@@ -67,7 +69,7 @@ export default async function NovaActionsPage({ searchParams }: PageProps<"/nova
   }
 
   const supabase = await createClient();
-  const [{ opportunities }, { data: historyRows }] = await Promise.all([
+  const [{ opportunities }, { data: historyRows }] = await checkedAll([
     getOpportunities(workspaceId),
     supabase
       .from("nova_action_log")
@@ -91,7 +93,7 @@ export default async function NovaActionsPage({ searchParams }: PageProps<"/nova
   // lib/nova-opportunities.ts, qui pointent vers /nova/actions?campaign=...).
   const campaignTemplate = campaignContext
     ? await (async () => {
-        const [{ data: businessProfile }, osProfile, { count: customerCount }] = await Promise.all([
+        const [{ data: businessProfile }, osProfile, { count: customerCount }] = await checkedAll([
           supabase.from("business_profiles").select("company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
           getCachedBusinessOsProfile(workspaceId),
           supabase.from("customers").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null),
@@ -198,3 +200,5 @@ export default async function NovaActionsPage({ searchParams }: PageProps<"/nova
     </AppShell>
   );
 }
+
+export default async function NovaActionsPage(props: Parameters<typeof NovaActionsPageContent>[0]) { try { return await NovaActionsPageContent(props); } catch(error) { if(error instanceof DataLoadError) return <DataLoadErrorView kind={error.kind}/>; if(error && typeof error === "object" && "code" in error) return <DataLoadErrorView kind={classifyDataError(error)}/>; throw error; } }

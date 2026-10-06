@@ -1,5 +1,8 @@
 "use server";
 
+import { propertyToStudioInput } from "@/lib/realestate";
+import { checkedAll } from "@/lib/data-state";
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateStudioContent } from "@/lib/studio/generator";
@@ -41,6 +44,7 @@ export interface CreateStudioCreationInput {
   offerType: OfferType;
   input: StudioInput;
   sourceMissionId?: string | null;
+  sourcePropertyId?: string | null;
 }
 
 /**
@@ -51,16 +55,23 @@ export interface CreateStudioCreationInput {
 export async function createStudioCreation(
   workspaceId: string,
   params: CreateStudioCreationInput,
-): Promise<{ ok: true; id: string; content: GeneratedContent } | { ok: false; error: string }> {
+): Promise<{ ok: true; id: string; content: GeneratedContent; input: StudioInput; photos: import("@/lib/studio/photos").StudioPhoto[] } | { ok: false; error: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Session expirée." };
 
+  let sourcePhotos: import("@/lib/studio/photos").StudioPhoto[] = [];
+  if(params.sourcePropertyId) {
+    const {data:property,error}=await supabase.from("properties").select("*").eq("workspace_id",workspaceId).eq("id",params.sourcePropertyId).single();
+    if(error || !property) return {ok:false,error:"Bien inaccessible : communication non créée."};
+    params={...params,vertical:"realestate",offerType:"bien",input:propertyToStudioInput(property)};
+    sourcePhotos=parsePhotos(property.photos);
+  }
   if (!params.input.title.trim()) return { ok: false, error: "Le titre est obligatoire." };
 
-  const [{ data: profile }, { data: brandKitRow }] = await Promise.all([
+  const [{ data: profile }, { data: brandKitRow }] = await checkedAll([
     supabase.from("business_profiles").select("company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
     supabase.from("brand_kits").select("*").eq("workspace_id", workspaceId).maybeSingle(),
   ]);
@@ -85,14 +96,34 @@ export async function createStudioCreation(
       generated_content: content as unknown as Record<string, unknown>,
       status: "draft",
       source_mission_id: params.sourceMissionId ?? null,
+      source_property_id: params.sourcePropertyId ?? null,
     })
     .select("id")
     .single();
 
   if (error || !data) return { ok: false, error: error?.message ?? "Échec de la création." };
 
+  const copied: import("@/lib/studio/photos").StudioPhoto[] = [];
+  for(const photo of sourcePhotos) {
+    const path=buildPhotoPath(workspaceId,data.id,photo.path.split("/").pop()??"photo",crypto.randomUUID());
+    const result=await supabase.storage.from(STUDIO_PHOTOS_BUCKET).copy(photo.path,path);
+    if(result.error) {
+      if(copied.length) await supabase.storage.from(STUDIO_PHOTOS_BUCKET).remove(copied.map(p=>p.path));
+      await supabase.from("studio_creations").delete().eq("workspace_id",workspaceId).eq("id",data.id);
+      return {ok:false,error:"Une photo n’a pas pu être reprise. Réessayez la création."};
+    }
+    copied.push({path});
+  }
+  if(copied.length) {
+    const {error}=await supabase.from("studio_creations").update({photos:copied}).eq("workspace_id",workspaceId).eq("id",data.id);
+    if(error) {
+      await supabase.storage.from(STUDIO_PHOTOS_BUCKET).remove(copied.map(p=>p.path));
+      await supabase.from("studio_creations").delete().eq("workspace_id",workspaceId).eq("id",data.id);
+      return {ok:false,error:"Photos non enregistrées. Réessayez."};
+    }
+  }
   revalidatePath("/studio");
-  return { ok: true, id: data.id, content };
+  return { ok: true, id: data.id, content, input:params.input, photos: copied };
 }
 
 export async function updateStudioCreationInput(
@@ -121,7 +152,7 @@ export async function regenerateStudioCreation(
 ): Promise<{ ok: true; content: GeneratedContent } | { ok: false; error: string }> {
   const supabase = await createClient();
 
-  const [{ data: creation }, { data: profile }, { data: brandKitRow }] = await Promise.all([
+  const [{ data: creation }, { data: profile }, { data: brandKitRow }] = await checkedAll([
     supabase.from("studio_creations").select("*").eq("id", id).eq("workspace_id", workspaceId).maybeSingle(),
     supabase.from("business_profiles").select("company_name, city").eq("workspace_id", workspaceId).maybeSingle(),
     supabase.from("brand_kits").select("*").eq("workspace_id", workspaceId).maybeSingle(),
