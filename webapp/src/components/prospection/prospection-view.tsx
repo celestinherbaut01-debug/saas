@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils";
 import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions/search";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
+import { nafCodesForSelection } from "@/lib/prospecting-naf";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
-import { ProspectingWizard, type WizardLaunchParams } from "@/components/prospection/prospecting-wizard";
+import { ProspectingWizard, WEB_FILTER_LABEL, type WizardLaunchParams } from "@/components/prospection/prospecting-wizard";
 
 type SearchResult = ProspectionResult;
 
@@ -42,6 +43,11 @@ export function ProspectionView({
   const [viewingIndex, setViewingIndex] = useState<number | null>(null);
   const [phoneOnly, setPhoneOnly] = useState(initialFilters.phoneOnly);
   const [googleFicheOnly, setGoogleFicheOnly] = useState(initialFilters.googleFicheOnly);
+  // Mémorisé pour le message "0 affiché" honnête (voir runSearch) — doit
+  // pouvoir dire "votre filtre webFilter explique ce 0" plutôt que le
+  // message générique "aucune cible pertinente" qui laisserait croire à un
+  // problème de zone/métier alors que le registre en contient bien.
+  const [lastSearchMeta, setLastSearchMeta] = useState<{ registryFound: number; webFilter: ProspectionFilters["webFilter"] } | null>(null);
   const router = useRouter();
 
   const nafToLabel = useMemo(() => {
@@ -62,15 +68,6 @@ export function ProspectionView({
   const secondaryResults = displayedResults.filter(({ r }) => r.relevanceTier === "secondary");
   const [showSecondary, setShowSecondary] = useState(false);
 
-  function nafCodesForSelection(targetIds: string[]): string[] {
-    const set = new Set<string>();
-    for (const id of targetIds) {
-      const cat = categories.find((c) => c.id === id);
-      cat?.naf_codes.forEach((code) => set.add(code));
-    }
-    return [...set];
-  }
-
   async function runSearch(params: WizardLaunchParams) {
     setPhoneOnly(params.filters.phoneOnly);
     setGoogleFicheOnly(params.filters.googleFicheOnly);
@@ -78,7 +75,7 @@ export function ProspectionView({
     setStatus({ kind: "info", text: "Recherche en cours — registre officiel, Google Places, analyse des sites…" });
     setChecked(new Set());
 
-    const nafCodes = nafCodesForSelection(params.targetIds);
+    const nafCodes = nafCodesForSelection(params.targetIds, categories);
 
     const result = await runProspectSearch(workspaceId, {
       lat: params.address.lat,
@@ -121,11 +118,22 @@ export function ProspectionView({
     setScoringProfileLabel(data.scoringProfileLabel);
     setManuallyVerified(new Set());
     setHasSearched(true);
+    setLastSearchMeta({ registryFound: data.registryFound, webFilter: params.filters.webFilter });
 
-    const warningSuffix = data.warnings.length > 0 ? ` (${data.warnings.join(" ")})` : "";
+    // Message construit à partir des vraies catégories/zone recherchées —
+    // jamais "162 trouvé(s), 0 affiché(s)" sans contexte (le nombre final
+    // dépend des vrais établissements, jamais forcé à une valeur fixe).
+    const categoryNames = params.targetIds
+      .map((id) => categories.find((c) => c.id === id)?.name)
+      .filter((n): n is string => Boolean(n));
+    const categoryLabel = categoryNames.length > 0 ? categoryNames.join(", ") : "établissement(s)";
+    const zoneLabel = params.address.city ? `autour de ${params.address.city}` : "dans votre zone";
+    const headline = `${data.registryFound} ${categoryLabel} trouvé(s) dans le registre dans un rayon de ${params.radiusKm} km ${zoneLabel}.`;
+
+    const warningSuffix = data.warnings.length > 0 ? ` ${data.warnings.join(" ")}` : "";
     setStatus({
       kind: "ok",
-      text: `${data.registryFound} établissement(s) trouvé(s) dans le registre, ${data.displayed} affiché(s), ${data.googleVerified} vérifié(s) par Google${
+      text: `${headline} ${data.displayed} affiché(s), ${data.googleVerified} vérifié(s) par Google${
         data.googlePlacesConfigured ? "." : " — clé Google Places non configurée côté serveur : les entreprises restent affichées avec le statut « À vérifier »."
       }${warningSuffix}`,
     });
@@ -261,9 +269,11 @@ export function ProspectionView({
 
         {results.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">
-            {hasSearched
-              ? "Aucune cible pertinente trouvée dans le registre pour cet objectif et cette zone — essayez d'élargir le rayon ou d'explorer d'autres secteurs."
-              : "Choisissez un objectif ci-dessus, vérifiez la stratégie recommandée, puis lancez la recherche."}
+            {!hasSearched
+              ? "Choisissez un objectif ci-dessus, vérifiez la stratégie recommandée, puis lancez la recherche."
+              : lastSearchMeta && lastSearchMeta.registryFound > 0 && lastSearchMeta.webFilter !== "all"
+                ? `${lastSearchMeta.registryFound} établissement(s) existent bien dans le registre pour cette zone, mais aucun ne correspond au filtre « ${WEB_FILTER_LABEL[lastSearchMeta.webFilter]} » actuellement sélectionné. Essayez « Tous les statuts » dans Affiner.`
+                : "Aucune cible pertinente trouvée dans le registre pour cet objectif et cette zone — essayez d'élargir le rayon ou d'explorer d'autres secteurs."}
           </p>
         ) : displayedResults.length === 0 ? (
           <p className="mt-4 text-[13px] text-muted">

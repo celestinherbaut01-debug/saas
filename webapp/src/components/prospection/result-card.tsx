@@ -62,6 +62,7 @@ function buildReasons(r: ProspectionResult): string[] {
   const reasons: string[] = [...r.relevanceReasons];
   if (r.verificationSources.no_website) reasons.push("Aucun site confirmé");
   else if (r.verificationSources.weak_website) reasons.push("Site à améliorer");
+  else if (r.verificationSources.website_unverified) reasons.push("Présence web à vérifier");
   if (r.verificationSources.google_operational) reasons.push("Fiche Google active");
   if (r.verificationSources.large_structure_opportunity) reasons.push("Structure de taille significative");
   if (r.verificationSources.multi_site_opportunity) reasons.push("Enseigne multi-sites");

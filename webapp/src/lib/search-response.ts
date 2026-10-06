@@ -46,6 +46,14 @@ export function normalizeSearchResponse(raw: unknown): ProspectionSearchResponse
     warnings.push("La réponse du serveur ne contenait pas de liste de résultats exploitable.");
   }
 
+  // Avertissements RÉDIGÉS PAR LE SERVEUR (ex. filtre "besoin digital"
+  // dépendant de Google Places alors que la clé n'est pas configurée) —
+  // jamais écrasés par les avertissements calculés côté client ci-dessous,
+  // simplement concaténés.
+  if (Array.isArray(r.warnings)) {
+    for (const w of r.warnings) if (typeof w === "string") warnings.push(w);
+  }
+
   let missingRelevanceTier = 0;
   const results: ProspectionResult[] = rawResults.map((item) => {
     const tier = item.relevanceTier === "primary" || item.relevanceTier === "secondary" ? item.relevanceTier : "primary";

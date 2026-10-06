@@ -24,6 +24,9 @@ import {
 
 const AUTOSAVE_DEBOUNCE_MS = 900;
 
+/** Rayons courants proposés en un clic — le curseur reste disponible pour une valeur précise. */
+const RADIUS_PRESETS = [5, 10, 15, 20, 30, 40];
+
 const CONFIDENCE_ICON: Record<SignalConfidence, string> = { confirmed: "✓", probable: "~", unknown: "?" };
 const CONFIDENCE_TITLE: Record<SignalConfidence, string> = {
   confirmed: "Donnée confirmée",
@@ -51,11 +54,22 @@ function objectiveIcon(id: string): string {
 }
 
 const WEB_SIGNAL_CARDS: { id: string; icon: string; title: string; description: string; webFilter: ProspectionFilters["webFilter"] }[] = [
-  { id: "no_website", icon: "🌐", title: "Aucun site détecté", description: "Entreprises pour lesquelles aucun site n'a été identifié.", webFilter: "none" },
-  { id: "weak_website", icon: "⚠️", title: "Site à analyser", description: "Entreprises possédant un site pouvant nécessiter une refonte.", webFilter: "weak" },
-  { id: "gmb_no_site", icon: "📍", title: "Fiche Google active", description: "Présence locale existante mais présence web à compléter.", webFilter: "unknown" },
+  { id: "no_website", icon: "🌐", title: "Aucun site détecté", description: "Entreprises sans site confirmé — registre seul si Google Places n'est pas configuré.", webFilter: "none" },
+  { id: "weak_website", icon: "⚠️", title: "Site à analyser", description: "Nécessite Google Places : site confirmé faible ou non concluant.", webFilter: "weak" },
+  { id: "gmb_no_site", icon: "📍", title: "Fiche Google active", description: "Nécessite Google Places : présence locale existante, site à compléter.", webFilter: "unknown" },
   { id: "all", icon: "✨", title: "Tous les statuts", description: "Ne filtrer sur aucun statut de site en particulier.", webFilter: "all" },
 ];
+
+// Partagé avec ProspectionView (message "0 affiché" honnête quand UN
+// filtre webFilter actif explique l'absence de résultats, plutôt que le
+// message générique "aucune cible pertinente").
+export const WEB_FILTER_LABEL: Record<ProspectionFilters["webFilter"], string> = {
+  all: "Tous les statuts",
+  no_or_weak: "Site absent ou faible",
+  none: "Aucun site détecté",
+  weak: "Site à analyser",
+  unknown: "Fiche Google active",
+};
 
 export interface WizardLaunchParams {
   targetIds: string[];
@@ -392,9 +406,41 @@ export function ProspectingWizard({
           )}
 
           <div className="mt-3">
-            <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Zone</p>
-            <p className="mt-1 text-[13px] text-ink">
-              {radiusKm} km {address?.city ? `autour de ${address.city}` : "— adresse à renseigner"}
+            <p className="text-[10.5px] font-bold uppercase tracking-wider text-faint">Localisation</p>
+            <div className="mt-1.5">
+              <AddressField value={address} onChange={setAddress} />
+            </div>
+            <p className="mt-3 text-[10.5px] font-bold uppercase tracking-wider text-faint">Rayon</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {RADIUS_PRESETS.filter((km) => km <= maxRadiusKm).map((km) => (
+                <button
+                  key={km}
+                  type="button"
+                  onClick={() => setRadiusKm(km)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition",
+                    radiusKm === km
+                      ? "border-transparent bg-accent text-accent-ink shadow-sm"
+                      : "border-line bg-panel text-ink hover:border-accent/30 hover:bg-soft",
+                  )}
+                >
+                  {km} km
+                </button>
+              ))}
+            </div>
+            <input
+              type="range"
+              min={0.5}
+              max={maxRadiusKm}
+              step={0.5}
+              value={radiusKm}
+              onChange={(e) => setRadiusKm(Math.min(Number(e.target.value), maxRadiusKm))}
+              className="mt-2 w-full"
+              aria-label="Rayon précis (km)"
+            />
+            <p className="mt-1 text-[11px] text-faint">
+              {radiusKm} km {address?.city ? `autour de ${address.city}` : "— adresse à renseigner"}. Votre forfait{" "}
+              {planLabel} permet jusqu&apos;à {maxRadiusKm} km.
             </p>
           </div>
 
@@ -416,36 +462,15 @@ export function ProspectingWizard({
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button onClick={launch} disabled={!canLaunch || searching}>
-              {searching ? "Recherche…" : "Trouver mes prospects →"}
-            </Button>
-            <Button variant="ghost" onClick={() => setObjectiveId(null)}>
-              Modifier l&apos;objectif
+              {searching ? "Recherche…" : "Rechercher les entreprises →"}
             </Button>
             <Button variant="ghost" onClick={() => setRefineOpen((v) => !v)}>
-              {refineOpen ? "Masquer affiner" : "Affiner"}
+              {refineOpen ? "Masquer les filtres supplémentaires" : "Filtres supplémentaires (optionnel)"}
             </Button>
           </div>
 
           {refineOpen && (
             <div className="mt-4 flex flex-col gap-4 border-t border-line pt-4">
-              <div>
-                <label className="text-[11px] font-semibold text-muted">Adresse de départ</label>
-                <div className="mt-1.5">
-                  <AddressField value={address} onChange={setAddress} />
-                </div>
-                <label className="mt-3 block text-[11px] font-semibold text-muted">Rayon : {radiusKm} km</label>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={maxRadiusKm}
-                  step={0.5}
-                  value={radiusKm}
-                  onChange={(e) => setRadiusKm(Math.min(Number(e.target.value), maxRadiusKm))}
-                  className="w-full"
-                />
-                <p className="mt-1 text-[11px] text-faint">Votre forfait {planLabel} permet jusqu&apos;à {maxRadiusKm} km.</p>
-              </div>
-
               <div className="grid grid-cols-2 gap-2 text-[12px]">
                 <FilterCheck label="Écarter fermés" checked={operationalOnly} onChange={setOperationalOnly} />
                 <FilterCheck label="Écarter fermés temp." checked={excludeTempClosed} onChange={setExcludeTempClosed} />

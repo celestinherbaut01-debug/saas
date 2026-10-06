@@ -20,6 +20,7 @@ import { verifyWithGooglePlaces } from "../_shared/placesApi.ts";
 import { analyseWebsiteQuality } from "../_shared/websiteQuality.ts";
 import { computeQualityScore, resolveScoringProfile, SCORING_PROFILE_LABEL } from "../_shared/scoring.ts";
 import { computeRelevance } from "../_shared/relevance.ts";
+import { matchesWebFilter, GOOGLE_DEPENDENT_WEB_FILTERS } from "../_shared/webFilter.ts";
 import type { EnrichedProspect, SearchRequest, VerificationStatus } from "../_shared/types.ts";
 
 const DEFAULT_MAX_PLACES_LOOKUPS = 25;
@@ -163,7 +164,15 @@ Deno.serve(async (req) => {
     }
 
     // 4. Distance exacte + filtres registre (indépendance, statut).
+    //
+    // Logs détaillés à chaque étape — but explicite : pouvoir diagnostiquer
+    // en une lecture un futur "X trouvés → 0 affichés" sans deviner à quelle
+    // étape les candidats ont disparu (cause réelle du bug "162 trouvés, 0
+    // affichés" : voir plus bas, le filtre webFilter — PAS cette section,
+    // qui s'est avérée saine à l'audit, mais gardée aussi détaillée pour la
+    // prochaine fois).
     const perSirenCount = new Map<string, number>();
+    const geolocatedCount = raw.filter((e) => e.lat !== null && e.lng !== null).length;
     let candidates = raw
       .map((e) => {
         if (e.lat === null || e.lng === null) return null;
@@ -171,10 +180,12 @@ Deno.serve(async (req) => {
         return { ...e, distanceKm };
       })
       .filter((e): e is NonNullable<typeof e> => e !== null && e.distanceKm <= radiusKm);
+    const inRadiusCount = candidates.length;
 
     if (filters.operationalOnly) {
       candidates = candidates.filter((e) => e.etatAdministratif === "A");
     }
+    const operationalFilteredCount = candidates.length;
 
     candidates = candidates.filter((e) => {
       const assoc = isAssociationOrPublic(e.natureJuridique);
@@ -197,11 +208,12 @@ Deno.serve(async (req) => {
     candidates.sort((a, b) => a.distanceKm - b.distanceKm);
     const totalMatched = candidates.length;
 
-    // Stage 2/8 + 3/8 : résultats registre bruts puis après normalisation
-    // (distance exacte + filtres indépendance).
+    // Stage 2/8 + 3/8 : chaque étape loguée séparément pour isoler
+    // immédiatement où des candidats disparaissent.
     console.log(
-      `[search-prospects] registre : ${raw.length} établissements bruts reçus → ${totalMatched} après ` +
-        `filtre distance/indépendance`,
+      `[search-prospects] registre : ${raw.length} bruts reçus → ${geolocatedCount} géolocalisés → ` +
+        `${inRadiusCount} dans le rayon de ${radiusKm}km → ${operationalFilteredCount} actifs → ` +
+        `${totalMatched} après filtres indépendance (chaînes/associations/grands groupes/max-par-SIREN)`,
     );
 
     // 5. Vérification Google Places (avec cache par SIRET) + qualité du site.
@@ -384,18 +396,23 @@ Deno.serve(async (req) => {
     console.log(`[search-prospects] après scoring/pertinence : ${enriched.length} prospects enrichis`);
 
     // 6. Filtre "besoin digital" — optionnel, "all" par défaut côté client :
-    // ne doit jamais, à lui seul, faire disparaître un prospect du registre.
+    // ne doit jamais, à lui seul, faire disparaître un prospect du registre
+    // à cause d'une absence de vérification Google (voir _shared/webFilter.ts
+    // pour le détail du bug corrigé — filtrer sur `verificationStatus`, pas
+    // sur le `websiteQuality` brut qui vaut "unknown" pour TOUT le monde
+    // sans clé Google Places, même avec 162 candidats réels dans le registre).
+    const warnings: string[] = [];
     let results = enriched;
     if (filters.webFilter !== "all") {
-      const wanted: Record<string, EnrichedProspect["websiteQuality"][]> = {
-        no_or_weak: ["none", "weak"],
-        none: ["none"],
-        weak: ["weak"],
-        unknown: ["unknown"],
-      };
-      const allowed = wanted[filters.webFilter];
-      if (allowed) results = results.filter((r) => allowed.includes(r.websiteQuality));
+      results = results.filter((r) => matchesWebFilter(r.verificationStatus, filters.webFilter));
       console.log(`[search-prospects] après filtre web (${filters.webFilter}) : ${results.length} résultats`);
+      if (!googleApiKey && GOOGLE_DEPENDENT_WEB_FILTERS.includes(filters.webFilter)) {
+        warnings.push(
+          "Ce filtre (« Site à analyser » / « Fiche Google active ») nécessite une vérification Google Places réelle, " +
+            "non configurée côté serveur — il peut légitimement renvoyer peu ou aucun résultat tant qu'elle ne l'est " +
+            "pas. Essayez « Aucun site détecté », « Site absent ou faible » ou « Tous les statuts ».",
+        );
+      }
     }
 
     // 7. Tri : la pertinence (primary avant secondary) prime toujours sur le
@@ -430,6 +447,7 @@ Deno.serve(async (req) => {
       googlePlacesConfigured: Boolean(googleApiKey),
       scoringProfile,
       scoringProfileLabel: SCORING_PROFILE_LABEL[scoringProfile],
+      warnings,
       results,
     });
   } catch (err) {

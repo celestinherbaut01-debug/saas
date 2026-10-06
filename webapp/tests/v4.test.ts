@@ -36,6 +36,81 @@ test('all four command centers preserve object references and signal genuine blo
  const restaurant=computeRestaurantCommandCenter({appointments:[],purchaseOrders:[],inventory:[{id:'ingredient',name:'Test',quantity:2,unit:'kg',low_stock_threshold:3}] as never});assert.equal(restaurant.blockers?.[0].detailId,'ingredient');
 });
 
+import {nafCodesForSelection} from '../src/lib/prospecting-naf';
+import {matchesWebFilter} from '../../supabase/functions/_shared/webFilter';
+import {haversineKm} from '../../supabase/functions/_shared/haversine';
+
+// Bug réel rapporté par un client (Prospection, "Boulangeries" autour de
+// Béthune) : "162 trouvé(s) dans le registre, 0 affiché(s)". Cause exacte :
+// le filtre "besoin digital" comparait websiteQuality ("none"/"weak"/"ok"/
+// "unknown") plutôt que verificationStatus, et websiteQuality vaut TOUJOURS
+// "unknown" sans clé Google Places configurée — aucun candidat ne pouvait
+// jamais matcher "none"/"weak"/"no_or_weak". Ces tests verrouillent le
+// comportement corrigé : Google Places ne doit JAMAIS être une condition
+// d'existence du résultat (voir supabase/functions/_shared/webFilter.ts).
+test('un candidat jamais vérifié par Google reste visible sous "aucun site" / "absent ou faible" / "tous"', () => {
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'all'), true);
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'none'), true);
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'no_or_weak'), true);
+});
+test('un candidat jamais vérifié ne peut pas satisfaire un filtre qui exige une vraie donnée Google', () => {
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'weak'), false);
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'unknown'), false);
+});
+test('un site confirmé par Google comme bon est exclu des filtres "opportunité"', () => {
+  assert.equal(matchesWebFilter('WEBSITE_GOOD', 'all'), true);
+  assert.equal(matchesWebFilter('WEBSITE_GOOD', 'no_or_weak'), false);
+  assert.equal(matchesWebFilter('WEBSITE_GOOD', 'none'), false);
+  assert.equal(matchesWebFilter('WEBSITE_GOOD', 'unknown'), false);
+});
+test('Google confirmant explicitement l\'absence de site matche "aucun site" et "absent ou faible"', () => {
+  assert.equal(matchesWebFilter('NO_WEBSITE_CONFIRMED', 'none'), true);
+  assert.equal(matchesWebFilter('NO_WEBSITE_CONFIRMED', 'no_or_weak'), true);
+  assert.equal(matchesWebFilter('NO_WEBSITE_CONFIRMED', 'weak'), false);
+});
+test('"Fiche Google active" exige une fiche confirmée, jamais un candidat non vérifié', () => {
+  assert.equal(matchesWebFilter('GOOGLE_VERIFIED', 'unknown'), true);
+  assert.equal(matchesWebFilter('WEBSITE_WEAK', 'unknown'), true);
+  assert.equal(matchesWebFilter('REGISTRY_ONLY', 'unknown'), false);
+  assert.equal(matchesWebFilter('WEBSITE_GOOD', 'unknown'), false);
+});
+
+// Sélection des métiers : un seul métier sélectionné ne doit jamais ramener
+// les codes NAF d'un métier voisin non sélectionné (ex. Boulangeries seule
+// ne doit pas inclure Boucheries) ; la sélection multiple doit fonctionner.
+const BAKERY = { id: 'bakery', naf_codes: ['10.71C'] };
+const BUTCHER = { id: 'butcher', naf_codes: ['10.13A'] };
+const RESTAURANT = { id: 'restaurant', naf_codes: ['56.10A'] };
+test('un seul métier sélectionné ne ramène que ses propres codes NAF', () => {
+  assert.deepEqual(nafCodesForSelection(['bakery'], [BAKERY, BUTCHER, RESTAURANT]), ['10.71C']);
+});
+test('plusieurs métiers sélectionnés cumulent leurs codes NAF sans doublon', () => {
+  const codes = nafCodesForSelection(['bakery', 'butcher', 'restaurant'], [BAKERY, BUTCHER, RESTAURANT]);
+  assert.deepEqual([...codes].sort(), ['10.13A', '10.71C', '56.10A']);
+});
+test('retirer un métier retire réellement son code NAF de la sélection', () => {
+  assert.deepEqual(nafCodesForSelection(['restaurant'], [BAKERY, BUTCHER, RESTAURANT]), ['56.10A']);
+});
+
+// Rayon : un établissement pile sur la limite doit rester inclus (<=), un
+// établissement juste au-delà doit être exclu — la logique d'appel (voir
+// index.ts, filter sur distanceKm <= radiusKm) dépend de haversineKm qui
+// doit rester une distance exacte, jamais fabriquée.
+test('le calcul de distance est exact et le rayon inclut la limite exacte', () => {
+  // Béthune (approx.) -> Lille (approx.) : environ 32-33 km réels.
+  const bethune = { lat: 50.5303, lng: 2.6414 };
+  const lille = { lat: 50.6292, lng: 3.0573 };
+  const d = haversineKm(bethune.lat, bethune.lng, lille.lat, lille.lng);
+  assert.ok(d > 30 && d < 35, `distance Béthune-Lille hors plage attendue : ${d}`);
+  assert.equal(haversineKm(0, 0, 0, 0), 0);
+  // À une distance connue d'environ 20km (10km élargi à 20km doit inclure
+  // tout ce que 10km incluait) : un point à 15km doit matcher radius=20
+  // mais pas radius=10.
+  const near = haversineKm(bethune.lat, bethune.lng, 50.5303 + 0.135, 2.6414); // ~15km plein nord
+  assert.ok(near > 10, `point de test attendu hors du rayon 10km : ${near}`);
+  assert.ok(near < 20, `point de test attendu dans le rayon 20km : ${near}`);
+});
+
 import {GARAGE_NEXT_STATUS,garageWorkshopStage} from '../src/lib/garage-workflow';
 import type {RepairOrder} from '../src/lib/supabase/types';
 test('workshop chain preserves validation, blocking, readiness and delivery',()=>{
