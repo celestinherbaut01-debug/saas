@@ -37,7 +37,7 @@ export function BrandKitCard({ workspaceId, initialBrandKit }: { workspaceId: st
     <Card>
       <h2 className="font-display text-sm font-bold">Brand Kit</h2>
       <p className="mt-1 text-[12.5px] text-muted">
-        Le ton et les couleurs sont appliqués automatiquement à chaque contenu créé dans Studio IA.
+        Le ton et les couleurs sont appliqués automatiquement à chaque contenu créé dans Communication.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
         <div>

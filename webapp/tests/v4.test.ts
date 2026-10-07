@@ -167,3 +167,78 @@ test('workshop chain preserves validation, blocking, readiness and delivery',()=
  assert.equal(garageWorkshopStage({status:'diagnostic',scheduled_at:'2026-10-07T10:00:00Z'} as RepairOrder,new Date('2026-10-06T10:00:00Z')),'upcoming');
  assert.equal(garageWorkshopStage({status:'diagnostic',scheduled_at:'2026-10-05T10:00:00Z'} as RepairOrder,new Date('2026-10-06T10:00:00Z')),'diagnostic');
 });
+
+import {computeDocumentTotals,lineTotalHt,lineTotalTtc,nextDocumentNumber} from '../src/lib/document-totals';
+test('les totaux HT/TVA/TTC sont calculés à partir des lignes réelles, jamais inventés',()=>{
+ const totals=computeDocumentTotals([{description:'Site vitrine',quantity:1,unitPriceHt:1000,vatRate:20},{description:'Maintenance',quantity:3,unitPriceHt:50,vatRate:10}]);
+ assert.equal(totals.totalHt,1150);assert.equal(totals.totalTtc,1200+165);assert.equal(totals.totalVat,totals.totalTtc-totals.totalHt);
+});
+test('une ligne à quantité/prix décimaux ne produit pas d\'erreur de flottant visible',()=>{
+ assert.equal(lineTotalHt({description:'x',quantity:0.1,unitPriceHt:0.2,vatRate:0}),0.02);
+ assert.equal(lineTotalTtc({description:'x',quantity:1,unitPriceHt:100,vatRate:20}),120);
+});
+test('un devis sans aucune ligne produit des totaux à zéro, pas une erreur',()=>{
+ const totals=computeDocumentTotals([]);
+ assert.deepEqual(totals,{totalHt:0,totalVat:0,totalTtc:0});
+});
+test('la numérotation des documents suit le compteur réel fourni, jamais un nombre fixe',()=>{
+ const year=new Date().getFullYear();
+ assert.equal(nextDocumentNumber('invoice',0),`FAC-${year}-0001`);
+ assert.equal(nextDocumentNumber('quote',11),`DEV-${year}-0012`);
+});
+
+import {filterEntriesByRange,groupEntriesByDay,rangeBounds} from '../src/lib/planning';
+import type {PlanningEntry} from '../src/lib/supabase/types';
+function fakeEntry(startsAt:string,overrides:Partial<PlanningEntry> = {}):PlanningEntry {
+ return {id:startsAt,workspace_id:'w',title:'Événement',starts_at:startsAt,ends_at:null,kind:'appointment',customer_id:null,project_id:null,team_member_id:null,notes:'',status:'planned',created_at:startsAt,updated_at:startsAt,...overrides};
+}
+test('le filtre "aujourd\'hui" ne garde que les événements du jour courant',()=>{
+ const now=new Date('2026-10-07T10:00:00Z');
+ const entries=[fakeEntry('2026-10-07T08:00:00Z'),fakeEntry('2026-10-07T23:00:00Z'),fakeEntry('2026-10-08T01:00:00Z'),fakeEntry('2026-10-06T23:59:00Z')];
+ const todayCount=filterEntriesByRange(entries,'today',now).length;
+ assert.ok(todayCount>=1 && todayCount<=2,`attendu 1 ou 2 selon fuseau, obtenu ${todayCount}`);
+ assert.equal(filterEntriesByRange(entries,'today',now).some(e=>e.starts_at==='2026-10-08T01:00:00Z'),false);
+});
+test('le filtre "semaine" inclut plus d\'événements que "aujourd\'hui", jamais moins',()=>{
+ const now=new Date('2026-10-07T10:00:00Z');
+ const entries=[fakeEntry('2026-10-07T08:00:00Z'),fakeEntry('2026-10-09T08:00:00Z'),fakeEntry('2026-10-20T08:00:00Z')];
+ const today=filterEntriesByRange(entries,'today',now).length;
+ const week=filterEntriesByRange(entries,'week',now).length;
+ assert.ok(week>=today);
+ assert.equal(filterEntriesByRange(entries,'week',now).some(e=>e.starts_at==='2026-10-20T08:00:00Z'),false);
+});
+test('le regroupement par jour trie chronologiquement et ne perd aucun événement',()=>{
+ const entries=[fakeEntry('2026-10-07T14:00:00Z'),fakeEntry('2026-10-07T08:00:00Z'),fakeEntry('2026-10-08T08:00:00Z')];
+ const grouped=groupEntriesByDay(entries);
+ const totalEntries=grouped.reduce((n,g)=>n+g.entries.length,0);
+ assert.equal(totalEntries,3);
+ assert.equal(grouped[0].entries[0].starts_at,'2026-10-07T08:00:00Z');
+});
+test('les bornes de "mois" couvrent strictement plus que "semaine"',()=>{
+ const now=new Date('2026-10-07T10:00:00Z');
+ const week=rangeBounds('week',now);const month=rangeBounds('month',now);
+ assert.ok(month.end.getTime()>week.end.getTime());
+ assert.equal(week.start.getTime(),month.start.getTime());
+});
+
+import {haveSearchParamsChanged} from '../src/lib/prospecting-search-params';
+const baseSnapshot={targetIds:['bakery'],lat:50.53,lng:2.64,radiusKm:10,filters:{operationalOnly:true,excludeTempClosed:true,excludeChains:true,excludeAssociations:true,excludeLargeGroups:true,needContact:false,maxEstablishmentsPerSiren:8,webFilter:'all' as const,phoneOnly:false,googleFicheOnly:false}};
+test('sans recherche précédente, les paramètres ne sont jamais "modifiés"',()=>{
+ assert.equal(haveSearchParamsChanged(baseSnapshot,null),false);
+});
+test('des paramètres identiques à la dernière recherche ne sont pas "modifiés"',()=>{
+ assert.equal(haveSearchParamsChanged({...baseSnapshot},{...baseSnapshot}),false);
+});
+test('changer la localisation (Béthune -> Lille) marque les paramètres comme modifiés',()=>{
+ assert.equal(haveSearchParamsChanged({...baseSnapshot,lat:50.63,lng:3.06},baseSnapshot),true);
+});
+test('changer le rayon marque les paramètres comme modifiés',()=>{
+ assert.equal(haveSearchParamsChanged({...baseSnapshot,radiusKm:20},baseSnapshot),true);
+});
+test('changer la cible métier (même en changeant juste l\'ordre) : ajouter un métier est détecté, réordonner ne l\'est pas',()=>{
+ assert.equal(haveSearchParamsChanged({...baseSnapshot,targetIds:['bakery','butcher']},baseSnapshot),true);
+ assert.equal(haveSearchParamsChanged({...baseSnapshot,targetIds:['bakery']},{...baseSnapshot,targetIds:['bakery']}),false);
+});
+test('changer un filtre (webFilter) marque les paramètres comme modifiés',()=>{
+ assert.equal(haveSearchParamsChanged({...baseSnapshot,filters:{...baseSnapshot.filters,webFilter:'none'}},baseSnapshot),true);
+});

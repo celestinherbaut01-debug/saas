@@ -10,11 +10,15 @@ import type {
   RepairOrder,
   RepairOrderPart,
   BusinessDocument,
+  DocumentItem,
+  PlanningEntry,
 } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeGarageAlerts, partsTotals } from "@/lib/garage";
 import { computeGarageCommandCenter } from "@/lib/command-center";
+import { makeDocumentHandlers } from "@/lib/business-os-handlers/document-handlers";
+import { makePlanningHandlers } from "@/lib/business-os-handlers/planning-handlers";
 import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { VehiclesModule } from "@/components/business-os/vehicles-module";
@@ -86,6 +90,8 @@ export function GarageView({
   initialRepairOrders,
   initialLines,
   initialDocuments,
+  initialDocumentItems,
+  initialPlanningEntries,
 }: {
   workspaceId: string;
   isAdvanced: boolean;
@@ -97,6 +103,8 @@ export function GarageView({
   initialRepairOrders: RepairOrder[];
   initialLines: RepairOrderPart[];
   initialDocuments: BusinessDocument[];
+  initialDocumentItems: DocumentItem[];
+  initialPlanningEntries: PlanningEntry[];
 }) {
   const supabase = createClient();
   const [mutationError,setMutationError]=useState<string|null>(null);
@@ -111,7 +119,31 @@ export function GarageView({
   const [repairOrders, setRepairOrders] = useState(initialRepairOrders);
   const [lines, setLines] = useState(initialLines);
   const [documents, setDocuments] = useState(initialDocuments);
+  const [documentItems, setDocumentItems] = useState<Record<string, DocumentItem[]>>(() => {
+    const map: Record<string, DocumentItem[]> = {};
+    for (const item of initialDocumentItems) (map[item.document_id] ??= []).push(item);
+    return map;
+  });
   const [openDetailId, setOpenDetailId] = useState<string | null>(null);
+
+  const { createDocument: createDocumentManual, deleteDraftDocument, convertQuoteToInvoice } = makeDocumentHandlers({
+    supabase,
+    workspaceId,
+    linkField: "repair_order_id",
+    getDocuments: () => documents,
+    setDocuments,
+    getDocumentItems: () => documentItems,
+    setDocumentItems,
+    setMutationError,
+  });
+
+  const [planningEntries, setPlanningEntries] = useState(initialPlanningEntries);
+  const { createPlanningEntry, updatePlanningEntry, deletePlanningEntry } = makePlanningHandlers({
+    supabase,
+    workspaceId,
+    setEntries: setPlanningEntries,
+    setMutationError,
+  });
 
   const alerts = useMemo(
     () => computeGarageAlerts({ parts, repairOrders, documents, technicians }, isAdvanced),
@@ -481,7 +513,19 @@ export function GarageView({
           onOpenDetailIdChange={setOpenDetailId}
         />
       )}
-      {active === "planning" && <PlanningModule rows={repairOrders} vehicles={vehicles} customers={customers} onOpenDetail={openOrder} />}
+      {active === "planning" && (
+        <PlanningModule
+          rows={repairOrders}
+          vehicles={vehicles}
+          customers={customers}
+          technicians={technicians}
+          entries={planningEntries}
+          onOpenDetail={openOrder}
+          onCreateEntry={createPlanningEntry}
+          onUpdateEntryStatus={(id, status) => updatePlanningEntry(id, { status })}
+          onDeleteEntry={deletePlanningEntry}
+        />
+      )}
       {active === "parts" && <PartsModule rows={parts} suppliers={suppliers} onCreate={createPart} onUpdate={updatePart} onRemove={removePart} />}
       {active === "stock" && <StockModule rows={parts} onAdjust={adjustPartQuantity} />}
       {active === "suppliers" && <SuppliersModule rows={suppliers} onCreate={createSupplier} onUpdate={updateSupplier} onRemove={removeSupplier} />}
@@ -489,20 +533,31 @@ export function GarageView({
         <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="quote"
           rows={documents}
+          itemsByDocument={documentItems}
           customers={customers}
           resolveLinkedLabel={(d) => (d.repair_order_id ? repairOrders.find((r) => r.id === d.repair_order_id)?.title ?? "—" : "—")}
-          emptyHint="Créés depuis un ordre de réparation."
+          emptyHint="Devis créés manuellement ou depuis un ordre de réparation."
           onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocumentManual("quote", input)}
+          onDeleteDraft={deleteDraftDocument}
+          onConvertToInvoice={convertQuoteToInvoice}
+          linkLabel="Ordre de réparation"
+          linkOptions={repairOrders.map((r) => ({ id: r.id, label: r.title }))}
         />
       )}
       {active === "invoices" && (
         <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="invoice"
           rows={documents}
+          itemsByDocument={documentItems}
           customers={customers}
           resolveLinkedLabel={(d) => (d.repair_order_id ? repairOrders.find((r) => r.id === d.repair_order_id)?.title ?? "—" : "—")}
-          emptyHint="Créées depuis un ordre de réparation, une fois la réparation prête à facturer."
+          emptyHint="Créez une facture manuellement, ou depuis un ordre de réparation prêt à facturer."
           onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocumentManual("invoice", input)}
+          onDeleteDraft={deleteDraftDocument}
+          linkLabel="Ordre de réparation"
+          linkOptions={repairOrders.map((r) => ({ id: r.id, label: r.title }))}
         />
       )}
       {active === "technicians" && isAdvanced && (

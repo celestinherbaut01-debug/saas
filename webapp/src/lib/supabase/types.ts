@@ -438,6 +438,7 @@ export interface Database {
           due_at: string | null;
           paid_at: string | null;
           notes: string;
+          converted_to_document_id: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -446,6 +447,50 @@ export interface Database {
           doc_type: "quote" | "invoice";
         };
         Update: Partial<Database["public"]["Tables"]["documents"]["Row"]>;
+        Relationships: [];
+      };
+      document_items: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          document_id: string;
+          description: string;
+          quantity: number;
+          unit_price_ht: number;
+          vat_rate: number;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["document_items"]["Row"]> & {
+          workspace_id: string;
+          document_id: string;
+          description: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_items"]["Row"]>;
+        Relationships: [];
+      };
+      planning_entries: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          title: string;
+          starts_at: string;
+          ends_at: string | null;
+          kind: "appointment" | "deadline" | "intervention" | "visit" | "maintenance" | "other";
+          customer_id: string | null;
+          project_id: string | null;
+          team_member_id: string | null;
+          notes: string;
+          status: "planned" | "done" | "canceled";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["planning_entries"]["Row"]> & {
+          workspace_id: string;
+          title: string;
+          starts_at: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["planning_entries"]["Row"]>;
         Relationships: [];
       };
       client_sites: {
@@ -1095,6 +1140,8 @@ export type Supplier = Database["public"]["Tables"]["suppliers"]["Row"];
 export type Part = Database["public"]["Tables"]["parts"]["Row"];
 export type RepairOrderPart = Database["public"]["Tables"]["repair_order_parts"]["Row"];
 export type BusinessDocument = Database["public"]["Tables"]["documents"]["Row"];
+export type DocumentItem = Database["public"]["Tables"]["document_items"]["Row"];
+export type PlanningEntry = Database["public"]["Tables"]["planning_entries"]["Row"];
 export type ClientSite = Database["public"]["Tables"]["client_sites"]["Row"];
 export type Ticket = Database["public"]["Tables"]["tickets"]["Row"];
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];

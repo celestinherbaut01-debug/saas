@@ -15,9 +15,10 @@ async function ParametresPageContent() {
   const membership = await getCachedMembership(user.id);
   if (!membership) redirect("/dashboard"); // workspace auto-provisionné dès l'inscription (0015) : ne devrait jamais arriver
 
-  const [{ data: businessProfile }, { data: brandKitRow }] = await checkedAll([
+  const [{ data: businessProfile }, { data: brandKitRow }, { data: categories }] = await checkedAll([
     supabase.from("business_profiles").select("*").eq("workspace_id", membership.workspace_id).maybeSingle(),
     supabase.from("brand_kits").select("*").eq("workspace_id", membership.workspace_id).maybeSingle(),
+    supabase.from("business_categories").select("*").order("sort_order"),
   ]);
 
   const brandKit: BrandKit = brandKitRow
@@ -26,7 +27,12 @@ async function ParametresPageContent() {
 
   return (
     <AppShell>
-      <SettingsView workspaceId={membership.workspace_id} businessProfile={businessProfile} brandKit={brandKit} />
+      <SettingsView
+        workspaceId={membership.workspace_id}
+        businessProfile={businessProfile}
+        brandKit={brandKit}
+        categories={categories ?? []}
+      />
     </AppShell>
   );
 }

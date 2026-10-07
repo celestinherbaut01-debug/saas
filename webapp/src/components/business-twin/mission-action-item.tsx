@@ -73,7 +73,7 @@ export function MissionActionItem({ workspaceId, missionId, action }: { workspac
 
       {action.actionType === "campagne" && (
         <Link href={studioPrefillHref(missionId, action)} className="mt-2 inline-block text-[11.5px] font-semibold text-accent">
-          🎨 Créer cette campagne dans Studio IA →
+          🎨 Créer cette campagne dans Communication →
         </Link>
       )}
 

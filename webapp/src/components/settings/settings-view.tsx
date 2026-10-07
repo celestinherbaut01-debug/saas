@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
-import type { BusinessProfile } from "@/lib/supabase/types";
+import type { BusinessCategory, BusinessProfile } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,16 +11,19 @@ import { cn } from "@/lib/utils";
 import { updateBusinessProfile, updateProductMode, type SettingsActionState } from "@/lib/actions/settings";
 import { PRODUCT_MODE_OPTIONS } from "@/lib/product-mode";
 import { BrandKitCard } from "@/components/settings/brand-kit-card";
+import { BusinessActivityCard } from "@/components/settings/business-activity-card";
 import type { BrandKit } from "@/lib/studio/types";
 
 export function SettingsView({
   workspaceId,
   businessProfile,
   brandKit,
+  categories,
 }: {
   workspaceId: string;
   businessProfile: BusinessProfile | null;
   brandKit: BrandKit;
+  categories: BusinessCategory[];
 }) {
   const boundAction = updateBusinessProfile.bind(null, workspaceId);
   const [state, formAction, pending] = useActionState<SettingsActionState, FormData>(boundAction, {
@@ -98,6 +101,13 @@ export function SettingsView({
           </Button>
         </form>
       </Card>
+
+      <BusinessActivityCard
+        workspaceId={workspaceId}
+        categories={categories}
+        ownCategoryId={businessProfile?.own_category_id ?? null}
+        ownCategoryLabel={businessProfile?.own_category_label ?? null}
+      />
 
       <BrandKitCard workspaceId={workspaceId} initialBrandKit={brandKit} />
 

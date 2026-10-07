@@ -1,10 +1,12 @@
 "use client";
 
-import type { RepairOrder, Vehicle, Customer } from "@/lib/supabase/types";
+import type { RepairOrder, Vehicle, Customer, PlanningEntry, TeamMember } from "@/lib/supabase/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { REPAIR_STATUS_LABEL, REPAIR_STATUS_ACTIVE } from "@/lib/garage";
+import { PlanningEntriesSection } from "@/components/business-os/planning-entries-section";
+import type { PlanningEntryInput } from "@/lib/business-os-handlers/planning-handlers";
 
 // Vue agenda (liste groupée par jour), pas un calendrier en grille avec
 // glisser-déposer — une vraie vue de planification, plus simple qu'un
@@ -13,12 +15,22 @@ export function PlanningModule({
   rows,
   vehicles,
   customers,
+  technicians,
+  entries,
   onOpenDetail,
+  onCreateEntry,
+  onUpdateEntryStatus,
+  onDeleteEntry,
 }: {
   rows: RepairOrder[];
   vehicles: Vehicle[];
   customers: Customer[];
+  technicians: TeamMember[];
+  entries: PlanningEntry[];
   onOpenDetail: (id: string) => void;
+  onCreateEntry: (input: PlanningEntryInput) => Promise<void> | void;
+  onUpdateEntryStatus: (id: string, status: PlanningEntry["status"]) => void;
+  onDeleteEntry: (id: string) => void;
 }) {
   const active = rows.filter((r) => REPAIR_STATUS_ACTIVE.includes(r.status));
   const scheduled = active.filter((r) => r.scheduled_at).sort((a, b) => a.scheduled_at!.localeCompare(b.scheduled_at!));
@@ -38,8 +50,17 @@ export function PlanningModule({
   }
 
   return (
-    <Card>
-      <h2 className="font-display text-sm font-bold">Planning</h2>
+    <div className="flex flex-col gap-5">
+      <PlanningEntriesSection
+        entries={entries}
+        customers={customers}
+        teamMembers={technicians}
+        onCreate={onCreateEntry}
+        onUpdateStatus={onUpdateEntryStatus}
+        onDelete={onDeleteEntry}
+      />
+      <Card>
+      <h2 className="font-display text-sm font-bold">Échéances (ordres de réparation)</h2>
       {scheduled.length === 0 && unscheduled.length === 0 ? (
         <div className="mt-4">
           <EmptyState icon="📅" title="Rien de planifié" description="Renseignez une date prévue sur un ordre de réparation pour le voir ici." />
@@ -83,6 +104,7 @@ export function PlanningModule({
           )}
         </div>
       )}
-    </Card>
+      </Card>
+    </div>
   );
 }

@@ -163,6 +163,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       { data: repairOrders },
       { data: lines },
       { data: documents },
+      { data: documentItems },
+      { data: planningEntries },
     ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("vehicles").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -172,6 +174,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       supabase.from("repair_orders").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("repair_order_parts").select("*").eq("workspace_id", workspaceId),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
+      supabase.from("document_items").select("*").eq("workspace_id", workspaceId).order("sort_order"),
+      supabase.from("planning_entries").select("*").eq("workspace_id", workspaceId).order("starts_at"),
     ]);
 
     const activeStatuses = new Set(["diagnostic", "quote", "accepted", "in_progress", "waiting_parts"]);
@@ -201,6 +205,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
             initialRepairOrders={repairOrders ?? []}
             initialLines={lines ?? []}
             initialDocuments={documents ?? []}
+            initialDocumentItems={documentItems ?? []}
+            initialPlanningEntries={planningEntries ?? []}
           />
         </div>
       </AppShell>
@@ -218,6 +224,7 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       { data: teamMembers },
       { data: inventory },
       { data: documents },
+      { data: documentItems },
     ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("sites").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -227,6 +234,7 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
+      supabase.from("document_items").select("*").eq("workspace_id", workspaceId).order("sort_order"),
     ]);
 
     const upcomingDates = (interventions ?? []).filter((i) => i.status === "planned").map((i) => i.scheduled_at);
@@ -253,6 +261,7 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
             initialTeamMembers={teamMembers ?? []}
             initialInventory={inventory ?? []}
             initialDocuments={documents ?? []}
+            initialDocumentItems={documentItems ?? []}
           />
         </div>
       </AppShell>
@@ -269,6 +278,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       { data: tasks },
       { data: teamMembers },
       { data: documents },
+      { data: documentItems },
+      { data: planningEntries },
     ] = await checkedAll([
       supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("projects").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
@@ -277,6 +288,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("due_date"),
       supabase.from("team_members").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
       supabase.from("documents").select("*").eq("workspace_id", workspaceId).order("issued_at", { ascending: false }),
+      supabase.from("document_items").select("*").eq("workspace_id", workspaceId).order("sort_order"),
+      supabase.from("planning_entries").select("*").eq("workspace_id", workspaceId).order("starts_at"),
     ]);
 
     const in30Days = new Date().getTime() + 30 * 24 * 60 * 60 * 1000;
@@ -305,6 +318,8 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
             initialTasks={tasks ?? []}
             initialTeamMembers={teamMembers ?? []}
             initialDocuments={documents ?? []}
+            initialDocumentItems={documentItems ?? []}
+            initialPlanningEntries={planningEntries ?? []}
           />
         </div>
       </AppShell>

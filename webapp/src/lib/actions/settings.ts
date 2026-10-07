@@ -162,7 +162,18 @@ export async function updateOwnCategory(
     .eq("workspace_id", workspaceId);
 
   if (error) return { ok: false, error: error.message };
+  // Toute page qui résout le Business OS depuis own_category_id doit voir
+  // le changement au prochain chargement (voir lib/session.ts
+  // getCachedBusinessOsProfile) — revalidation manquante avant ce correctif
+  // sur /business-os, /abonnement, /automatisations, /nova/actions, et sur
+  // le layout (sidebar : icône/nom du Business OS affiché partout).
   revalidatePath("/prospection");
   revalidatePath("/studio");
+  revalidatePath("/business-os");
+  revalidatePath("/abonnement");
+  revalidatePath("/automatisations");
+  revalidatePath("/nova/actions");
+  revalidatePath("/parametres");
+  revalidatePath("/", "layout");
   return { ok: true };
 }

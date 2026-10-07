@@ -10,6 +10,7 @@ import { OwnActivityEditor } from "@/components/prospection/own-activity-editor"
 import { cn } from "@/lib/utils";
 import { saveProspectingConfig } from "@/lib/actions/prospecting";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
+import { haveSearchParamsChanged, type SearchParamsSnapshot } from "@/lib/prospecting-search-params";
 import { recommendedSlugsForOffer, filterSlugsByAudience } from "@/lib/target-recommendations";
 import { getProspectingFilterProfile } from "@/lib/prospecting-filter-profile";
 import { ChannelStrategyBanner } from "@/components/prospection/channel-strategy-banner";
@@ -91,6 +92,7 @@ export function ProspectingWizard({
   planLabel,
   searching,
   onLaunch,
+  lastSearchSnapshot,
 }: {
   workspaceId: string;
   categories: BusinessCategory[];
@@ -101,6 +103,7 @@ export function ProspectingWizard({
   planLabel: string;
   searching: boolean;
   onLaunch: (params: WizardLaunchParams) => void;
+  lastSearchSnapshot: SearchParamsSnapshot | null;
 }) {
   // Métier modifiable EN PLACE (voir OwnActivityEditor) — état local, jamais
   // figé depuis le rendu serveur initial : changer d'activité doit
@@ -269,6 +272,21 @@ export function ProspectingWizard({
 
   const searchFlowVisible = !objective || objective.audience === "b2b" || showAdvancedB2bSearch;
   const canLaunch = Boolean(objective && address && targetIds.length > 0);
+
+  // "Paramètres modifiés" : les résultats actuellement affichés viennent de
+  // lastSearchSnapshot (la dernière recherche réellement lancée) — jamais
+  // remplacés tant que l'utilisateur n'a pas cliqué "Rechercher" à nouveau.
+  // Dès qu'un paramètre réellement envoyé à la recherche (métier/adresse/
+  // rayon/filtre) change, on le signale clairement au lieu de laisser
+  // croire que les résultats affichés correspondent à la sélection actuelle.
+  const currentSnapshot: SearchParamsSnapshot = {
+    targetIds,
+    lat: address?.lat ?? null,
+    lng: address?.lng ?? null,
+    radiusKm,
+    filters,
+  };
+  const paramsChangedSinceLastSearch = haveSearchParamsChanged(currentSnapshot, lastSearchSnapshot);
 
   function launch() {
     if (!objective || !address) return;
@@ -477,9 +495,15 @@ export function ProspectingWizard({
             </div>
           )}
 
+          {paramsChangedSinceLastSearch && (
+            <p className="mt-3 rounded-lg bg-amber-bg px-3 py-2 text-[12px] font-medium text-amber-fg">
+              Paramètres modifiés — les résultats ci-dessous correspondent à la recherche précédente. Relancez la
+              recherche pour les actualiser.
+            </p>
+          )}
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <Button onClick={launch} disabled={!canLaunch || searching}>
-              {searching ? "Recherche…" : "Rechercher les entreprises →"}
+              {searching ? "Recherche…" : paramsChangedSinceLastSearch ? "Rechercher avec ces paramètres →" : "Rechercher les entreprises →"}
             </Button>
             <Button variant="ghost" onClick={() => setRefineOpen((v) => !v)}>
               {refineOpen ? "Masquer les filtres supplémentaires" : "Filtres supplémentaires (optionnel)"}

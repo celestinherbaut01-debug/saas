@@ -10,6 +10,7 @@ import { addProspectsToCrm } from "@/lib/actions/prospects";
 import { runProspectSearch, type ProspectionSearchResponse } from "@/lib/actions/search";
 import { type ProspectionFilters } from "@/lib/prospecting-config";
 import { nafCodesForSelection } from "@/lib/prospecting-naf";
+import type { SearchParamsSnapshot } from "@/lib/prospecting-search-params";
 import { ResultCard, type ProspectionResult } from "@/components/prospection/result-card";
 import { ProspectingWizard, WEB_FILTER_LABEL, type WizardLaunchParams } from "@/components/prospection/prospecting-wizard";
 
@@ -48,6 +49,12 @@ export function ProspectionView({
   // message générique "aucune cible pertinente" qui laisserait croire à un
   // problème de zone/métier alors que le registre en contient bien.
   const [lastSearchMeta, setLastSearchMeta] = useState<{ registryFound: number; webFilter: ProspectionFilters["webFilter"] } | null>(null);
+  // Paramètres de la DERNIÈRE recherche réellement exécutée avec succès —
+  // jamais mis à jour sur un échec (les résultats affichés restent alors
+  // ceux d'avant). Comparé en direct à l'état courant du formulaire dans
+  // ProspectingWizard pour afficher "Paramètres modifiés" sans jamais
+  // remplacer silencieusement les résultats avant une relance explicite.
+  const [lastSearchSnapshot, setLastSearchSnapshot] = useState<SearchParamsSnapshot | null>(null);
   const router = useRouter();
 
   const nafToLabel = useMemo(() => {
@@ -119,6 +126,7 @@ export function ProspectionView({
     setManuallyVerified(new Set());
     setHasSearched(true);
     setLastSearchMeta({ registryFound: data.registryFound, webFilter: params.filters.webFilter });
+    setLastSearchSnapshot({ targetIds: params.targetIds, lat: params.address.lat, lng: params.address.lng, radiusKm: params.radiusKm, filters: params.filters });
 
     // Message construit à partir des vraies catégories/zone recherchées —
     // jamais "162 trouvé(s), 0 affiché(s)" sans contexte (le nombre final
@@ -229,6 +237,7 @@ export function ProspectionView({
         planLabel={planLabel}
         searching={searching}
         onLaunch={runSearch}
+        lastSearchSnapshot={lastSearchSnapshot}
       />
 
       {status && (

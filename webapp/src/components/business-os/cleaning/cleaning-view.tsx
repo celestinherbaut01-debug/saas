@@ -3,11 +3,12 @@
 import { CleaningOperations } from "@/components/business-os/cleaning/cleaning-operations";
 
 import { useMemo, useState } from "react";
-import type { Customer, Site, Contract, Intervention, Incident, TeamMember, InventoryItem, BusinessDocument } from "@/lib/supabase/types";
+import type { Customer, Site, Contract, Intervention, Incident, TeamMember, InventoryItem, BusinessDocument, DocumentItem } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeCleaningAlerts } from "@/lib/cleaning";
 import { computeCleaningCommandCenter } from "@/lib/command-center";
+import { makeDocumentHandlers } from "@/lib/business-os-handlers/document-handlers";
 import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { InventoryModule } from "@/components/business-os/inventory-module";
@@ -21,7 +22,7 @@ import { QualityModule } from "@/components/business-os/cleaning/cleaning-qualit
 import { IncidentsModule } from "@/components/business-os/cleaning/cleaning-incidents";
 import { CleaningDashboard } from "@/components/business-os/cleaning/cleaning-dashboard";
 
-type Tab = "operations" | "today" | "dashboard" | "customers" | "sites" | "contracts" | "interventions" | "planning" | "quality" | "team" | "inventory" | "incidents" | "invoices";
+type Tab = "operations" | "today" | "dashboard" | "customers" | "sites" | "contracts" | "interventions" | "planning" | "quality" | "team" | "inventory" | "incidents" | "quotes" | "invoices";
 
 const TABS: { key: Tab; label: string; advancedOnly?: boolean }[] = [
   { key: "today", label: "Aujourd'hui" },
@@ -36,6 +37,7 @@ const TABS: { key: Tab; label: string; advancedOnly?: boolean }[] = [
   { key: "team", label: "Employés" },
   { key: "inventory", label: "Matériel & Stock" },
   { key: "incidents", label: "Incidents" },
+  { key: "quotes", label: "Devis" },
   { key: "invoices", label: "Facturation" },
 ];
 
@@ -50,6 +52,7 @@ export function CleaningView({
   initialTeamMembers,
   initialInventory,
   initialDocuments,
+  initialDocumentItems,
 }: {
   workspaceId: string;
   isAdvanced: boolean;
@@ -61,6 +64,7 @@ export function CleaningView({
   initialTeamMembers: TeamMember[];
   initialInventory: InventoryItem[];
   initialDocuments: BusinessDocument[];
+  initialDocumentItems: DocumentItem[];
 }) {
   const supabase = createClient();
   const [mutationError,setMutationError]=useState<string|null>(null);
@@ -75,6 +79,22 @@ export function CleaningView({
   const [teamMembers, setTeamMembers] = useState(initialTeamMembers);
   const [inventory, setInventory] = useState(initialInventory);
   const [documents, setDocuments] = useState(initialDocuments);
+  const [documentItems, setDocumentItems] = useState<Record<string, DocumentItem[]>>(() => {
+    const map: Record<string, DocumentItem[]> = {};
+    for (const item of initialDocumentItems) (map[item.document_id] ??= []).push(item);
+    return map;
+  });
+
+  const { createDocument, deleteDraftDocument, convertQuoteToInvoice } = makeDocumentHandlers({
+    supabase,
+    workspaceId,
+    linkField: "contract_id",
+    getDocuments: () => documents,
+    setDocuments,
+    getDocumentItems: () => documentItems,
+    setDocumentItems,
+    setMutationError,
+  });
 
   const alerts = useMemo(() => computeCleaningAlerts({ contracts, interventions, incidents }, isAdvanced), [contracts, interventions, incidents, isAdvanced]);
   const commandCenter = useMemo(() => computeCleaningCommandCenter({ interventions, incidents, contracts }), [interventions, incidents, contracts]);
@@ -326,14 +346,35 @@ export function CleaningView({
       {active === "team" && <TeamModule label="Employés" rows={teamMembers} workloadOf={(id) => `${interventions.filter((it) => it.team_member_id === id && it.status === "planned").length} planifiée(s)`} onCreate={createTeamMember} onUpdate={updateTeamMember} onRemove={removeTeamMember} />}
       {active === "inventory" && <InventoryModule key={`${active}-${focusId}`} initialFocusId={focusId} workspaceId={workspaceId} initial={inventory} label="Matériel & Consommables" controlled={{ rows: inventory, onCreate: createInventoryItem, onUpdate: updateInventoryItem, onRemove: removeInventoryItem }} />}
       {active === "incidents" && <IncidentsModule key={`${active}-${focusId}`} initialFocusId={focusId} rows={incidents} sites={sites} onCreate={createIncident} onUpdate={updateIncident} onRemove={removeIncident} />}
+      {active === "quotes" && (
+        <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
+          docType="quote"
+          rows={documents}
+          itemsByDocument={documentItems}
+          customers={customers}
+          resolveLinkedLabel={(d) => (d.contract_id ? contracts.find((c) => c.id === d.contract_id)?.site_name ?? "—" : "—")}
+          emptyHint="Devis créés manuellement, liés à un contrat ou non."
+          onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocument("quote", input)}
+          onDeleteDraft={deleteDraftDocument}
+          onConvertToInvoice={convertQuoteToInvoice}
+          linkLabel="Contrat"
+          linkOptions={contracts.map((c) => ({ id: c.id, label: c.site_name }))}
+        />
+      )}
       {active === "invoices" && (
         <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="invoice"
           rows={documents}
+          itemsByDocument={documentItems}
           customers={customers}
           resolveLinkedLabel={(d) => (d.contract_id ? contracts.find((c) => c.id === d.contract_id)?.site_name ?? "—" : "—")}
-          emptyHint="Ouvrez un contrat pour créer une facture (montant repris du prix mensuel, modifiable)."
+          emptyHint="Créez une facture manuellement, liée à un contrat ou non."
           onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocument("invoice", input)}
+          onDeleteDraft={deleteDraftDocument}
+          linkLabel="Contrat"
+          linkOptions={contracts.map((c) => ({ id: c.id, label: c.site_name }))}
         />
       )}
     </div>

@@ -404,12 +404,12 @@ export function StudioView({
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-extrabold">Studio IA</h1>
+          <h1 className="font-display text-2xl font-extrabold">Communication</h1>
           <p className="mt-1 text-[13px] text-muted">
-            Transformez une offre en contenu prêt à publier, adapté à {STUDIO_VERTICAL_LABEL[vertical]} — jamais de caractéristique inventée, votre Brand Kit ({brandKit.tone}) est déjà appliqué.
+            Créez vos communications à partir de vos vraies offres et informations, adaptées à {STUDIO_VERTICAL_LABEL[vertical]} — jamais de caractéristique inventée, votre Brand Kit ({brandKit.tone}) est déjà appliqué.
           </p>
         </div>
-        <Button onClick={openNewForm}>+ Nouvelle création</Button>
+        <Button onClick={openNewForm}>+ Créer une communication</Button>
       </div>
 
       <div className="flex flex-wrap gap-1.5">
@@ -436,7 +436,7 @@ export function StudioView({
           icon="🎨"
           title={statusFilter === "draft" ? "Aucun brouillon pour l'instant" : `Aucune création ${STATUS_TABS.find((s) => s.key === statusFilter)?.label.toLowerCase()}`}
           description="Créez votre première campagne à partir d'un produit, service, bien, réalisation, événement ou promotion."
-          action={<Button onClick={openNewForm}>+ Nouvelle création</Button>}
+          action={<Button onClick={openNewForm}>+ Créer une communication</Button>}
         />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

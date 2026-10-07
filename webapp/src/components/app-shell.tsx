@@ -75,7 +75,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
           </>
         )}
         <NavLink href="/studio" icon="🎨">
-          Studio IA
+          Communication
         </NavLink>
       </NavSection>
 

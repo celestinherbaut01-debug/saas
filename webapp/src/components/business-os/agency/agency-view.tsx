@@ -3,11 +3,13 @@
 import { AgencyProduction } from "@/components/business-os/agency/agency-production";
 
 import { useMemo, useState } from "react";
-import type { Customer, Project, ClientSite, Ticket, Task, TeamMember, BusinessDocument } from "@/lib/supabase/types";
+import type { Customer, Project, ClientSite, Ticket, Task, TeamMember, BusinessDocument, DocumentItem, PlanningEntry } from "@/lib/supabase/types";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { computeAgencyAlerts } from "@/lib/agency";
 import { computeAgencyCommandCenter } from "@/lib/command-center";
+import { makeDocumentHandlers } from "@/lib/business-os-handlers/document-handlers";
+import { makePlanningHandlers } from "@/lib/business-os-handlers/planning-handlers";
 import { CommandCenter } from "@/components/business-os/command-center";
 import { CustomersModule } from "@/components/business-os/customers-module";
 import { TeamModule } from "@/components/business-os/team-module";
@@ -19,7 +21,7 @@ import { TasksModule } from "@/components/business-os/agency/agency-tasks";
 import { PlanningModule } from "@/components/business-os/agency/agency-planning";
 import { AgencyDashboard } from "@/components/business-os/agency/agency-dashboard";
 
-type Tab = "production" | "today" | "dashboard" | "customers" | "projects" | "sites" | "tickets" | "tasks" | "planning" | "team" | "invoices";
+type Tab = "production" | "today" | "dashboard" | "customers" | "projects" | "sites" | "tickets" | "tasks" | "planning" | "team" | "quotes" | "invoices";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "today", label: "Aujourd'hui" },
@@ -32,6 +34,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "tasks", label: "Tâches" },
   { key: "planning", label: "Planning" },
   { key: "team", label: "Équipe" },
+  { key: "quotes", label: "Devis" },
   { key: "invoices", label: "Factures" },
 ];
 
@@ -45,6 +48,8 @@ export function AgencyView({
   initialTasks,
   initialTeamMembers,
   initialDocuments,
+  initialDocumentItems,
+  initialPlanningEntries,
 }: {
   workspaceId: string;
   isAdvanced: boolean;
@@ -55,6 +60,8 @@ export function AgencyView({
   initialTasks: Task[];
   initialTeamMembers: TeamMember[];
   initialDocuments: BusinessDocument[];
+  initialDocumentItems: DocumentItem[];
+  initialPlanningEntries: PlanningEntry[];
 }) {
   const supabase = createClient();
   const [mutationError,setMutationError]=useState<string|null>(null);
@@ -68,6 +75,30 @@ export function AgencyView({
   const [tasks, setTasks] = useState(initialTasks);
   const [teamMembers, setTeamMembers] = useState(initialTeamMembers);
   const [documents, setDocuments] = useState(initialDocuments);
+  const [documentItems, setDocumentItems] = useState<Record<string, DocumentItem[]>>(() => {
+    const map: Record<string, DocumentItem[]> = {};
+    for (const item of initialDocumentItems) (map[item.document_id] ??= []).push(item);
+    return map;
+  });
+
+  const { createDocument, deleteDraftDocument, convertQuoteToInvoice } = makeDocumentHandlers({
+    supabase,
+    workspaceId,
+    linkField: "project_id",
+    getDocuments: () => documents,
+    setDocuments,
+    getDocumentItems: () => documentItems,
+    setDocumentItems,
+    setMutationError,
+  });
+
+  const [planningEntries, setPlanningEntries] = useState(initialPlanningEntries);
+  const { createPlanningEntry, updatePlanningEntry, deletePlanningEntry } = makePlanningHandlers({
+    supabase,
+    workspaceId,
+    setEntries: setPlanningEntries,
+    setMutationError,
+  });
 
   const alerts = useMemo(() => computeAgencyAlerts({ sites, projects, tickets }, isAdvanced), [sites, projects, tickets, isAdvanced]);
   const commandCenter = useMemo(() => computeAgencyCommandCenter({ sites, tickets, projects, documents, tasks }), [sites, tickets, projects, documents, tasks]);
@@ -292,16 +323,48 @@ export function AgencyView({
       {active === "sites" && <SitesModule key={`${active}-${focusId}`} initialFocusId={focusId} rows={sites} customers={customers} projects={projects} onCreate={createSite} onUpdate={updateSite} onRemove={removeSite} />}
       {active === "tickets" && <TicketsModule key={`${active}-${focusId}`} initialFocusId={focusId} rows={tickets} customers={customers} sites={sites} onCreate={createTicket} onUpdate={updateTicket} onRemove={removeTicket} />}
       {active === "tasks" && <TasksModule rows={tasks} projects={projects} onCreate={createTask} onToggle={toggleTask} onRemove={removeTask} />}
-      {active === "planning" && <PlanningModule tasks={tasks} projects={projects} />}
+      {active === "planning" && (
+        <PlanningModule
+          tasks={tasks}
+          projects={projects}
+          entries={planningEntries}
+          customers={customers}
+          teamMembers={teamMembers}
+          onCreateEntry={createPlanningEntry}
+          onUpdateEntryStatus={(id, status) => updatePlanningEntry(id, { status })}
+          onDeleteEntry={deletePlanningEntry}
+        />
+      )}
       {active === "team" && <TeamModule label="Équipe" rows={teamMembers} onCreate={createTeamMember} onUpdate={updateTeamMember} onRemove={removeTeamMember} />}
+      {active === "quotes" && (
+        <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
+          docType="quote"
+          rows={documents}
+          itemsByDocument={documentItems}
+          customers={customers}
+          resolveLinkedLabel={(d) => (d.project_id ? projects.find((p) => p.id === d.project_id)?.name ?? "—" : "—")}
+          emptyHint="Devis créés manuellement ou liés à un projet."
+          onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocument("quote", input)}
+          onDeleteDraft={deleteDraftDocument}
+          onConvertToInvoice={convertQuoteToInvoice}
+          linkLabel="Projet"
+          linkOptions={projects.map((p) => ({ id: p.id, label: p.name }))}
+        />
+      )}
       {active === "invoices" && (
         <DocumentsModule key={`${active}-${focusId}`} initialFocusId={focusId}
           docType="invoice"
           rows={documents}
+          itemsByDocument={documentItems}
           customers={customers}
           resolveLinkedLabel={(d) => (d.project_id ? projects.find((p) => p.id === d.project_id)?.name ?? "—" : "—")}
-          emptyHint="Ouvrez un projet pour créer une facture (montant repris du budget, modifiable)."
+          emptyHint="Créez une facture manuellement, ou depuis un projet (montant repris du budget)."
           onSetStatus={setDocumentStatus}
+          onCreate={(input) => createDocument("invoice", input)}
+          onDeleteDraft={deleteDraftDocument}
+          linkLabel="Projet"
+          linkOptions={projects.map((p) => ({ id: p.id, label: p.name }))}
         />
       )}
     </div>
