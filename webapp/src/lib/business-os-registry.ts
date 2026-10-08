@@ -6,5 +6,6 @@ export const BUSINESS_OS_REGISTRY:Record<BusinessOsVertical,{workflow:readonly s
  cleaning:{workflow:["Client","Site","Contrat","Équipe","Intervention","Qualité","Facture"],scope:"Les interventions et les équipes sur le terrain"},
  restaurant:{workflow:["Fournisseur","Réception","Stock","Recette","Coût matière","Pertes","Réapprovisionnement"],scope:"Les ingrédients, les recettes et l’approvisionnement"},
  realestate:{workflow:["Propriétaire","Bien","Mandat","Publication","Visite","Offre","Vente / location"],scope:"Les biens, leurs acquéreurs et leur commercialisation"},
+ butcher:{workflow:["Produit","Catégorie","Fournisseur","Commande","Réception","Lot / DLC","Mouvement de stock","Perte"],scope:"Les produits, le stock et les fournisseurs"},
  generic:{workflow:["Client","Stock","Rendez-vous"],scope:"Le socle commun : clients, stock et rendez-vous. Aucun workflow spécialisé pour ce métier actuellement"},
 };

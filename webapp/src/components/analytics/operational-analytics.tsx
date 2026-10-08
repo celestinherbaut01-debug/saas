@@ -4,8 +4,8 @@ import { getWorkspacePlan } from "@/lib/plan";
 import { businessOsAtLeast } from "@/lib/entitlements";
 import { checkedAll } from "@/lib/data-state";
 import { PROPERTY_STAGES } from "@/lib/realestate";
-const SOURCES={garage:{table:"repair_orders",name:"Ordres atelier"},agency:{table:"projects",name:"Projets"},cleaning:{table:"interventions",name:"Interventions"},restaurant:{table:"purchase_orders",name:"Commandes fournisseur"},realestate:{table:"properties",name:"Biens"}} as const;
-const LABELS:Record<string,string>={diagnostic:"Diagnostic",quote:"Devis",accepted:"Validé / accepté",waiting_parts:"Pièces attendues",in_progress:"En cours",done:"Terminé",delivered:"Livré",maintenance:"Maintenance",planned:"Planifié",missed:"Non réalisé",draft:"Brouillon",ordered:"Commandé",received:"Reçu",canceled:"Annulé",...Object.fromEntries(PROPERTY_STAGES)};
+const SOURCES={garage:{table:"repair_orders",name:"Ordres atelier"},agency:{table:"projects",name:"Projets"},cleaning:{table:"interventions",name:"Interventions"},restaurant:{table:"purchase_orders",name:"Commandes fournisseur"},realestate:{table:"properties",name:"Biens"},butcher:{table:"supplier_orders",name:"Commandes fournisseurs"}} as const;
+const LABELS:Record<string,string>={diagnostic:"Diagnostic",quote:"Devis",accepted:"Validé / accepté",waiting_parts:"Pièces attendues",in_progress:"En cours",done:"Terminé",delivered:"Livré",maintenance:"Maintenance",planned:"Planifié",missed:"Non réalisé",draft:"Brouillon",ordered:"Commandé",received:"Reçu",sent:"Envoyée",confirmed:"Confirmée",canceled:"Annulé",...Object.fromEntries(PROPERTY_STAGES)};
 export async function OperationalAnalytics({workspaceId}:{workspaceId:string}) {
  if(!businessOsAtLeast(await getWorkspacePlan(workspaceId),"standard"))return null;
  const profile=await getCachedBusinessOsProfile(workspaceId);if(profile.vertical==="generic")return null;

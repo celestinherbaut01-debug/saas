@@ -25,6 +25,7 @@ import { GarageView } from "@/components/business-os/garage/garage-view";
 import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
 import { AgencyView } from "@/components/business-os/agency/agency-view";
 import { RestaurantView } from "@/components/business-os/restaurant/restaurant-view";
+import { ButcherView } from "@/components/business-os/butcher/butcher-view";
 
 async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
   const user = await getCachedUser();
@@ -148,6 +149,55 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
       supabase.from("customers").select("*").eq("workspace_id",workspaceId).is("archived_at",null),
     ]);
     return <AppShell><div className="space-y-6">{header}{opportunitiesBlock}<RealEstateView customers={customers.data??[]} key={propertyId??"estate"} initialPropertyId={propertyId} workspaceId={workspaceId} initial={{owners:owners.data??[],properties:properties.data??[],mandates:mandates.data??[],buyers:buyers.data??[],visits:visits.data??[],offers:offers.data??[]}}/></div></AppShell>;
+  }
+
+  // Boucherie a sa propre vue dédiée : produits/catégories/fournisseurs/
+  // commandes/réceptions/mouvements de stock — un vrai workflow métier, pas
+  // un relabelling du socle générique (voir components/business-os/butcher/).
+  if (vertical === "butcher") {
+    const [
+      { data: customers },
+      { data: suppliers },
+      { data: categories },
+      { data: items },
+      { data: movements },
+      { data: orders },
+      { data: orderItems },
+      { data: receptions },
+    ] = await checkedAll([
+      supabase.from("customers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("suppliers").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("created_at", { ascending: false }),
+      supabase.from("inventory_categories").select("*").eq("workspace_id", workspaceId).order("sort_order"),
+      supabase.from("inventory_items").select("*").eq("workspace_id", workspaceId).is("archived_at", null).order("name"),
+      supabase.from("inventory_movements").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+      supabase.from("supplier_orders").select("*").eq("workspace_id", workspaceId).order("ordered_at", { ascending: false }),
+      supabase.from("supplier_order_items").select("*").eq("workspace_id", workspaceId),
+      supabase.from("goods_receptions").select("*").eq("workspace_id", workspaceId).order("received_at", { ascending: false }),
+    ]);
+
+    const lowStockCount = (items ?? []).filter((i) => i.low_stock_threshold != null && i.quantity <= i.low_stock_threshold).length;
+    const insights: ProactiveInsight[] = [buildLowStockInsight(lowStockCount, automationSettings)].filter((i): i is ProactiveInsight => i !== null);
+
+    return (
+      <AppShell>
+        <div className="flex flex-col gap-5">
+          {header}
+          {opportunitiesBlock}
+          <ProactiveInsights insights={insights} />
+          <ButcherView
+            workspaceId={workspaceId}
+            initialCustomers={customers ?? []}
+            initialSuppliers={suppliers ?? []}
+            initialCategories={categories ?? []}
+            initialItems={items ?? []}
+            initialMovements={movements ?? []}
+            initialOrders={orders ?? []}
+            initialOrderItems={orderItems ?? []}
+            initialReceptions={receptions ?? []}
+          />
+        </div>
+      </AppShell>
+    );
   }
 
   // Garage a sa propre vue dédiée (bien plus riche que les 3 modules

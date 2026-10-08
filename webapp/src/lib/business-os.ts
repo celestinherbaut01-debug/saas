@@ -16,7 +16,7 @@
 // verticale "generic" — seuls les métiers feuilles listés ci-dessous, dont
 // le workflow correspond vraiment, déclenchent la verticale dédiée.
 
-export type BusinessOsVertical = "garage" | "cleaning" | "agency" | "restaurant" | "realestate" | "generic";
+export type BusinessOsVertical = "garage" | "cleaning" | "agency" | "restaurant" | "realestate" | "butcher" | "generic";
 
 export interface BusinessOsProfile {
   vertical: BusinessOsVertical;
@@ -65,6 +65,10 @@ const AGENCY_PROFILE: BusinessOsProfile = {
 // n'en font pas et restent sur le profil de famille (generic, ci-dessous).
 const LEAF_PROFILES: Record<string, BusinessOsProfile> = {
   realestate: { vertical: "realestate", osName: "Immobilier OS", icon: "⌂", customersLabel: "Propriétaires", inventoryLabel: "Biens", appointmentsLabel: "Visites" },
+  // Boucherie : vrai workflow produits/catégories/fournisseurs/réceptions/
+  // mouvements de stock (voir components/business-os/butcher/) — pas un
+  // simple relabelling du socle générique.
+  butcher: { vertical: "butcher", osName: "Boucherie OS", icon: "🥩", customersLabel: "Clients", inventoryLabel: "Produits", appointmentsLabel: "Livraisons" },
   cleaning: {
     vertical: "cleaning",
     osName: "Nettoyage OS",

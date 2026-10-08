@@ -5,11 +5,13 @@ import {propertyToStudioInput,estateAttention,type Property,type RealEstateData}
 import {generateStudioContent} from '../src/lib/studio/generator';
 import {DEFAULT_BRAND_KIT} from '../src/lib/studio/types';
 import {checkedAll,DataLoadError,classifyDataError,requireRead} from '../src/lib/data-state';
-import {computeGarageCommandCenter,computeCleaningCommandCenter,computeAgencyCommandCenter,computeRestaurantCommandCenter} from '../src/lib/command-center';
+import {computeGarageCommandCenter,computeCleaningCommandCenter,computeAgencyCommandCenter,computeRestaurantCommandCenter,computeButcherCommandCenter} from '../src/lib/command-center';
+import {computeButcherAlerts} from '../src/lib/butcher';
 const property={id:'property',workspace_id:'workspace',created_at:'2026-10-06T07:00:00Z',updated_at:'2026-10-06T07:00:00Z',title:'Bien de test',owner_id:null,property_type:null,address:null,city:null,surface_m2:null,rooms:null,bedrooms:null,price:null,description:'',features:[],status:'to_publish',transaction_type:'sale',photos:[],dpe:null} as Property;
 test('a real estate agent receives its vertical; an expert and unknown job use the honest fallback',()=>{
  assert.equal(getBusinessOsProfile('immobilier','realestate').vertical,'realestate');assert.equal(getBusinessOsProfile('immobilier','expertise').vertical,'generic');
  assert.equal(getBusinessOsProfile('automobile','garages').vertical,'garage');assert.equal(getBusinessOsProfile('numerique-communication','web').vertical,'agency');assert.equal(getBusinessOsProfile('services-b2b','cleaning').vertical,'cleaning');assert.equal(getBusinessOsProfile('restauration','restaurants').vertical,'restaurant');
+ assert.equal(getBusinessOsProfile(null,'butcher').vertical,'butcher');assert.equal(getBusinessOsProfile('n-importe-quoi','butcher').osName,'Boucherie OS');
 });
 test('unfilled property fields are never inferred in five channel outputs',()=>{
  const input=propertyToStudioInput(property);assert.equal(input.price,null);assert.equal(input.surfaceM2,null);assert.deepEqual(input.highlights,[]);
@@ -34,6 +36,24 @@ test('all four command centers preserve object references and signal genuine blo
  const cleaning=computeCleaningCommandCenter({interventions:[{id:'intervention',scheduled_at:new Date().toISOString(),status:'planned',team_member_id:null}] as never,incidents:[],contracts:[]});assert.equal(cleaning.blockers?.[0].detailId,'intervention');
  const agency=computeAgencyCommandCenter({sites:[],projects:[],tickets:[],documents:[],tasks:[{id:'task',title:'Test',blocked:true,done:false}] as never});assert.ok(agency.actions.some(a=>a.tab==='production'&&a.priority===3));
  const restaurant=computeRestaurantCommandCenter({appointments:[],purchaseOrders:[],inventory:[{id:'ingredient',name:'Test',quantity:2,unit:'kg',low_stock_threshold:3}] as never});assert.equal(restaurant.blockers?.[0].detailId,'ingredient');
+});
+test('butcher alerts only flag what was really recorded — no invented regulatory traceability',()=>{
+ const items=[{id:'item',name:'Entrecôte',quantity:1,unit:'kg',low_stock_threshold:2,archived_at:null} as never];
+ const soon=new Date(Date.now()+2*24*60*60*1000).toISOString().slice(0,10);
+ const movements=[{id:'m1',item_id:'item',type:'reception',quantity_delta:5,expires_on:soon,lot_number:'L42',created_at:new Date().toISOString()} as never];
+ const orders=[{id:'o1',status:'sent',ordered_at:new Date().toISOString(),expected_at:new Date(Date.now()-86400000).toISOString()} as never];
+ const alerts=computeButcherAlerts({items,movements,orders});
+ assert.ok(alerts.some(a=>a.level==='danger'&&a.text.includes('stock bas')));
+ assert.ok(alerts.some(a=>a.text.includes('L42')&&a.level==='danger'));
+ assert.ok(alerts.some(a=>a.text.includes('attendue')));
+ // Un lot sans DLC saisie ne doit jamais générer d'alerte DLC inventée.
+ const noDlc=computeButcherAlerts({items:[],movements:[{id:'m2',item_id:'item',type:'reception',quantity_delta:5,expires_on:null,lot_number:null,created_at:new Date().toISOString()} as never],orders:[]});
+ assert.equal(noDlc.length,0);
+});
+test('butcher command center signals low stock as a blocker with the item id',()=>{
+ const items=[{id:'item',name:'Saucisses',quantity:0,unit:'kg',low_stock_threshold:1,archived_at:null} as never];
+ const cc=computeButcherCommandCenter({items,movements:[],orders:[]});
+ assert.equal(cc.blockers?.[0].detailId,'item');
 });
 
 import {nafCodesForSelection} from '../src/lib/prospecting-naf';

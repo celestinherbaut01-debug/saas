@@ -30,6 +30,7 @@ const VISUAL_IDEA: Record<BusinessOsVertical, string> = {
   cleaning: "Photo avant/après d'une prestation récente, avec la zone couverte en texte.",
   agency: "Visuel épuré avec votre logo + celui d'un client existant (avec son accord), et l'offre en une phrase.",
   restaurant: "Photo d'un plat ou de la salle au moment ciblé (ex. mercredi soir), avec l'offre en surimpression.",
+  butcher: "Photo réelle de la vitrine ou d'un produit phare, avec l'offre en texte court.",
   generic: "Une photo réelle de votre activité (jamais une image générique) avec l'offre en texte court.",
 };
 
@@ -39,6 +40,7 @@ const AUDIENCE_LABEL: Record<BusinessOsVertical, string> = {
   cleaning: "les entreprises et copropriétés de votre zone qui n'ont pas encore de contrat récurrent",
   agency: "les entreprises de votre zone dont le site ou la présence en ligne est daté",
   restaurant: "vos clients passés et les habitants/salariés à proximité",
+  butcher: "vos clients passés et les habitants/salariés à proximité",
   generic: "vos clients passés et les prospects de votre zone",
 };
 

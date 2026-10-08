@@ -36,6 +36,7 @@ const APPOINTMENT_COPY: Record<BusinessOsVertical, { title: string; desc: string
   cleaning: { title: "Rappels d'interventions", desc: "NOVA vous signale les interventions planifiées bientôt." },
   restaurant: { title: "Rappels de rendez-vous", desc: "NOVA vous signale les rendez-vous à venir." },
   agency: { title: "Rappels de rendez-vous", desc: "NOVA vous signale les rendez-vous à venir." },
+  butcher: { title: "Rappels de livraisons", desc: "NOVA vous signale les commandes fournisseurs attendues bientôt." },
   generic: { title: "Rappels de rendez-vous", desc: "NOVA vous signale les rendez-vous à venir." },
 };
 

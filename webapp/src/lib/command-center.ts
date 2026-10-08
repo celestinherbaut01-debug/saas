@@ -11,6 +11,8 @@ import type {
   PurchaseOrder,
   InventoryItem,
   Appointment,
+  InventoryMovement,
+  SupplierOrder,
 } from "@/lib/supabase/types";
 
 // "Votre entreprise aujourd'hui" — le Command Center de chaque verticale
@@ -300,5 +302,50 @@ export function computeRestaurantCommandCenter({
 
 export function hasAnythingToShow(data: CommandCenterData): boolean {
   return data.today.length > 0 || data.actions.length > 0 || data.opportunities.length > 0;
+}
+
+// ---------------------------------------------------------------------------
+// BOUCHERIE
+// ---------------------------------------------------------------------------
+export function computeButcherCommandCenter({
+  items,
+  movements,
+  orders,
+}: {
+  items: InventoryItem[];
+  movements: InventoryMovement[];
+  orders: SupplierOrder[];
+}): CommandCenterData {
+  const now = new Date();
+  const active = items.filter((i) => !i.archived_at);
+  const lowStock = active.filter((i) => i.low_stock_threshold != null && i.quantity <= i.low_stock_threshold);
+  const pendingOrders = orders.filter((o) => o.status === "sent" || o.status === "confirmed");
+  const sevenDays = 7 * 24 * 60 * 60 * 1000;
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  const expiringSoon = movements.filter(
+    (m) => m.type === "reception" && m.expires_on && new Date(m.expires_on).getTime() - now.getTime() >= 0 && new Date(m.expires_on).getTime() - now.getTime() <= sevenDays,
+  );
+
+  const today: string[] = [];
+  if (lowStock.length > 0) today.push(`${lowStock.length} produit${plural(lowStock.length, "", "s")} en stock bas`);
+  if (expiringSoon.length > 0) today.push(`${expiringSoon.length} lot${plural(expiringSoon.length, "", "s")} à DLC proche`);
+  if (pendingOrders.length > 0) today.push(`${pendingOrders.length} commande${plural(pendingOrders.length, "", "s")} fournisseur en attente`);
+  if (today.length === 0) today.push("Rien d'urgent côté stock aujourd'hui");
+
+  const actions: CommandCenterAction[] = [];
+  for (const i of lowStock.slice(0, 5)) actions.push({ text: `Commander ${i.name} (${i.quantity} ${i.unit} restant${plural(i.quantity, "", "s")})`, tab: "products", detailId: i.id });
+  for (const m of expiringSoon.slice(0, 5)) {
+    const item = itemById.get(m.item_id);
+    actions.push({ text: `Vérifier le lot${m.lot_number ? ` ${m.lot_number}` : ""} de ${item?.name ?? "produit"} (DLC ${new Date(m.expires_on!).toLocaleDateString("fr-FR")})`, tab: "movements" });
+  }
+
+  const opportunities: CommandCenterAction[] = [];
+
+  return {
+    today,
+    actions,
+    opportunities,
+    blockers: lowStock.map((i) => ({ text: `${i.name} : ${i.quantity} ${i.unit}`, tab: "products", detailId: i.id, reason: `Au seuil ou sous le seuil de ${i.low_stock_threshold} ${i.unit}`, priority: 3 })),
+  };
 }
 
