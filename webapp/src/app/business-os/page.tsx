@@ -26,6 +26,7 @@ import { CleaningView } from "@/components/business-os/cleaning/cleaning-view";
 import { AgencyView } from "@/components/business-os/agency/agency-view";
 import { RestaurantView } from "@/components/business-os/restaurant/restaurant-view";
 import { ButcherView } from "@/components/business-os/butcher/butcher-view";
+import { MetierSwitcher } from "@/components/business-os/metier-switcher";
 
 async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
   const user = await getCachedUser();
@@ -59,10 +60,12 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
 
   const isAdvanced = businessOsAtLeast(plan, "advanced");
 
-  const [businessProfile, profile, automationSettings] = await checkedAll([
+  const [businessProfile, profile, automationSettings, ownCategoryLabelRow, businessCategories] = await checkedAll([
     getCachedBusinessProfile(workspaceId),
     getCachedBusinessOsProfile(workspaceId),
     getCachedAutomationSettings(workspaceId),
+    supabase.from("business_profiles").select("own_category_label").eq("workspace_id", workspaceId).maybeSingle(),
+    supabase.from("business_categories").select("*").order("sort_order"),
   ]);
   const vertical = profile.vertical;
   const query=await searchParams;
@@ -118,9 +121,17 @@ async function BusinessOsPageContent({searchParams}:PageProps<"/business-os">) {
   const header = (
     <div className="flex items-center justify-between gap-3">
       <div>
-        <h1 className="font-display text-2xl font-extrabold">
-          {profile.icon} {profile.osName}
-        </h1>
+        <div className="flex items-center gap-2.5">
+          <h1 className="font-display text-2xl font-extrabold">
+            {profile.icon} {profile.osName}
+          </h1>
+          <MetierSwitcher
+            workspaceId={workspaceId}
+            categories={businessCategories.data ?? []}
+            ownCategoryId={businessProfile?.own_category_id ?? null}
+            ownCategoryLabel={ownCategoryLabelRow.data?.own_category_label ?? null}
+          />
+        </div>
         <p className="mt-1 text-[13px] text-muted">
           {BUSINESS_OS_REGISTRY[vertical].scope}.
         </p>

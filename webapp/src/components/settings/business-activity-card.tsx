@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { updateOwnCategory } from "@/lib/actions/settings";
 import { getBusinessOsProfile } from "@/lib/business-os";
+import { BUSINESS_OS_REGISTRY } from "@/lib/business-os-registry";
 
 function resolveProfile(categories: BusinessCategory[], categoryId: string | null) {
   if (!categoryId) return getBusinessOsProfile(null, null);
@@ -28,11 +29,14 @@ export function BusinessActivityCard({
   categories,
   ownCategoryId,
   ownCategoryLabel,
+  onSaved,
 }: {
   workspaceId: string;
   categories: BusinessCategory[];
   ownCategoryId: string | null;
   ownCategoryLabel: string | null;
+  /** Permet à un appelant (ex. le sélecteur de /business-os) de réagir une fois le changement persisté — ex. rafraîchir la page pour afficher immédiatement le nouveau Business OS. */
+  onSaved?: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -80,6 +84,7 @@ export function BusinessActivityCard({
       setEditing(false);
       setConfirming(false);
       setSaved(true);
+      onSaved?.();
     });
   }
 
@@ -112,6 +117,10 @@ export function BusinessActivityCard({
             Votre espace de gestion va être adapté au métier <strong>{draftDisplayLabel}</strong> ({draftProfile.osName}).
             Vos données existantes ne seront pas supprimées.
           </p>
+          <div className="text-[11.5px] text-muted">
+            <span className="font-semibold text-ink">Modules disponibles : </span>
+            {BUSINESS_OS_REGISTRY[draftProfile.vertical].workflow.join(" · ")}
+          </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={doSave} disabled={pending}>
               {pending ? "Enregistrement…" : "Confirmer le changement"}
